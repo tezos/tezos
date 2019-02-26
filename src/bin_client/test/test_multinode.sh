@@ -54,24 +54,48 @@ $client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_propagation_level 5
 
 endorse_hash=$($client3 endorse for bootstrap3 | extract_operation_hash)
-transfer_hash=$($client4 transfer 500 from bootstrap1 to bootstrap3 | extract_operation_hash)
+
+transfer4_hash1=$($client4 transfer 500 from bootstrap1 to bootstrap3 | extract_operation_hash)
+$client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
+transfer4_hash2=$($client4 transfer 400 from bootstrap1 to bootstrap3 | extract_operation_hash)
+$client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
+transfer4_hash3=$($client4 transfer 300 from bootstrap1 to bootstrap3 | extract_operation_hash)
+$client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
+
+sleep 2
+
+transfer3_hash1=$($client3 transfer 500 from bootstrap1 to bootstrap3 | extract_operation_hash)
+$client3 bake for bootstrap4 --max-priority 512 --minimal-timestamp
+transfer3_hash2=$($client3 transfer 400 from bootstrap1 to bootstrap3 | extract_operation_hash)
+$client3 bake for bootstrap4 --max-priority 512 --minimal-timestamp
+transfer3_hash3=$($client3 transfer 300 from bootstrap1 to bootstrap3 | extract_operation_hash)
+$client3 bake for bootstrap4 --max-priority 512 --minimal-timestamp
 
 # wait for the propagation of operations
 sleep 2
 
 assert_contains_operation() {
     hash="$1"
+    # hash = '' means that the transfer didn't succeed
+    if [ -z "$hash" ]; then
+      exit 2
+    fi
     printf "Asserting operations list contains '$hash'\n"
     for client in "${client_instances[@]}"; do
-        ( $client rpc get /chains/main/blocks/head/operation_hashes \
-              | assert_in_output $hash ) \
-            || exit 2
+        ( $client get receipt for $hash ) || exit 2
     done
 }
 
 $client4 bake for bootstrap4 --max-priority 512 --minimal-timestamp
 retry 2 15 assert_contains_operation $endorse_hash
-retry 2 15 assert_contains_operation $transfer_hash
+
+retry 2 15 assert_contains_operation $transfer4_hash1
+retry 2 15 assert_contains_operation $transfer4_hash2
+retry 2 15 assert_contains_operation $transfer4_hash3
+
+retry 2 15 assert_contains_operation $transfer3_hash1
+retry 2 15 assert_contains_operation $transfer3_hash2
+retry 2 15 assert_contains_operation $transfer3_hash3
 
 echo
 echo End of test

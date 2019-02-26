@@ -24,5 +24,24 @@
 (*****************************************************************************)
 
 module Name = struct let name = "demo" end
-module Environment = Tezos_client_environment.Environment.Make(Name)()
-include Tezos_protocol_demo.Functor.Make(Environment)
+module Demo_environment = Tezos_protocol_environment_faked.MakeV1(Name)()
+module Proto = Tezos_protocol_demo.Functor.Make(Demo_environment)
+module Demo_block_services = Block_services.Make(Proto)(Proto)
+include Proto
+
+class type rpc_context = object
+  inherit RPC_context.json
+  inherit [Shell_services.chain * Shell_services.block] Demo_environment.RPC_context.simple
+end
+
+class type full = object
+  inherit Client_context.full
+  inherit [Shell_services.chain * Shell_services.block] Demo_environment.RPC_context.simple
+end
+
+class wrap_full (t : Client_context.full) : full = object
+  inherit Client_context.proxy_context t
+  inherit [Shell_services.chain, Shell_services.block] Demo_environment.proto_rpc_context
+      (t :> RPC_context.t)
+      Shell_services.Blocks.path
+end

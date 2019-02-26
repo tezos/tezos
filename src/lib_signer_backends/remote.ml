@@ -80,12 +80,12 @@ module Make(S : sig
            | path -> Uri.with_path S.default (path ^ "/" ^ key))
     | _ -> assert false
 
-  let public_key pk_uri =
-    Remote.public_key
+  let public_key ?interactive pk_uri =
+    Remote.public_key ?interactive
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
-  let public_key_hash pk_uri =
-    Remote.public_key_hash
+  let public_key_hash ?interactive pk_uri =
+    Remote.public_key_hash ?interactive
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
   let neuterize sk_uri =
@@ -96,6 +96,20 @@ module Make(S : sig
       ?watermark
       (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
       msg
+
+  let deterministic_nonce sk_uri msg =
+    Remote.deterministic_nonce
+      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+      msg
+
+  let deterministic_nonce_hash sk_uri msg =
+    Remote.deterministic_nonce_hash
+      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
+      msg
+
+  let supports_deterministic_nonces sk_uri =
+    Remote.supports_deterministic_nonces
+      (Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)))
 
 end
 
@@ -186,4 +200,3 @@ let parse_base_uri s =
     | Some scheme -> failwith "Unknown scheme: %s" scheme
     | None -> failwith "Unknown scheme: <empty>"
   with Invalid_argument msg -> failwith "Malformed URI: %s" msg
-

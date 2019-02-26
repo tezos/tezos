@@ -13,6 +13,7 @@ depends: [
   "tezos-client-base"
   "tezos-rpc-http"
   "tezos-signer-services"
+  "tezos-shell-services"
   "pbkdf"
   "bip39"
   "ledgerwallet-tezos"

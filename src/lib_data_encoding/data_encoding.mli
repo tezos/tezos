@@ -559,7 +559,7 @@ module Json: sig
   val convert : 'a Encoding.t -> 'a Json_encoding.encoding
 
   (** Generate a schema from an {!encoding}. *)
-  val schema : 'a Encoding.t -> schema
+  val schema : ?definitions_path:string -> 'a Encoding.t -> schema
 
   (** Construct a JSON object from an encoding. *)
   val construct : 't Encoding.t -> 't -> json

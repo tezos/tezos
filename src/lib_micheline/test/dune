@@ -1,0 +1,25 @@
+(executables
+ (names test_parser)
+ (libraries tezos-micheline
+            alcotest-lwt)
+ (flags (:standard -w -9-32 -safe-string
+                   -open Tezos_micheline)))
+
+(alias
+  (name buildtest)
+  (deps test_parser.exe))
+
+(alias
+  (name runtest_micheline_parser)
+  (action (run %{exe:test_parser.exe})))
+
+(alias
+  (name runtest)
+  (deps (alias runtest_micheline_parser)))
+
+(alias
+  (name runtest_indent)
+  (deps (glob_files *.ml{,i}))
+  (action
+    (run bash
+      %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

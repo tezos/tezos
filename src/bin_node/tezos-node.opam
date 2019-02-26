@@ -19,6 +19,8 @@ depends: [
   "tezos-mempool-003-PsddFKi3"
   "cmdliner"
   "tls"
+  "cstruct" { < "3.4.0" } ## Because "tls" depends on a version of "nocrypto"
+                          ## that is not compatible with recent "cstruct"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

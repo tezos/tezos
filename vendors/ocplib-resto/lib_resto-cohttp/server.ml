@@ -86,8 +86,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
     | Ok x -> f x
     | Error err -> Lwt.return_error err
 
-  let callback server (_io, con) req body =
-    (* FIXME: check inbound adress *)
+  let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
     let uri = Request.uri req in
     let path = Uri.pct_decode (Uri.path uri) in
     lwt_log_info "(%s) receive request to %s"
@@ -96,6 +95,13 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
     let req_headers = Request.headers req in
     begin
       match Request.meth req with
+      | #Resto.meth when server.cors.allowed_origins <> [] &&
+                         not (Cors.check_host req_headers server.cors) ->
+          let headers =
+            Cohttp.Header.init_with "X-OCaml-Resto-CORS-Error" "invalid host" in
+          Lwt.return_ok
+            (Response.make ~headers ~status:`Forbidden (),
+             Cohttp_lwt.Body.empty)
       | #Resto.meth as meth -> begin
           Directory.lookup server.root ()
             meth path >>=? fun (Directory.Service s) ->
@@ -316,7 +322,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
       mode root =
     let default_media_type =
       match Media_type.first_complete_media media_types with
-      | None -> invalid_arg "RestoCohttp.launch(empty media type list)"
+      | None -> invalid_arg "Resto_directory_cohttp.launch(empty media type list)"
       | Some ((l, r), m) -> l^"/"^r, m in
     let stop, stopper = Lwt.wait () in
     let server = {

@@ -267,7 +267,7 @@ let commands () =
          begin
            if MBytes.get bytes 0 != '\005' then
              failwith "Not a piece of packed Michelson data (must start with `0x05`)"
-           else return ()
+           else return_unit
          end >>=? fun () ->
          (* Remove first byte *)
          let bytes = MBytes.sub bytes 1 ((MBytes.length bytes) - 1) in

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,12 +26,14 @@
 
 open Block_validator_worker_state
 open Block_validator_errors
-let invalid_block block error = Invalid_block { block ; error }
 
 type limits = {
   protocol_timeout: float ;
   worker_limits : Worker_types.limits ;
 }
+
+type validator_kind = Block_validator_process.validator_kind =
+  | Internal of Context.index
 
 module Name = struct
   type t = unit
@@ -43,9 +46,10 @@ module Types = struct
   include Worker_state
   type state = {
     protocol_validator: Protocol_validator.t ;
+    validation_process: Block_validator_process.t ;
     limits : limits ;
   }
-  type parameters = limits * Distributed_db.t
+  type parameters = limits * Distributed_db.t * Block_validator_process.validator_kind
   let view _state _parameters = ()
 end
 
@@ -71,197 +75,9 @@ end
 module Worker = Worker.Make (Name) (Event) (Request) (Types)
 
 type t = Worker.infinite Worker.queue Worker.t
-type error += Closed = Worker.Closed
 
 let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
-
-let check_header
-    (pred: State.Block.t) validation_passes hash (header: Block_header.t) =
-  let pred_header = State.Block.header pred in
-  fail_unless
-    (Int32.succ pred_header.shell.level = header.shell.level)
-    (invalid_block hash @@
-     Invalid_level { expected = Int32.succ pred_header.shell.level ;
-                     found = header.shell.level }) >>=? fun () ->
-  fail_unless
-    Time.(pred_header.shell.timestamp < header.shell.timestamp)
-    (invalid_block hash Non_increasing_timestamp) >>=? fun () ->
-  fail_unless
-    Fitness.(pred_header.shell.fitness < header.shell.fitness)
-    (invalid_block hash Non_increasing_fitness) >>=? fun () ->
-  fail_unless
-    (header.shell.validation_passes = validation_passes)
-    (invalid_block hash
-       (Unexpected_number_of_validation_passes header.shell.validation_passes)
-    ) >>=? fun () ->
-  return_unit
-
-let assert_no_duplicate_operations block live_operations operation_hashes =
-  fold_left_s (fold_left_s (fun live_operations oph ->
-      fail_when (Operation_hash.Set.mem oph live_operations)
-        (invalid_block block @@ Replayed_operation oph) >>=? fun () ->
-      return (Operation_hash.Set.add oph live_operations)))
-    live_operations operation_hashes >>=? fun _ ->
-  return_unit
-
-let assert_operation_liveness block live_blocks operations =
-  iter_s (iter_s (fun op ->
-      fail_unless
-        (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
-        (invalid_block block @@
-         Outdated_operation { operation = Operation.hash op ;
-                              originating_block = op.shell.branch })))
-    operations
-
-let check_liveness chain_state pred hash operations_hashes operations =
-  begin
-    Chain.data chain_state >>= fun chain_data ->
-    if State.Block.equal chain_data.current_head pred then
-      Lwt.return (chain_data.live_blocks, chain_data.live_operations)
-    else
-      Chain_traversal.live_blocks
-        pred (State.Block.max_operations_ttl pred)
-  end >>= fun (live_blocks, live_operations) ->
-  assert_no_duplicate_operations
-    hash live_operations operations_hashes >>=? fun () ->
-  assert_operation_liveness hash live_blocks operations >>=? fun () ->
-  return_unit
-
-let may_patch_protocol
-    ~level
-    (validation_result : Tezos_protocol_environment_shell.validation_result) =
-  match Block_header.get_forced_protocol_upgrade ~level with
-  | None ->
-      return validation_result
-  | Some hash ->
-      Context.set_protocol validation_result.context hash >>= fun context ->
-      return { validation_result with context }
-
-let apply_block
-    chain_state
-    pred (module Proto : Registered_protocol.T)
-    hash (header: Block_header.t)
-    operations =
-  let pred_header = State.Block.header pred
-  and pred_hash = State.Block.hash pred in
-  check_header pred (List.length Proto.validation_passes) hash header >>=? fun () ->
-  iteri2_p
-    (fun i ops quota ->
-       fail_unless
-         (Option.unopt_map ~default:true
-            ~f:(fun max -> List.length ops <= max) quota.Tezos_protocol_environment_shell.max_op)
-         (let max = Option.unopt ~default:~-1 quota.max_op in
-          invalid_block hash @@
-          Too_many_operations
-            { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->
-       iter_p (fun op ->
-           let size = Data_encoding.Binary.length Operation.encoding op in
-           fail_unless
-             (size <= Proto.max_operation_data_length)
-             (invalid_block hash @@
-              Oversized_operation
-                { operation = Operation.hash op ;
-                  size ; max = Proto.max_operation_data_length })) ops >>=? fun () ->
-       return_unit)
-    operations Proto.validation_passes >>=? fun () ->
-  let operation_hashes = List.map (List.map Operation.hash) operations in
-  check_liveness chain_state pred hash operation_hashes operations >>=? fun () ->
-  begin
-    match
-      Data_encoding.Binary.of_bytes
-        Proto.block_header_data_encoding
-        header.protocol_data with
-    | None ->
-        fail (invalid_block hash Cannot_parse_block_header)
-    | Some protocol_data ->
-        return ({ shell = header.shell ; protocol_data } : Proto.block_header)
-  end >>=? fun header ->
-  mapi2_s (fun pass -> map2_s begin fun op_hash op ->
-      match
-        Data_encoding.Binary.of_bytes
-          Proto.operation_data_encoding
-          op.Operation.proto with
-      | None ->
-          fail (invalid_block hash (Cannot_parse_operation op_hash))
-      | Some protocol_data ->
-          let op = { Proto.shell = op.shell ; protocol_data } in
-          let allowed_pass = Proto.acceptable_passes op in
-          fail_unless (List.mem pass allowed_pass)
-            (invalid_block hash
-               (Unallowed_pass { operation = op_hash ;
-                                 pass ; allowed_pass } )) >>=? fun () ->
-          return op
-    end)
-    operation_hashes
-    operations >>=? fun parsed_operations ->
-  State.Block.context pred >>= fun pred_context ->
-  Context.reset_test_chain
-    pred_context pred_hash header.shell.timestamp >>= fun context ->
-  (* TODO wrap 'proto_error' into 'block_error' *)
-  Proto.begin_application
-    ~chain_id: (State.Chain.id chain_state)
-    ~predecessor_context:context
-    ~predecessor_timestamp:pred_header.shell.timestamp
-    ~predecessor_fitness:pred_header.shell.fitness
-    header >>=? fun state ->
-  fold_left_s
-    (fun (state, acc) ops ->
-       fold_left_s
-         (fun (state, acc) op ->
-            Proto.apply_operation state op >>=? fun (state, op_metadata) ->
-            return (state, op_metadata :: acc))
-         (state, []) ops >>=? fun (state, ops_metadata) ->
-       return (state, List.rev ops_metadata :: acc))
-    (state, []) parsed_operations >>=? fun (state, ops_metadata) ->
-  let ops_metadata = List.rev ops_metadata in
-  Proto.finalize_block state >>=? fun (validation_result, block_data) ->
-  may_patch_protocol
-    ~level:header.shell.level validation_result >>=? fun validation_result ->
-  Context.get_protocol validation_result.context >>= fun new_protocol ->
-  let expected_proto_level =
-    if Protocol_hash.equal new_protocol Proto.hash then
-      pred_header.shell.proto_level
-    else
-      (pred_header.shell.proto_level + 1) mod 256 in
-  fail_when (header.shell.proto_level <> expected_proto_level)
-    (invalid_block hash @@  Invalid_proto_level {
-        found = header.shell.proto_level ;
-        expected = expected_proto_level ;
-      }) >>=? fun () ->
-  fail_when
-    Fitness.(validation_result.fitness <> header.shell.fitness)
-    (invalid_block hash @@ Invalid_fitness {
-        expected = header.shell.fitness ;
-        found = validation_result.fitness ;
-      }) >>=? fun () ->
-  begin
-    if Protocol_hash.equal new_protocol Proto.hash then
-      return validation_result
-    else
-      match Registered_protocol.get new_protocol with
-      | None ->
-          fail (Unavailable_protocol { block = hash ;
-                                       protocol = new_protocol })
-      | Some (module NewProto) ->
-          NewProto.init validation_result.context header.shell
-  end >>=? fun validation_result ->
-  let max_operations_ttl =
-    max 0
-      (min
-         ((State.Block.max_operations_ttl pred)+1)
-         validation_result.max_operations_ttl) in
-  let validation_result =
-    { validation_result with max_operations_ttl } in
-  let block_data =
-    Data_encoding.Binary.to_bytes_exn Proto.block_header_metadata_encoding block_data in
-  let ops_metadata =
-    List.map
-      (List.map
-         (Data_encoding.Binary.to_bytes_exn
-            Proto.operation_receipt_encoding))
-      ops_metadata in
-  return (validation_result, block_data, ops_metadata)
 
 let check_chain_liveness chain_db hash (header: Block_header.t) =
   let chain_state = Distributed_db.chain_state chain_db in
@@ -281,6 +97,7 @@ let get_proto pred hash =
       fail (Unavailable_protocol { block = hash ;
                                    protocol = pred_protocol_hash })
   | Some p -> return p
+
 
 let on_request
   : type r. t -> r Request.t -> r tzresult Lwt.t
@@ -308,17 +125,23 @@ let on_request
               debug w "validating block %a" Block_hash.pp_short hash ;
               State.Block.read
                 chain_state header.shell.predecessor >>=? fun pred ->
-              get_proto pred hash >>=? fun proto ->
               (* TODO also protect with [Worker.canceler w]. *)
               protect ?canceler begin fun () ->
-                apply_block
-                  (Distributed_db.chain_state chain_db)
-                  pred proto hash
-                  header operations >>=? fun (result, header_data, operations_data) ->
+                Block_validator_process.apply_block
+                  bv.validation_process
+                  ~predecessor:pred
+                  header operations >>=? fun { validation_result ; block_metadata ;
+                                               ops_metadata ; context_hash } ->
+                let validation_store =
+                  ({ context_hash ;
+                     message = validation_result.message ;
+                     max_operations_ttl =  validation_result.max_operations_ttl ;
+                     last_allowed_fork_level = validation_result.last_allowed_fork_level} :
+                     State.Block.validation_store) in
                 Distributed_db.commit_block
                   chain_db hash
-                  header header_data operations operations_data
-                  result >>=? function
+                  header block_metadata operations ops_metadata
+                  validation_store >>=? function
                 | None -> assert false (* should not happen *)
                 | Some block -> return block
               end
@@ -330,9 +153,7 @@ let on_request
                   block ;
                 notify_new_block block ;
                 return (Ok (Some block))
-            (* TODO catch other temporary error (e.g. system errors)
-               and do not 'commit' them on disk... *)
-            | Error [Canceled | Unavailable_protocol _] as err ->
+            | Error [ Canceled | Unavailable_protocol _ | System_error _ ] as err ->
                 (* FIXME: Canceled can escape. Canceled is not registered. BOOM! *)
                 return err
             | Error errors ->
@@ -343,9 +164,10 @@ let on_request
                 assert commited ;
                 return (Error errors)
 
-let on_launch _ _ (limits, db) =
+let on_launch _ _ (limits, db, validation_kind) =
   let protocol_validator = Protocol_validator.create db in
-  Lwt.return { Types.protocol_validator ; limits }
+  Block_validator_process.init validation_kind >>= fun validation_process ->
+  return { Types.protocol_validator ; validation_process ; limits }
 
 let on_error w r st errs =
   Worker.record_event w (Validation_failure (r, st, errs)) ;
@@ -366,14 +188,18 @@ let on_completion
           (Event.Validation_failure (Request.view r, st, errs)) ;
         Lwt.return_unit
 
+let on_close w =
+  let bv = Worker.state w in
+  Block_validator_process.close bv.validation_process
+
 let table = Worker.create_table Queue
 
-let create limits db =
+let create limits db validation_process_kind =
   let module Handlers = struct
     type self = t
     let on_launch = on_launch
     let on_request = on_request
-    let on_close _ = Lwt.return_unit
+    let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion
     let on_no_request _ = return_unit
@@ -382,7 +208,7 @@ let create limits db =
     table
     limits.worker_limits
     ()
-    (limits, db)
+    (limits, db, validation_process_kind)
     (module Handlers)
 
 let shutdown = Worker.shutdown

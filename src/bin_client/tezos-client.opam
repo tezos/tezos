@@ -12,6 +12,7 @@ depends: [
   "tezos-client-base-unix"
   "tezos-client-base"
   "tezos-client-commands"
+  "tezos-client-demo"
   "tezos-client-000-Ps9mPmXa"
   "tezos-client-003-PsddFKi3"
   "tezos-client-003-PsddFKi3-commands"

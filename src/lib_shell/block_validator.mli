@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,10 +31,12 @@ type limits = {
   worker_limits : Worker_types.limits ;
 }
 
-type error += Closed of unit
+type validator_kind =
+  | Internal of Context.index
 
 val create:
-  limits -> Distributed_db.t -> t Lwt.t
+  limits ->  Distributed_db.t -> validator_kind ->
+  t tzresult Lwt.t
 
 val validate:
   t ->
@@ -58,8 +61,3 @@ val status: t -> Worker_types.worker_status
 val pending_requests : t -> (Time.t * Block_validator_worker_state.Request.view) list
 val current_request : t -> (Time.t * Time.t * Block_validator_worker_state.Request.view) option
 val last_events : t -> (Lwt_log_core.level * Block_validator_worker_state.Event.t list) list
-
-val may_patch_protocol:
-  level:Int32.t ->
-  Tezos_protocol_environment_shell.validation_result ->
-  Tezos_protocol_environment_shell.validation_result tzresult Lwt.t

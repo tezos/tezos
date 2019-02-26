@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -177,7 +178,8 @@ let create
     ?(sandboxed = false)
     { genesis ; store_root ; context_root ;
       patch_context ; p2p = p2p_params ;
-      test_chain_max_tll = max_child_ttl ; checkpoint }
+      test_chain_max_tll = max_child_ttl ;
+      checkpoint }
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
@@ -187,19 +189,23 @@ let create
     | Some (config, _limits) -> not config.P2p.disable_mempool
     | None -> true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
-  State.read
-    ~store_root ~context_root ?patch_context genesis >>=? fun (state, mainchain_state) ->
+  State.init
+    ~store_root ~context_root ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
+    (Block_validator.Internal context_index)
     prevalidator_limits
-    chain_validator_limits >>= fun validator ->
+    chain_validator_limits
+  >>=? fun validator ->
   Validator.activate validator
-    ?max_child_ttl ~start_prevalidator mainchain_state >>= fun mainchain_validator ->
+    ?max_child_ttl ~start_prevalidator mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
+    Distributed_db.shutdown distributed_db >>= fun () ->
     Validator.shutdown validator >>= fun () ->
     State.close state >>= fun () ->
     Lwt.return_unit

@@ -294,7 +294,7 @@ let fee_cap_arg =
     ~long:"fee-cap"
     ~placeholder:"amount"
     ~default:"1.0"
-    ~doc:"Set the fee cap (in tez)"
+    ~doc:"Set the fee cap"
     (parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
@@ -305,7 +305,7 @@ let burn_cap_arg =
     ~long:"burn-cap"
     ~placeholder:"amount"
     ~default:"0"
-    ~doc:"Set the burn cap (in tez)"
+    ~doc:"Set the burn cap"
     (parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t

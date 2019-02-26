@@ -121,8 +121,15 @@ let build_valid_chain state vtbl pred names =
              (* no operations *)
              Proto.finalize_block vstate
            end >>=? fun (ctxt, _metadata) ->
+           Context.commit ~time:block.shell.timestamp ctxt.context
+           >>= fun context_hash ->
            State.Block.store state
-             block zero [[op]] [[zero]] ctxt >>=? fun _vblock ->
+             block zero [[op]] [[zero]]
+             ({context_hash;
+               message = ctxt.message;
+               max_operations_ttl = ctxt.max_operations_ttl;
+               last_allowed_fork_level = ctxt.last_allowed_fork_level} :
+                State.Block.validation_store) >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock
@@ -168,12 +175,12 @@ let wrap_state_init f base_dir =
   begin
     let store_root = base_dir // "store" in
     let context_root = base_dir // "context" in
-    State.read
+    State.init
       ~store_mapsize:4_096_000_000L
       ~context_mapsize:4_096_000_000L
       ~store_root
       ~context_root
-      genesis >>=? fun (state, chain) ->
+      genesis >>=? fun (state, chain, _index) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->
     return_unit

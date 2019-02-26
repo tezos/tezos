@@ -23,23 +23,61 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type Authenticated_request = sig
+  type t = {
+    pkh: Signature.Public_key_hash.t ;
+    data: MBytes.t ;
+    signature: Signature.t option ;
+  }
+  val to_sign:
+    pkh: Signature.Public_key_hash.t ->
+    data: MBytes.t ->
+    MBytes.t
+  val encoding : t Data_encoding.t
+end
+
 module Sign : sig
 
+  module Request : Authenticated_request
+
+  module Response : sig
+    type t = Signature.t
+    val encoding : t Data_encoding.t
+  end
+
+end
+
+module Deterministic_nonce : sig
+
+  module Request : Authenticated_request
+
+  module Response : sig
+    type t = MBytes.t
+    val encoding : t Data_encoding.t
+  end
+
+end
+
+module Deterministic_nonce_hash : sig
+
+  module Request : Authenticated_request
+
+  module Response : sig
+    type t = MBytes.t
+    val encoding : t Data_encoding.t
+  end
+
+end
+
+module Supports_deterministic_nonces : sig
+
   module Request : sig
-    type t = {
-      pkh: Signature.Public_key_hash.t ;
-      data: MBytes.t ;
-      signature: Signature.t option ;
-    }
-    val to_sign:
-      pkh: Signature.Public_key_hash.t ->
-      data: MBytes.t ->
-      MBytes.t
+    type t = Signature.Public_key_hash.t
     val encoding : t Data_encoding.t
   end
 
   module Response : sig
-    type t = Signature.t
+    type t = bool
     val encoding : t Data_encoding.t
   end
 
@@ -70,12 +108,16 @@ module Authorized_keys : sig
 
 end
 
+
 module Request : sig
 
   type t =
     | Sign of Sign.Request.t
     | Public_key of Public_key.Request.t
     | Authorized_keys
+    | Deterministic_nonce of Deterministic_nonce.Request.t
+    | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
+    | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
   val encoding : t Data_encoding.t
 
 end

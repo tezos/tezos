@@ -176,19 +176,19 @@ val simplify : schema -> schema
     error raised by {!Json_repr.path_of_json_pointer} with
     [~wildcards:false]. Returns the modified schema and the [Def_ref]
     node that references this definition to be used in the schema. *)
-val add_definition : string -> element -> schema -> schema * element
+val add_definition : ?definitions_path:string -> string -> element -> schema -> schema * element
 
 (** Finds a definition by its path, may raise [Not_found].
     See {!add_definition} for the name format.*)
-val find_definition : string -> schema -> element
+val find_definition : ?definitions_path:string -> string -> schema -> element
 
 (** Tells if a path leads to a definition.
     See {!add_definition} for the name format. *)
-val definition_exists : string -> schema -> bool
+val definition_exists : ?definitions_path:string -> string -> schema -> bool
 
 (** Build a reference to a definition.
     See {!add_definition} for the name format. *)
-val definition_ref : string -> element
+val definition_ref : ?definitions_path:string -> string -> element
 
 (** {2 Predefined values} *) (***********************************************)
 

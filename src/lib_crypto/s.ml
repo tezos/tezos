@@ -247,4 +247,8 @@ module type SIGNATURE = sig
 
   val generate_key: ?seed:MBytes.t -> unit -> (Public_key_hash.t * Public_key.t * Secret_key.t)
 
+  val deterministic_nonce: Secret_key.t -> MBytes.t -> MBytes.t
+
+  val deterministic_nonce_hash: Secret_key.t -> MBytes.t -> MBytes.t
+
 end

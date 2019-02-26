@@ -91,8 +91,7 @@ let get_delegates cctxt state =
   | _ -> return state.delegates
 
 let generate_seed_nonce () =
-  let bytes = Rand.generate Constants.nonce_length in
-  match Nonce.of_bytes bytes with
+  match Nonce.of_bytes (Rand.generate Constants.nonce_length) with
   | Error _errs -> assert false
   | Ok nonce -> nonce
 
@@ -151,6 +150,12 @@ let inject_block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Shell_services.Injection.block cctxt
     ?force ~chain signed_header operations >>=? fun block_hash ->
+  lwt_log_info Tag.DSL.(fun f ->
+      f "Client_baking_forge.inject_block: inject %a"
+      -% t event "inject_baked_block"
+      -% a Block_hash.Logging.tag block_hash
+      -% t signed_header_tag signed_header
+      -% t operations_tag operations) >>= fun () ->
   return block_hash
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
@@ -207,25 +212,25 @@ let sort_manager_operations
   filter_map_s
     (fun op ->
        get_manager_operation_gas_and_fee op >>=? fun (fee, gas) ->
-       let (size, gas, _ratio) as weight = compute_weight op (fee, gas) in
-       let open Alpha_environment in
-       let fees_in_nanotez =
-         Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
-       let minimal_fees_in_nanotez =
-         Z.mul (Z.of_int64 (Tez.to_mutez minimal_fees)) (Z.of_int 1000) in
-       let minimal_fees_for_gas_in_nanotez =
-         Z.mul minimal_nanotez_per_gas_unit gas in
-       let minimal_fees_for_size_in_nanotez =
-         Z.mul minimal_nanotez_per_byte (Z.of_int size) in
-       if Z.compare
-           fees_in_nanotez
-           (Z.add
-              minimal_fees_in_nanotez
-              (Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez))
-          >= 0 then
-         return_some (op, weight)
-       else
+       if Tez.(fee < minimal_fees) then
          return_none
+       else
+         let (size, gas, _ratio) as weight = compute_weight op (fee, gas) in
+         let open Alpha_environment in
+         let fees_in_nanotez =
+           Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
+         let enough_fees_for_gas =
+           let minimal_fees_in_nanotez =
+             Z.mul minimal_nanotez_per_gas_unit gas in
+           Z.compare minimal_fees_in_nanotez fees_in_nanotez  <= 0 in
+         let enough_fees_for_size =
+           let minimal_fees_in_nanotez =
+             Z.mul minimal_nanotez_per_byte (Z.of_int size) in
+           Z.compare minimal_fees_in_nanotez fees_in_nanotez  <= 0 in
+         if enough_fees_for_size && enough_fees_for_gas then
+           return_some (op, weight)
+         else
+           return_none
     ) operations >>=? fun operations ->
   (* We sort by the biggest weight *)
   return
@@ -473,34 +478,34 @@ let filter_and_apply_operations
             -% a Operation_hash.Logging.tag (Operation.hash_packed op)
             -% a errs_tag errs)
         >>= fun () ->
-        return_none
+        Lwt.return_none
     | Ok (resulting_state, _receipt) ->
-        return_some resulting_state
+        Lwt.return_some resulting_state
   in
   let filter_valid_operations inc ops =
-    fold_left_s (fun (inc, acc) op ->
-        validate_operation inc op >>=? function
-        | None -> return (inc, acc)
-        | Some inc' -> return (inc', op :: acc)
+    Lwt_list.fold_left_s (fun (inc, acc) op ->
+        validate_operation inc op >>= function
+        | None -> Lwt.return (inc, acc)
+        | Some inc' -> Lwt.return (inc', op :: acc)
       ) (inc, []) ops
   in
   (* Invalid endorsements are detected during block finalization *)
   let is_valid_endorsement inc endorsement =
-    validate_operation inc endorsement >>=? function
-    | None -> return_none
+    validate_operation inc endorsement >>= function
+    | None -> Lwt.return_none
     | Some inc' -> finalize_construction inc' >>= begin function
-        | Ok _ -> return_some endorsement
-        | Error _ -> return_none
+        | Ok _ -> Lwt.return_some endorsement
+        | Error _ -> Lwt.return_none
       end
   in
-  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
+  filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
   (* Retrieve the correct index order *)
   let managers = List.sort Proto_alpha.compare_operations managers in
   let overflowing_operations = List.sort Proto_alpha.compare_operations overflowing_operations in
-  filter_valid_operations inc (managers @  overflowing_operations) >>=? fun (inc, managers) ->
+  filter_valid_operations inc (managers @  overflowing_operations) >>= fun (inc, managers) ->
   (* Gives a chance to the endorser to fund their deposit in the current block *)
-  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   finalize_construction inc >>=? fun _ ->
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
   tzforce state.constants >>=? fun
@@ -526,17 +531,17 @@ let filter_and_apply_operations
   (* Retrieve the correct index order *)
   let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
   (* Make sure we only keep valid operations *)
-  filter_valid_operations initial_inc votes >>=? fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>=? fun (inc, anonymous) ->
-  filter_valid_operations inc accepted_managers >>=? fun (inc, accepted_managers) ->
-  filter_map_s (is_valid_endorsement inc) endorsements >>=? fun endorsements ->
+  filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
+  filter_valid_operations inc accepted_managers >>= fun (inc, accepted_managers) ->
+  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   (* Endorsements won't fail now *)
   fold_left_s (fun inc op ->
       add_operation inc op >>=? fun (inc, _receipt) ->
       return inc) inc endorsements >>=? fun inc ->
   (* Endorsement and double baking/endorsement evidence do not commute:
      we apply denunciation operations after endorsements. *)
-  filter_valid_operations inc evidences >>=? fun (final_inc, evidences) ->
+  filter_valid_operations inc evidences >>= fun (final_inc, evidences) ->
   let operations = List.map List.rev [ endorsements ; votes ; anonymous @ evidences ; accepted_managers ] in
   finalize_construction final_inc >>=? fun (validation_result, metadata) ->
   return (final_inc, (validation_result, metadata), operations)
@@ -702,13 +707,12 @@ let shell_prevalidation
           f "Shell-side validation: error while prevalidating operations:@\n%a"
           -% t event "built_invalid_block_error"
           -% a errs_tag errs) >>= fun () ->
-      return None
+      return_none
   | Ok (shell_header, operations) ->
       let raw_ops =
         List.map (fun l ->
             List.map snd l.Preapply_result.applied) operations in
-      return
-        (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+      return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
 let filter_outdated_endorsements expected_level ops =
   List.filter (function
@@ -739,7 +743,7 @@ let next_baking_delay state priority =
   return span
 
 let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) operations =
-  fold_left_s (fun acc -> function
+  Lwt_list.fold_left_s (fun acc -> function
       | { Alpha_context.protocol_data =
             Operation_data { contents = Single (Endorsement { level }) }} as op
         when Raw_level.(level = head.Client_baking_blocks.level) ->
@@ -749,12 +753,12 @@ let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) oper
             | Ok (_inc,
                   Operation_metadata
                     { contents = Single_result (Endorsement_result { slots })} ) ->
-                return (acc + List.length slots)
+                Lwt.return (acc + List.length slots)
             | Error _ | _ ->
                 (* We do not handle errors here *)
-                return acc
+                Lwt.return acc
           end
-      | _ -> return acc
+      | _ -> Lwt.return acc
     ) 0 operations
 
 let rec filter_limits tnow limits =
@@ -782,7 +786,7 @@ let fetch_operations
   | Some current_mempool ->
       let operations = ref (filter_outdated_endorsements head.Client_baking_blocks.level current_mempool) in
       Client_baking_simulator.begin_construction ~timestamp state.index head >>=? fun inc ->
-      count_slots_endorsements inc slot !operations >>=? fun nb_arrived_endorsements ->
+      count_slots_endorsements inc slot !operations >>= fun nb_arrived_endorsements ->
       tzforce state.constants >>=? fun { Constants.parametric = { endorsers_per_block }} ->
       (* If 100% of the endorsements arrived, we don't need to wait *)
       if (not state.await_endorsements) || nb_arrived_endorsements = endorsers_per_block then
@@ -828,7 +832,7 @@ let fetch_operations
           | `Event (Some op_list) -> begin
               last_get_event := None ;
               operations := op_list @ !operations ;
-              count_slots_endorsements inc slot op_list >>=? fun new_endorsements ->
+              count_slots_endorsements inc slot op_list >>= fun new_endorsements ->
               let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
               let limits = filter_limits (Time.now ()) limits in
               let required =
@@ -929,7 +933,7 @@ let build_block
                 -% a timestamp_tag timestamp) >>= fun () ->
             finalize_block_header final_context ~timestamp validation_result operations >>=? fun shell_header ->
             let raw_ops = List.map (List.map forge) operations in
-            return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+            return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
 let previously_baked_level cctxt pkh new_lvl =
   State.get cctxt pkh  >>=? function
@@ -969,7 +973,8 @@ let bake (cctxt : #Proto_alpha.full) state =
           lwt_log_error Tag.DSL.(fun f ->
               f "Level %a : previously baked"
               -% t event "double_bake_near_miss"
-              -% a level_tag level)  >>= return
+              -% a level_tag level) >>= fun () ->
+          return_unit
       | false ->
           (* Record baked blocks to prevent double baking and nonces to reveal later *)
           State.record cctxt src_pkh level >>=? fun () ->
@@ -981,8 +986,8 @@ let bake (cctxt : #Proto_alpha.full) state =
                   f "@[<v 4>Error while injecting block@ @[Included operations : %a@]@ %a@]"
                   -% t event "block_injection_failed"
                   -% a raw_operations_tag (List.concat operations)
-                  -% a errs_tag errs
-                ) >>= fun () -> return_unit
+                  -% a errs_tag errs) >>= fun () ->
+              return_unit
 
           | Ok block_hash ->
               lwt_log_notice Tag.DSL.(fun f ->
@@ -994,8 +999,7 @@ let bake (cctxt : #Proto_alpha.full) state =
                   -% a level_tag level
                   -% s bake_priority_tag priority
                   -% a fitness_tag shell_header.fitness
-                  -% a operations_tag operations
-                ) >>= fun () ->
+                  -% a operations_tag operations) >>= fun () ->
 
               begin if seed_nonce_hash <> None then
                   Client_baking_nonces.add cctxt block_hash seed_nonce
@@ -1123,49 +1127,30 @@ let get_unrevealed_nonces
       match Block_hash.Map.find_opt hash nonces with
       | None -> return_none
       | Some nonce ->
-          begin
-            Chain_services.Blocks.protocols
-              cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { next_protocol } ->
-            if Protocol_hash.equal next_protocol Tezos_client_003_PsddFKi3.Proto_alpha.hash then
-              Alpha_block_services.metadata
-                cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
-              if force then
+          Alpha_block_services.metadata
+            cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
+          if force then
+            return_some (hash, (level.level, nonce))
+          else
+            Alpha_services.Nonce.get
+              cctxt (chain, head) level.level >>=? function
+            | Missing nonce_hash
+              when Nonce.check_hash nonce nonce_hash ->
+                lwt_log_notice Tag.DSL.(fun f ->
+                    f "Found nonce to reveal for %a (level: %a)"
+                    -% t event "found_nonce"
+                    -% a Block_hash.Logging.tag hash
+                    -% a level_tag level.level)
+                >>= fun () ->
                 return_some (hash, (level.level, nonce))
-              else
-                Alpha_services.Nonce.get
-                  cctxt (chain, head) level.level >>=? function
-                | Missing nonce_hash
-                  when Nonce.check_hash nonce nonce_hash ->
-                    lwt_log_notice Tag.DSL.(fun f ->
-                        f "Found nonce to reveal for %a (level: %a)"
-                        -% t event "found_nonce"
-                        -% a Block_hash.Logging.tag hash
-                        -% a level_tag level.level)
-                    >>= fun () ->
-                    return_some (hash, (level.level, nonce))
-                | Missing _nonce_hash ->
-                    lwt_log_error Tag.DSL.(fun f ->
-                        f "Incoherent nonce for level %a"
-                        -% t event "bad_nonce"
-                        -% a level_tag level.level)
-                    >>= fun () -> return_none
-                | Forgotten -> return_none
-                | Revealed _ -> return_none
-            else
-              lwt_log_error Tag.DSL.(fun f ->
-                  f "Unexpected protocol when revealing nonce for block %a"
-                  -% t event "nonce_from_an_unexpected_protocol"
-                  -% a Block_hash.Logging.tag hash)
-              >>= fun () -> return_none
-          end >>= function
-          | Error err ->
-              lwt_log_error Tag.DSL.(fun f ->
-                  f "@[<v 4>Error while revealing nonce for block %a@ %a@]"
-                  -% t event "error_revealing_nonces"
-                  -% a Block_hash.Logging.tag hash
-                  -% a errs_tag err) >>= fun () ->
-              return_none
-          | Ok _ as res -> Lwt.return res)
+            | Missing _nonce_hash ->
+                lwt_log_error Tag.DSL.(fun f ->
+                    f "Incoherent nonce for level %a"
+                    -% t event "bad_nonce"
+                    -% a level_tag level.level)
+                >>= fun () -> return_none
+            | Forgotten -> return_none
+            | Revealed _ -> return_none)
     blocks >>=? function
   | [] -> return_nil
   | x ->
@@ -1186,8 +1171,7 @@ let reveal_potential_nonces cctxt new_head =
       lwt_warn Tag.DSL.(fun f ->
           f "Cannot read nonces: %a"
           -% t event "read_nonce_fail"
-          -% a errs_tag err)
-      >>= fun () ->
+          -% a errs_tag err) >>= fun () ->
       return_unit
 
 (** [create] starts the main loop of the baker. The loop monitors new blocks and

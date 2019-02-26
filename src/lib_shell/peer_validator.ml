@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -298,6 +299,9 @@ let on_error w r st errs =
       Worker.trigger_shutdown w ;
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       Lwt.return (Error errs)
+  | [Block_validator_errors.System_error _ ] as errs ->
+      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      return_unit
   | [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
       Block_validator.fetch_and_compile_protocol
         pv.parameters.block_validator
@@ -342,7 +346,7 @@ let on_launch _ name parameters =
   and notify_new_block block =
     pv.last_validated_head <- State.Block.header block ;
     parameters.notify_new_block block in
-  Lwt.return pv
+  return pv
 
 let table =
   let merge w (Worker.Any_request neu) old =

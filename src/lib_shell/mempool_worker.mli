@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,22 +47,26 @@ module type T = sig
     | Refused of error list
     | Duplicate
     | Not_in_branch
+  val result_encoding : result Data_encoding.t
 
   (** Creates/tear-down a new mempool validator context. *)
-  val create : limits -> Distributed_db.chain_db -> t Lwt.t
+  val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
   val shutdown : t -> unit Lwt.t
 
-  (** parse a new operation and add it to the mempool context *)
-  val parse : t -> Operation.t -> operation tzresult Lwt.t
+  (** parse a new operation *)
+  val parse : Operation.t -> operation tzresult
 
   (** validate a new operation and add it to the mempool context *)
   val validate : t -> operation -> result tzresult Lwt.t
 
-  val chain_db : t -> Distributed_db.chain_db tzresult
+  val chain_db : t -> Distributed_db.chain_db
 
   val rpc_directory : t RPC_directory.t
 
 end
 
-module Make (Proto : Registered_protocol.T) : T
+module type STATIC = sig
+  val max_size_parsed_cache: int
+end
 
+module Make (Static : STATIC) (Proto : Registered_protocol.T) : T with module Proto = Proto

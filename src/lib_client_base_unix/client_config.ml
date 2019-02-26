@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -106,6 +107,7 @@ module Cfg_file = struct
     web_port: int ;
     remote_signer: Uri.t option ;
     confirmations: int option ;
+    password_filename: string option ;
   }
 
   let default = {
@@ -116,6 +118,7 @@ module Cfg_file = struct
     web_port = 8080 ;
     remote_signer = None ;
     confirmations = Some 0 ;
+    password_filename = None ;
   }
 
   open Data_encoding
@@ -123,25 +126,27 @@ module Cfg_file = struct
   let encoding =
     conv
       (fun { base_dir ; node_addr ; node_port ; tls ; web_port ;
-             remote_signer ; confirmations } ->
+             remote_signer ; confirmations ; password_filename } ->
         (base_dir, Some node_addr, Some node_port,
-         Some tls, Some web_port, remote_signer, confirmations))
+         Some tls, Some web_port, remote_signer, confirmations, password_filename ))
       (fun (base_dir, node_addr, node_port, tls, web_port,
-            remote_signer, confirmations) ->
+            remote_signer, confirmations, password_filename) ->
         let node_addr = Option.unopt ~default:default.node_addr node_addr in
         let node_port = Option.unopt ~default:default.node_port node_port in
         let tls = Option.unopt ~default:default.tls tls in
         let web_port = Option.unopt ~default:default.web_port web_port in
         { base_dir ; node_addr ; node_port ; tls ; web_port ;
-          remote_signer ; confirmations })
-      (obj7
+          remote_signer ; confirmations ; password_filename })
+      (obj8
          (req "base_dir" string)
          (opt "node_addr" string)
          (opt "node_port" int16)
          (opt "tls" bool)
          (opt "web_port" int16)
          (opt "remote_signer" RPC_client.uri_encoding)
-         (opt "confirmations" int8))
+         (opt "confirmations" int8)
+         (opt "password_filename" string)
+      )
 
   let from_json json =
     Data_encoding.Json.destruct encoding json
@@ -159,6 +164,7 @@ end
 type cli_args = {
   block: Shell_services.block ;
   confirmations: int option ;
+  password_filename: string option ;
   protocol: Protocol_hash.t option ;
   print_timings: bool ;
   log_requests: bool ;
@@ -167,6 +173,7 @@ type cli_args = {
 let default_cli_args = {
   block = default_block ;
   confirmations = Some 0 ;
+  password_filename = None ;
   protocol = None ;
   print_timings = false ;
   log_requests = false ;
@@ -298,6 +305,13 @@ let remote_signer_arg () =
     ~doc:"URI of the remote signer"
     (parameter
        (fun _ x -> Tezos_signer_backends.Remote.parse_base_uri x))
+let password_filename_arg () =
+  arg
+    ~long:"password-filename"
+    ~short:'f'
+    ~placeholder:"filename"
+    ~doc:"path to the password filename"
+    (string_parameter ())
 
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file >>=? fun cfg_json ->
@@ -372,7 +386,7 @@ let commands config_file cfg =
   ]
 
 let global_options () =
-  args11
+  args12
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -384,6 +398,7 @@ let global_options () =
     (port_arg ())
     (tls_switch ())
     (remote_signer_arg ())
+    (password_filename_arg ())
 
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options
@@ -400,7 +415,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
         node_addr,
         node_port,
         tls,
-        remote_signer), remaining) ->
+        remote_signer,
+        password_filename), remaining) ->
   begin match base_dir with
     | None ->
         let base_dir = default_base_dir in
@@ -443,7 +459,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       (Option.first_some remote_signer_env cfg.remote_signer) in
   let confirmations = Option.unopt ~default:cfg.confirmations confirmations in
   let cfg = { cfg with tls ; node_port ; node_addr ;
-                       remote_signer ; confirmations } in
+                       remote_signer ; confirmations ; password_filename } in
   if Sys.file_exists base_dir && not (Sys.is_directory base_dir) then begin
     Format.eprintf "%s is not a directory.@." base_dir ;
     exit 1 ;
@@ -455,6 +471,6 @@ let parse_config_args (ctx : #Client_context.full) argv =
   Lwt_utils_unix.create_dir config_dir >>= fun () ->
   return
     (cfg,
-     { block ; confirmations ;
+     { block ; confirmations ; password_filename ;
        print_timings = timings ; log_requests ; protocol },
      commands config_file cfg, remaining)

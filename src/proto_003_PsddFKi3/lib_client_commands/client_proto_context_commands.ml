@@ -67,11 +67,17 @@ let data_parameter =
       Lwt.return (Micheline_parser.no_parsing_error
                   @@ Michelson_v1_parser.parse_expression data))
 
-let non_negative_param = 
+let non_negative_param =
   Clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
-      | _ -> failwith "Parameter should be a non-negative integer literal") 
+      | _ -> failwith "Parameter should be a non-negative integer literal")
+
+let block_hash_param =
+  Clic.parameter (fun _ s ->
+      try return (Block_hash.of_b58check_exn s)
+      with _ ->
+        failwith "Parameter '%s' is an invalid block hash" s)
 
 let group =
   { Clic.name = "context" ;
@@ -505,8 +511,14 @@ let commands version () =
         register_as_delegate cctxt
           ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run ~fee_parameter
-          ?fee ~manager_sk:src_sk src_pk >>=? fun _res ->
-        return_unit
+          ?fee ~manager_sk:src_sk src_pk
+        >>= function
+        | Ok _ -> return_unit
+        | Error (Alpha_environment.Ecoproto_error
+                   Proto_alpha.Proto.Delegate_storage.Active_delegate  :: []) ->
+            cctxt#message "Delegate already activated." >>= fun () ->
+            return_unit
+        | Error el -> Lwt.return (Error el)
       end;
   ] @
   (if version = (Some `Mainnet) then [] else [
@@ -561,11 +573,12 @@ let commands version () =
     ]) @
   [
     command ~desc:"Wait until an operation is included in a block"
-      (args2
+      (args3
          (default_arg
             ~long:"confirmations"
             ~placeholder:"num_blocks"
-            ~doc:"do not end until after 'N' additional blocks after the operation appears"
+            ~doc:"wait until 'N' additional blocks after the operation \
+                  appears in the considered chain"
             ~default:"0"
             non_negative_param)
          (default_arg
@@ -573,7 +586,12 @@ let commands version () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_param))
+            non_negative_param)
+         (arg
+            ~long:"branch"
+            ~placeholder:"block_hash"
+            ~doc:"hash of the oldest block where we should look for the operation"
+            block_hash_param))
       (prefixes [ "wait" ; "for" ]
        @@ param
          ~name:"operation"
@@ -585,9 +603,9 @@ let commands version () =
                | Some hash -> return hash))
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
-      begin fun (confirmations, predecessors) operation_hash (ctxt : Proto_alpha.full) ->
+      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Proto_alpha.full) ->
         Client_confirmations.wait_for_operation_inclusion ctxt
-          ~chain:`Main ~confirmations ~predecessors operation_hash >>=? fun _ ->
+          ~chain:`Main ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
         return_unit
       end ;
 
@@ -635,6 +653,149 @@ let commands version () =
           (Data_encoding.Binary.describe
              Alpha_context.Operation.unsigned_encoding) >>= fun () ->
         return_unit
-      end
+      end ;
+
+    command ~group ~desc: "Submit protocol proposals"
+      no_options
+      (prefixes [ "submit" ; "proposals" ; "for" ]
+       @@ ContractAlias.destination_param
+         ~name: "delegate"
+         ~desc: "the delegate who makes the proposal"
+       @@ seq_of_param
+         (param
+            ~name:"proposal"
+            ~desc:"the protocol hash proposal to be submitted"
+            (parameter
+               (fun _ x ->
+                  match Protocol_hash.of_b58check_opt x with
+                  | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
+                  | Some hash -> return hash))))
+      begin fun () (_name, source) proposals (cctxt : Proto_alpha.full) ->
+        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        begin match info.current_period_kind with
+          | Proposal -> return_unit
+          | _ -> cctxt#error "Not in a proposal period"
+        end >>=? fun () ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
+        get_proposals ~chain:`Main ~block:cctxt#block cctxt >>=? fun known_proposals ->
+        (* for a proposal to be valid it must either a protocol that was already
+           proposed by somebody else or a protocol known by the node, because
+           the user is the first proposer and just injected it with
+           tezos-admin-client *)
+        let check_proposals proposals : bool tzresult Lwt.t =
+          let n = List.length proposals in
+          if n = 0 then cctxt#error "Empty proposal"
+          else if n > Constants.fixed.max_proposals_per_delegate then
+            cctxt#error "Too many proposals"
+          else
+            fold_left_s (fun acc (p : Protocol_hash.t) ->
+                if (List.mem p known_protos) ||
+                   (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
+                then return acc
+                else cctxt#message "Protocol %a is not a known proposal"
+                    Protocol_hash.pp p >>= fun () ->
+                  return false)
+              true proposals
+        in
+        check_proposals proposals >>=? fun all_valid ->
+        begin if all_valid then
+            cctxt#message "All proposals are valid"
+          else
+            cctxt#error "Submission failed because of invalid proposals"
+        end >>= fun () ->
+        Client_proto_context.get_manager
+          cctxt ~chain:`Main ~block:cctxt#block
+          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
+        submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh
+          proposals >>=? fun _res ->
+        return_unit
+      end ;
+
+    command ~group ~desc: "Submit a ballot"
+      no_options
+      (prefixes [ "submit" ; "ballot" ; "for" ]
+       @@ ContractAlias.destination_param
+         ~name: "delegate"
+         ~desc: "the delegate who votes"
+       @@ param
+         ~name:"proposal"
+         ~desc:"the protocol hash proposal to vote for"
+         (parameter
+            (fun _ x ->
+               match Protocol_hash.of_b58check_opt x with
+               | None -> failwith "Invalid proposal hash: '%s'" x
+               | Some hash -> return hash))
+       @@ param
+         ~name:"ballot"
+         ~desc:"the ballot value (yay, nay or pass)"
+         (parameter
+            ~autocomplete: (fun _ -> return [ "yea" ; "nay" ; "pass" ])
+            (fun _ s -> (* We should have [Vote.of_string]. *)
+               match String.lowercase_ascii s with
+               | "yay" | "yea" -> return Vote.Yay
+               | "nay" -> return Vote.Nay
+               | "pass" -> return Vote.Pass
+               | s -> failwith "Invalid ballot: '%s'" s))
+       @@ stop)
+      begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
+        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        begin match info.current_period_kind with
+          | Testing_vote | Promotion_vote -> return_unit
+          | _ -> cctxt#error "Not in a Testing_vote or Promotion_vote period"
+        end >>=? fun () ->
+        Client_proto_context.get_manager
+          cctxt ~chain:`Main ~block:cctxt#block
+          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
+        submit_ballot cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh
+          proposal ballot >>=? fun _res ->
+        return_unit
+      end ;
+
+    command ~group ~desc: "Summarize the current voting period"
+      no_options
+      (fixed [ "show" ; "voting" ; "period" ])
+      begin fun () (cctxt : Proto_alpha.full) ->
+        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        cctxt#message "Current period: %a\n\
+                       Blocks remaining until end of period: %ld"
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct
+             Proto_alpha.Alpha_context.Voting_period.kind_encoding
+             info.current_period_kind)
+          info.remaining >>= fun () ->
+        get_proposals ~chain:`Main ~block:cctxt#block cctxt >>=? fun props ->
+        let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
+                    List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
+        let print_proposal = function
+          | None -> assert false (* not called during proposal phase *)
+          | Some proposal -> cctxt#message "Current proposal: %a"
+                               Protocol_hash.pp proposal
+        in
+        match info.current_period_kind with
+        | Proposal ->
+            (* TODO improve printing of proposals *)
+            let proposals_string =
+              if List.length ranks = 0 then " none" else
+                List.fold_left (fun acc (p,w) ->
+                    Format.asprintf "%s\n%a %ld" acc Protocol_hash.pp p w) "" ranks
+            in
+            cctxt#answer "Current proposals:%s" proposals_string
+            >>= fun () -> return_unit
+        | Testing_vote | Promotion_vote ->
+            print_proposal info.current_proposal >>= fun () ->
+            get_ballots_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun ballots_info ->
+            cctxt#answer "Ballots: %a@,\
+                          Current participation %.2f%%, necessary quorum %.2f%%@,\
+                          Current in favor %ld, needed supermajority %ld"
+              Data_encoding.Json.pp (Data_encoding.Json.construct
+                                       Vote.ballots_encoding ballots_info.ballots)
+              (Int32.to_float ballots_info.participation /. 100.)
+              (Int32.to_float ballots_info.current_quorum /. 100.)
+              ballots_info.ballots.yay
+              ballots_info.supermajority
+            >>= fun () -> return_unit
+        | Testing -> print_proposal info.current_proposal >>= fun () ->
+            return_unit
+      end ;
 
   ]

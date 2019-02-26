@@ -36,3 +36,4 @@ val add_allow_origin:
 val add_headers:
   Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
 
+val check_host: Cohttp.Header.t -> t -> bool

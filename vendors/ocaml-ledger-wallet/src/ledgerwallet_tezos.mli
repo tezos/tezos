@@ -65,20 +65,45 @@ val authorize_baking :
 (** [authorize_baking ?pp ?buf ?prompt ledger curve path] is like
     [get_public_key] with [prompt = true], but only works with the
     baking Ledger application and serves to indicate that the key from
-    [curve] at [path] is allowed to bake. *)
+    [curve] at [path] is allowed to bake.
+
+    This is deprecated as it ignores test-chains, see {!setup_baking}. *)
+
+val setup_baking :
+  ?pp:Format.formatter -> ?buf:Cstruct.t -> Hidapi.t ->
+  main_chain_id: string -> main_hwm:int32 -> test_hwm:int32 ->
+  curve -> int32 list -> (Cstruct.t, Transport.error) result
+(** [setup_baking ?pp ?buf ?prompt ledger ~main_chain_id ~main_hwm ~test_hwm curve path]
+    sets up the Ledger's Baking application: it informs
+    the device of the ID of the main chain (should be of length [4]),
+    sets the high watermarks for the main and test chains, {i and}
+    indicates that the key at the given [curve/path] is authorized for
+    baking. *)
 
 val get_high_watermark :
   ?pp:Format.formatter -> ?buf:Cstruct.t ->
   Hidapi.t -> (int32, Transport.error) result
 (** [get_high_watermark ?pp ?buf ledger] is the current value of the
-    high water mark on [ledger]. This works with the baking app
-    only. *)
+    high water mark for the main-chain on [ledger]. This works with
+    the baking app only. See {!get_all_high_watermarks} for a more
+    complete query. *)
+
+val get_all_high_watermarks :
+  ?pp:Format.formatter ->
+  ?buf:Cstruct.t ->
+  Hidapi.t ->
+  ([ `Main_hwm of int32 ] * [ `Test_hwm of int32 ] * [ `Chain_id of string ],
+   Transport.error) result
+(** Query the high water marks for the main and test chains, as well as the ID
+    of the main-chain (string of length 4) recorded by the Ledger Baking app. *)
 
 val set_high_watermark :
   ?pp:Format.formatter -> ?buf:Cstruct.t ->
   Hidapi.t -> int32 -> (unit, Transport.error) result
-(** [get_high_watermark ?pp ?buf ledger hwm] reset the high water
-    mark on [ledger] to [hwm]. This works with the baking app only. *)
+(** [set_high_watermark ?pp ?buf ledger hwm] reset the high water
+    mark on [ledger] to [hwm] for the main-chain.
+    This works with the baking app only. Use {!setup_baking} to be able to also 
+    reset all the test-chain water mark. *)
 
 val sign :
   ?pp:Format.formatter ->

@@ -25,6 +25,9 @@
 
 open Proto_alpha
 open Alpha_context
+open Logging
+
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.blocks" end)
 
 type block_info = {
   hash: Block_hash.t ;
@@ -65,15 +68,27 @@ let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
   Monitor_services.valid_blocks cctxt
     ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun ((chain, block), { Tezos_base.Block_header.shell }) ->
-               raw_info cctxt ~chain:(`Hash chain) block shell)
+            (fun ((chain, block), data) ->
+               log_info Tag.DSL.(fun f ->
+                   f "Saw block %a on chain %a"
+                   -% t event "monitor_saw_valid_block"
+                   -% a Block_hash.Logging.tag block
+                   -% a State_logging.chain_id chain
+                   -% t block_header_tag data) ;
+               raw_info cctxt ~chain:(`Hash chain) block data.Tezos_base.Block_header.shell)
             block_stream)
 
 let monitor_heads cctxt ~next_protocols chain =
   Monitor_services.heads
     cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun (block, { Tezos_base.Block_header.shell }) -> raw_info cctxt ~chain block shell)
+            (fun (block, data) ->
+               log_info Tag.DSL.(fun f ->
+                   f "Saw head %a"
+                   -% t event "monitor_saw_head"
+                   -% a Block_hash.Logging.tag block
+                   -% t block_header_tag data) ;
+               raw_info cctxt ~chain block data.Tezos_base.Block_header.shell)
             block_stream)
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =

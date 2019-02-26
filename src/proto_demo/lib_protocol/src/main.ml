@@ -62,39 +62,11 @@ let compare_operations _ _ = 0
 
 type validation_state = {
   context : Context.t ;
-  fitness : Int64.t ;
+  fitness : Fitness.t ;
 }
 
 let current_context { context ; _ } =
   return context
-
-module Fitness = struct
-
-  type error += Invalid_fitness
-  type error += Invalid_fitness2
-
-  let int64_to_bytes i =
-    let b = MBytes.create 8 in
-    MBytes.set_int64 b 0 i;
-    b
-
-  let int64_of_bytes b =
-    if Compare.Int.(MBytes.length b <> 8) then
-      fail Invalid_fitness2
-    else
-      return (MBytes.get_int64 b 0)
-
-  let from_int64 fitness =
-    [ int64_to_bytes fitness ]
-
-  let to_int64 = function
-    | [ fitness ] -> int64_of_bytes fitness
-    | [] -> return 0L
-    | _ -> fail Invalid_fitness
-
-  let get { fitness ; _ } = fitness
-
-end
 
 let begin_application
     ~chain_id:_
@@ -102,8 +74,7 @@ let begin_application
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
     (raw_block: block_header) =
-  Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
-  return { context ; fitness }
+  return { context ; fitness = raw_block.shell.fitness }
 
 let begin_partial_application
     ~chain_id
@@ -127,22 +98,28 @@ let begin_construction
     ~predecessor:_
     ~timestamp:_
     ?protocol_data:_ () =
-  Fitness.to_int64 pred_fitness >>=? fun pred_fitness ->
-  let fitness = Int64.succ pred_fitness in
+
+  let increase_fitness = function
+    | [ v ; b ] ->
+        let f = MBytes.get_int64 b 0 in
+        let b' = MBytes.copy b in
+        MBytes.set_int64 b' 0 (Int64.succ f) ;
+        return [ v ;  b' ]
+    | [ ] -> return MBytes.[create 0; create 0]
+    | _ -> assert false
+  in
+  increase_fitness pred_fitness >>=? fun fitness ->
   return { context ; fitness }
 
 let apply_operation ctxt _ =
   return (ctxt, ())
 
 let finalize_block ctxt =
-  let fitness = Fitness.get ctxt in
-  let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
-  let fitness = Fitness.from_int64 fitness in
+  let fitness = ctxt.fitness in
+  let message = Some (Format.asprintf "fitness <- %a" Fitness.pp fitness) in
   return ({ Updater.message ; context = ctxt.context ; fitness ;
             max_operations_ttl = 0 ; last_allowed_fork_level = 0l ;
           }, ())
-
-let rpc_services = Services.rpc_services
 
 let init context block_header =
   return { Updater.message = None ; context ;
@@ -150,3 +127,5 @@ let init context block_header =
            max_operations_ttl = 0 ;
            last_allowed_fork_level = block_header.level ;
          }
+
+let rpc_services = Services.rpc_services

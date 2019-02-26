@@ -7,4 +7,10 @@ src_dir="$(dirname "$script_dir")"
 
 opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
-opam install $opams --deps-only --with-test -y --criteria="-notuptodate,-changed,-removed"
+export OPAMYES=${OPAMYES:=true}
+
+## In an ideal world, `--with-test` should be present only when using
+## `--dev`. But this would probably break the CI, so we postponed this
+## change until someone have some spare time. (@pirbo, @hnrgrgr)
+
+opam install $opams --deps-only --with-test --criteria="-notuptodate,-changed,-removed"

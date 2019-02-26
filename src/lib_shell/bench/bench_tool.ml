@@ -59,7 +59,7 @@ let if_debug k =
   if !debug then k ()
 
 let if_debug_s k =
-  if !debug then k () else return ()
+  if !debug then k () else return_unit
 
 let args = default_args
 

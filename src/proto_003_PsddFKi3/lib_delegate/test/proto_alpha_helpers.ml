@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -56,6 +57,7 @@ let no_write_context ?(block = `Head 0) config : #Client_context.full = object
   method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = fun f -> f ()
   method block = block
   method confirmations = None
+  method password_filename = None
   method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
     Format.kasprintf (fun _ -> return "")
   method prompt_password : type a. (a, MBytes.t tzresult) Client_context.lwt_format -> a =

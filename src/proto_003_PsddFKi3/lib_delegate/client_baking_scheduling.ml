@@ -103,10 +103,13 @@ let main
     begin
       (* event construction *)
       let timeout = compute_timeout state in
-      Lwt.choose [ (timeout >|= fun timesup -> `Timeout timesup) ;
+      Lwt.choose [ (Lwt_exit.termination_thread >|= fun _ -> `Termination) ;
+                   (timeout >|= fun timesup -> `Timeout timesup) ;
                    (get_event () >|= fun e -> `Event e) ;
                  ] >>= function
         (* event matching *)
+      | `Termination ->
+          return_unit
       | `Event (None | Some (Error _)) ->
           (* exit when the node is unavailable *)
           last_get_event := None ;
@@ -114,12 +117,13 @@ let main
               f "Connection to node lost, %s exiting."
               -% t event "daemon_connection_lost"
               -% s worker_tag name) >>= fun () ->
-          exit 1
+          return_unit
       | `Event (Some (Ok event)) -> begin
           (* new event: cancel everything and execute callback *)
           last_get_event := None ;
           (* TODO: pretty-print events (requires passing a pp as argument) *)
-          log_errors_and_continue ~name @@ event_k cctxt state event
+          log_errors_and_continue ~name @@ event_k cctxt state event >>= fun () ->
+          worker_loop ()
         end
       | `Timeout timesup ->
           (* main event: it's time *)
@@ -128,10 +132,9 @@ let main
               -% t event "daemon_wakeup"
               -% s worker_tag name) >>= fun () ->
           (* core functionality *)
-          log_errors_and_continue ~name @@ timeout_k cctxt state timesup
-    end >>= fun () ->
-    (* and restart *)
-    worker_loop () in
+          log_errors_and_continue ~name @@ timeout_k cctxt state timesup >>= fun () ->
+          worker_loop ()
+    end in
 
   (* ignition *)
   lwt_log_info Tag.DSL.(fun f ->

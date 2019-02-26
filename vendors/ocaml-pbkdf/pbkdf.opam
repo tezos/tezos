@@ -7,6 +7,7 @@ bug-reports:  "https://github.com/abeaumont/ocaml-pbkdf/issues"
 authors:      ["Alfredo Beaumont <alfredo.beaumont@gmail.com>" "Sonia Meruelo <smeruelo@gmail.com>"]
 maintainer:   ["Alfredo Beaumont <alfredo.beaumont@gmail.com>"]
 license:      "BSD2"
+synopsis:     "Password based key derivation functions from PKCS#5, RFC 2898"
 
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 run-test: [ "dune" "runtest" "-p" name "-j" jobs ]

@@ -67,6 +67,7 @@ let commands = [
 ]
 
 let () =
+  Random.self_init () ;
   match Cmdliner.Term.eval_choice (term, info) commands with
   | `Error _ -> exit 1
   | `Help -> exit 0

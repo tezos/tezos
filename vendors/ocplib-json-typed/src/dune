@@ -1,0 +1,26 @@
+(library
+ (name        ocplib_json_typed)
+ (public_name ocplib-json-typed)
+ (flags (:standard -w -9))
+ (modules json_encoding json_query json_repr json_schema)
+ (synopsis "Reliable manipulation of JSON objects")
+ (libraries uri)
+ (wrapped false))
+
+(library
+ (name        ocplib_json_typed_bson)
+ (public_name ocplib-json-typed-bson)
+ (flags (:standard -w -9))
+ (modules json_repr_bson)
+ (synopsis "BSON representation of JSON documents")
+ (libraries ocplib-json-typed ocplib-endian)
+ (wrapped false))
+
+(library
+ (name        ocplib_json_typed_browser)
+ (public_name ocplib-json-typed-browser)
+ (flags (:standard -w -9 -open Js_of_ocaml))
+ (modules json_repr_browser)
+ (synopsis "Native browser representation of JSON documents")
+ (libraries ocplib-json-typed js_of_ocaml)
+ (wrapped false))

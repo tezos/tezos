@@ -144,11 +144,18 @@ module type SIGNER = sig
   val title : string
   val description : string
   val neuterize : sk_uri -> pk_uri tzresult Lwt.t
-  val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
-  val public_key_hash : pk_uri -> (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+  val public_key :
+    ?interactive: Client_context.io_wallet ->
+    pk_uri -> Signature.Public_key.t tzresult Lwt.t
+  val public_key_hash :
+    ?interactive: Client_context.io_wallet ->
+    pk_uri -> (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
   val sign :
     ?watermark: Signature.watermark ->
     sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce_hash : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
 let signers_table : (string, (module SIGNER)) Hashtbl.t = Hashtbl.create 13
@@ -188,14 +195,14 @@ let neuterize sk_uri =
   let module Signer = (val signer : SIGNER) in
   Signer.neuterize sk_uri
 
-let public_key pk_uri =
+let public_key ?interactive pk_uri =
   let scheme = Option.unopt ~default:"" (Uri.scheme pk_uri) in
   find_signer_for_key ~scheme >>=? fun signer ->
   let module Signer = (val signer : SIGNER) in
-  Signer.public_key pk_uri
+  Signer.public_key ?interactive pk_uri
 
-let public_key_hash pk_uri =
-  public_key pk_uri >>=? fun pk ->
+let public_key_hash ?interactive pk_uri =
+  public_key ?interactive pk_uri >>=? fun pk ->
   return (Signature.Public_key.hash pk, Some pk)
 
 let sign cctxt ?watermark sk_uri buf =
@@ -227,6 +234,24 @@ let append cctxt ?watermark loc buf =
 let check ?watermark pk_uri signature buf =
   public_key pk_uri >>=? fun pk ->
   return (Signature.check ?watermark pk signature buf)
+
+let deterministic_nonce sk_uri data =
+  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
+  find_signer_for_key ~scheme >>=? fun signer ->
+  let module Signer = (val signer : SIGNER) in
+  Signer.deterministic_nonce sk_uri data
+
+let deterministic_nonce_hash sk_uri data =
+  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
+  find_signer_for_key ~scheme >>=? fun signer ->
+  let module Signer = (val signer : SIGNER) in
+  Signer.deterministic_nonce_hash sk_uri data
+
+let supports_deterministic_nonces sk_uri =
+  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
+  find_signer_for_key ~scheme >>=? fun signer ->
+  let module Signer = (val signer : SIGNER) in
+  Signer.supports_deterministic_nonces sk_uri
 
 let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) ?public_key name =
   Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->

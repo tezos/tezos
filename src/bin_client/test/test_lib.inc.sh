@@ -16,7 +16,10 @@ local_client="${4:-$test_dir/../../../_build/default/src/bin_client/main_client.
 local_admin_client="${5:-$test_dir/../../../_build/default/src/bin_client/main_admin.exe}"
 local_compiler="${6:-$test_dir/../../../_build/default/src/lib_protocol_compiler/main_native.exe}"
 
-contract_dir="contracts"
+contract_op_dir="contracts/opcodes"
+contract_macros_dir="contracts/macros"
+contract_scenarios_dir="contracts/mini_scenarios"
+contract_attic_dir="contracts/attic"
 
 source $tezos_sandboxed_node
 source $tezos_init_sandboxed_client
@@ -129,7 +132,7 @@ init_contract_from_file () {
 }
 
 bake () {
-    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp --minimal-fees 0 --minimal-nanotez-per-byte 0 --minimal-nanotez-per-gas-unit 0
+    $client bake for bootstrap1 --max-priority 512 --minimal-timestamp  --minimal-fees 0 --minimal-nanotez-per-byte 0 --minimal-nanotez-per-gas-unit 0
 }
 
 bake_after () {

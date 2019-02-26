@@ -4,12 +4,15 @@ version: "0.6"
 maintainer: "Benjamin Canou <benjamin@ocamlpro.com>"
 authors: "Benjamin Canou <benjamin@ocamlpro.com>"
 homepage: "https://github.com/ocamlpro/ocplib-json-typed"
+synopsis: "Libraries for reliable manipulation JSON objects"
 bug-reports: "https://github.com/ocamlpro/ocplib-json-typed/issues"
 license: "LGPLv3 w/ linking exception"
 dev-repo: "git+https://github.com/ocamlpro/ocplib-json-typed.git"
+
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
+  "ocaml" {>= "4.3.0"}
   "dune" {build & >= "1.0.1"}
   "uri" {>= "1.9.0" }
 ]

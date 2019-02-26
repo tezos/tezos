@@ -112,7 +112,7 @@ The number of active rolls can be computed with two RPCs, first we
 list all the active delegates with ``delegates?active``, then we sum
 all their ``stacking_balance`` and we simply divide by the size of a
 roll, 10kꜩ.
-At the time of writing, on Betanet the number of active rolls is ~30k
+At the time of writing, on Mainnet the number of active rolls is ~30k
 so for each block we know that the chance that we get selected for
 baking is ``1/30k`` while for endorsing is 32 times that.
 Given that every draw is with replacement, the distribution that
@@ -125,8 +125,8 @@ Moreover we could extend ``n`` to cover ``preserved_cycles = 5``.
 Once we have ``p`` and ``n``, the expected number of times that we
 might get selected is ``p * n`` (the mean of the distribution).
 Over many cycles our chances will fall around the mean, in some cycles
-we will unlucky get less rights, but in some cycles we might get lucky
-and be assigned more rights!
+we might get unlucky and be assigned fewer rights, but in some cycles we might
+get lucky and be assigned more rights!
 Clearly we would like to plan ahead and have enough deposits to cover
 also the "lucky" cycles so we need to compute a sort of "maximum"
 number of rights that is safe for `most cases`.

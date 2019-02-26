@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -98,7 +99,7 @@ module Pool_event : sig
     (** The remote peer rejected our connection. *)
 
     | Connection_established of Id.t * P2p_peer_id.t
-    (** We succesfully established a authentified connection. *)
+    (** We successfully established a authentified connection. *)
 
     | Swap_request_received of { source : P2p_peer_id.t }
     (** A swap request has been received. *)
@@ -119,6 +120,8 @@ module Pool_event : sig
     (** We decided to close the connection. *)
     | External_disconnection of P2p_peer_id.t
     (** The connection was closed for external reason. *)
+
+  val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 

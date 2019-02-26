@@ -38,7 +38,7 @@ let rec worker_loop st =
   let Pool pool = st.pool in
   Lwt_unix.yield () >>= fun () ->
   protect ~canceler:st.canceler begin fun () ->
-    Lwt_unix.accept st.socket >>= return
+    P2p_fd.accept st.socket >>= return
   end >>= function
   | Ok (fd, addr) ->
       let point =
@@ -63,7 +63,7 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   Lwt_unix.listen main_socket backlog ;
   Lwt.return main_socket
 
-let run ?addr ~backlog pool port =
+let create ?addr ~backlog pool port =
   Lwt.catch begin fun () ->
     create_listening_socket
       ~backlog ?addr port >>= fun socket ->
@@ -75,10 +75,6 @@ let run ?addr ~backlog pool port =
       socket ; canceler ; pool = Pool pool ;
       worker = Lwt.return_unit ;
     } in
-    st.worker <-
-      Lwt_utils.worker "welcome"
-        ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     Lwt.return st
   end begin fun exn ->
     lwt_log_error
@@ -86,6 +82,12 @@ let run ?addr ~backlog pool port =
       pp_exn exn >>= fun () ->
     Lwt.fail exn
   end
+
+let activate st =
+  st.worker <-
+    Lwt_utils.worker "welcome"
+      ~run:(fun () -> worker_loop st)
+      ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
 
 let shutdown st =
   Lwt_canceler.cancel st.canceler >>= fun () ->

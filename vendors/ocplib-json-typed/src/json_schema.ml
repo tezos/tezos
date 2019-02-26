@@ -1113,27 +1113,27 @@ module Make (Repr : Json_repr.Repr) = struct
     collect schema.root ;
     { schema with definitions = !res }
 
-  let definition_path_of_name name =
+  let definition_path_of_name ?(definitions_path="/definitions/") name =
     path_of_json_pointer ~wildcards:false @@
     match String.get name 0 with
     | exception _ -> raise (Bad_reference name)
     | '/' -> name
-    | _ -> "/definitions/" ^ name
+    | _ -> definitions_path ^ name
 
-  let find_definition name schema =
-    let path = definition_path_of_name name in
+  let find_definition ?definitions_path name schema =
+    let path = definition_path_of_name ?definitions_path name in
     find_definition path schema.definitions
 
-  let definition_ref name =
-    let path = definition_path_of_name name in
+  let definition_ref ?definitions_path name =
+    let path = definition_path_of_name ?definitions_path name in
     element (Def_ref path)
 
-  let definition_exists name schema =
-    let path = definition_path_of_name name in
+  let definition_exists ?definitions_path name schema =
+    let path = definition_path_of_name ?definitions_path name in
     definition_exists path schema.definitions
 
-  let add_definition name elt schema =
-    let path = definition_path_of_name name in
+  let add_definition ?definitions_path name elt schema =
+    let path = definition_path_of_name ?definitions_path name in
     (* check inside def *)
     let definitions = insert_definition path elt schema.definitions in
     { schema with definitions }, element (Def_ref path)

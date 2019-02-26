@@ -23,14 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let call_service1 cctxt s block a1 =
-  Client_rpcs.call_service1 cctxt
-    (s Block_services.proto_path) block a1
-let call_error_service1 cctxt s block a1 =
-  call_service1 cctxt s block a1 >>= function
-  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
-  | Ok (Ok v) -> return v
-  | Error _ as err -> Lwt.return err
+val failing:
+  'a #RPC_context.simple -> 'a -> int -> unit shell_tzresult Lwt.t
 
-let echo cctxt = call_service1 cctxt Services.echo_service
-let failing cctxt = call_error_service1 cctxt Services.failing_service
+val echo :
+  'a #RPC_context.simple -> 'a -> string -> string shell_tzresult Lwt.t
+
+val rpc_services : Updater.rpc_context RPC_directory.t

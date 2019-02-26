@@ -5,6 +5,7 @@ variables:
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
 stages:
+  - doc
   - build
   - test
   - packaging
@@ -113,10 +114,15 @@ test:p2p:pool:
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
-test:proto_alpha:
+test:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
     - dune build @src/proto_003_PsddFKi3/lib_protocol/runtest
+
+test:proto_alpha:lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_003_PsddFKi3/lib_client/test/runtest
 
 test:p2p:peerset:
   <<: *test_definition
@@ -148,6 +154,21 @@ test:contracts.sh:
   script:
     - dune build @src/bin_client/runtest_contracts.sh
 
+test:contracts_opcode.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_opcode.sh
+
+test:contracts_macros.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_macros.sh
+
+test:contracts_mini_scenarios.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
+
 test:multinode.sh:
   <<: *test_definition
   script:
@@ -157,6 +178,11 @@ test:inject.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_injection.sh
+
+test:voting.sh:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest_voting.sh
 
 test:proto:sandbox:
   <<: *test_definition
@@ -182,6 +208,15 @@ test:linkcheck:
     - make doc-html-and-linkcheck
   allow_failure: true
 
+test:validation:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_validation/runtest
+
+test:micheline:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_micheline/runtest
 
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
@@ -343,182 +378,192 @@ opam:27:tezos-client-base:
   variables:
     package: tezos-client-base
 
-opam:28:tezos-protocol-compiler:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-compiler
-
-opam:29:ledgerwallet-tezos:
-  <<: *opam_definition
-  variables:
-    package: ledgerwallet-tezos
-
-opam:30:tezos-signer-services:
-  <<: *opam_definition
-  variables:
-    package: tezos-signer-services
-
-opam:31:tezos-protocol-environment:
+opam:28:tezos-protocol-environment:
   <<: *opam_definition
   variables:
     package: tezos-protocol-environment
 
-opam:32:tezos-signer-backends:
+opam:29:tezos-protocol-compiler:
   <<: *opam_definition
   variables:
-    package: tezos-signer-backends
+    package: tezos-protocol-compiler
+
+opam:30:ledgerwallet-tezos:
+  <<: *opam_definition
+  variables:
+    package: ledgerwallet-tezos
+
+opam:31:tezos-signer-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer-services
+
+opam:32:tezos-protocol-environment-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-shell
 
 opam:33:tezos-protocol-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-protocol-003-PsddFKi3
 
-opam:34:tezos-protocol-environment-shell:
+opam:34:tezos-signer-backends:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-environment-shell
+    package: tezos-signer-backends
 
-opam:35:tezos-client-003-PsddFKi3:
+opam:35:tezos-protocol-updater:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-updater
+
+opam:36:tezos-client-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-client-003-PsddFKi3
 
-opam:36:tezos-client-commands:
+opam:37:tezos-client-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-commands
-
-opam:37:tezos-protocol-updater:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-updater
 
 opam:38:tezos-p2p:
   <<: *opam_definition
   variables:
     package: tezos-p2p
 
-opam:39:tezos-baking-003-PsddFKi3:
+opam:39:tezos-validation:
+  <<: *opam_definition
+  variables:
+    package: tezos-validation
+
+opam:40:tezos-baking-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-baking-003-PsddFKi3
 
-opam:40:tezos-protocol-000-Ps9mPmXa:
+opam:41:tezos-protocol-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
     package: tezos-protocol-000-Ps9mPmXa
 
-opam:41:ocplib-resto-json:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-json
-
-opam:42:tezos-embedded-protocol-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-003-PsddFKi3
-
-opam:43:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:44:tezos-baking-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-003-PsddFKi3-commands
-
-opam:45:tezos-client-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-000-Ps9mPmXa
-
-opam:46:tezos-client-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-003-PsddFKi3-commands
-
-opam:47:tezos-client-base-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-base-unix
-
-opam:48:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:49:tezos-embedded-protocol-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-000-Ps9mPmXa
-
-opam:50:tezos-embedded-protocol-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-demo
-
-opam:51:tezos-mempool-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-003-PsddFKi3
-
-opam:52:tezos-endorser-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-003-PsddFKi3-commands
-
-opam:53:tezos-client:
-  <<: *opam_definition
-  variables:
-    package: tezos-client
-
-opam:54:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:55:tezos-baker-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-003-PsddFKi3-commands
-
-opam:56:tezos-accuser-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-003-PsddFKi3-commands
-
-opam:57:tezos-accuser-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-003-PsddFKi3
-
-opam:58:tezos-protocol-demo:
+opam:42:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:59:tezos-signer:
+opam:43:ocplib-resto-json:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-json
+
+opam:44:tezos-embedded-protocol-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-003-PsddFKi3
+
+opam:45:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
+
+opam:46:tezos-baking-003-PsddFKi3-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-003-PsddFKi3-commands
+
+opam:47:tezos-client-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-000-Ps9mPmXa
+
+opam:48:tezos-client-003-PsddFKi3-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-003-PsddFKi3-commands
+
+opam:49:tezos-client-base-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-base-unix
+
+opam:50:tezos-client-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-demo
+
+opam:51:ocplib-ezresto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto
+
+opam:52:tezos-embedded-protocol-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-000-Ps9mPmXa
+
+opam:53:tezos-embedded-protocol-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo
+
+opam:54:tezos-mempool-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-003-PsddFKi3
+
+opam:55:tezos-endorser-003-PsddFKi3-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-003-PsddFKi3-commands
+
+opam:56:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:57:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:58:tezos-baker-003-PsddFKi3-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-003-PsddFKi3-commands
+
+opam:59:tezos-accuser-003-PsddFKi3-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-003-PsddFKi3-commands
+
+opam:60:tezos-accuser-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-003-PsddFKi3
+
+opam:61:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:60:tezos-baker-003-PsddFKi3:
+opam:62:tezos-baker-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-baker-003-PsddFKi3
 
-opam:61:tezos-node:
+opam:63:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:62:ocplib-json-typed-browser:
+opam:64:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:63:tezos-endorser-003-PsddFKi3:
+opam:65:tezos-endorser-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-endorser-003-PsddFKi3
@@ -562,7 +607,7 @@ publish:docker:
 
 publish:doc:
   image: ${build_deps_image_name}:${build_deps_image_version}
-  stage: publish
+  stage: doc
   only:
     - master
     - alphanet

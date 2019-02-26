@@ -43,5 +43,5 @@ echo
 docker build -t "$image_name:$image_version" "$tmp_dir"
 
 echo
-echo "### Succesfully build docker image: $image_name:$image_version"
+echo "### Successfully build docker image: $image_name:$image_version"
 echo

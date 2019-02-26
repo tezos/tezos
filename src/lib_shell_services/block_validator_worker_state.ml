@@ -87,7 +87,7 @@ module Event = struct
     | Debug msg -> Format.fprintf ppf "%s" msg
     | Validation_success (req, { pushed ; treated ; completed }) ->
         Format.fprintf ppf
-          "@[<v 0>Block %a succesfully validated@,\
+          "@[<v 0>Block %a successfully validated@,\
            Pushed: %a, Treated: %a, Completed: %a@]"
           Block_hash.pp req.block
           Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed

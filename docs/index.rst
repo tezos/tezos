@@ -15,12 +15,12 @@ capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 
- - Developer documentation is available online at https://tezos.gitlab.io/master
-   The documentation is automatically generated for the master branch and the
-   three official network branches `mainnet <https://tezos.gitlab.io/mainnet>`_,
-   `alphanet <https://tezos.gitlab.io/alphanet>`_,
-   `zeronet <https://tezos.gitlab.io/zeronet>`_. Make sure you are
-   consulting the right API version.
+ - Developer documentation is available online at
+   https://tezos.gitlab.io/master . The documentation is automatically
+   generated for the master branch, the main network `mainnet
+   <https://tezos.gitlab.io/mainnet>`_ and the test network `alphanet
+   <https://tezos.gitlab.io/alphanet>`_.
+   Make sure you are consulting the right version.
  - The website https://tezos.com/ contains more information about the project.
  - All development happens on GitLab at https://gitlab.com/tezos/tezos
 
@@ -89,7 +89,7 @@ Zeronet
 Zeronet is the most cutting-edge development network of Tezos. It is
 restarted without notice, possibly several times a day.
 This network is mostly used internally by the Tezos developers and may
-have *different constants* that Alphanet or Mainnet, for example it
+have *different constants* from Alphanet or Mainnet, for example it
 has shorter cycles and a shorter interval between blocks.
 We offer no support for the Zeronet.
 
