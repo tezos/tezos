@@ -20,4 +20,32 @@
 val config:
   ?config:Irmin.config -> ?mapsize:int64 -> ?readonly:bool -> string -> Irmin.config
 
-module Make : Irmin.S_MAKER
+module Make
+  (M: Irmin.Metadata.S)
+  (C: Irmin.Contents.S)
+  (P: Irmin.Path.S)
+  (B: Irmin.Branch.S)
+  (H: Irmin.Hash.S): sig
+  include Irmin.S
+    with type key = P.t
+     and type step = P.step
+     and module Key = P
+     and type metadata = M.t
+     and type contents = C.t
+     and type branch = B.t
+     and type Commit.Hash.t = H.t
+     and type Tree.Hash.t = H.t
+     and type Contents.Hash.t = H.t
+
+  type stats
+
+  val pp_stats: stats Fmt.t
+
+  val gc:
+    repo:Repo.t ->
+    ?before_pivot:(unit -> unit Lwt.t) ->
+    ?branches:B.t list ->
+    ?switch:Lwt_switch.t ->
+    Commit.hash list -> stats Lwt.t
+
+end

@@ -41,6 +41,11 @@ let get_chain state chain =
   get_chain_id state chain >>= fun chain_id ->
   State.Chain.get_exn state chain_id
 
+let get_checkpoint state (chain : Chain_services.chain) =
+  get_chain state chain >>= fun chain ->
+  State.Chain.checkpoint chain >>= fun header ->
+  Lwt.return (Block_header.hash header)
+
 let predecessors ignored length head =
   let rec loop acc length block =
     if length <= 0 then
@@ -118,6 +123,14 @@ let rpc_directory =
 
   register0 S.chain_id begin fun chain () () ->
     return (State.Chain.id chain)
+  end ;
+
+  register0 S.checkpoint begin fun chain () () ->
+    State.Chain.checkpoint chain >>= fun checkpoint ->
+    State.Chain.save_point chain >>= fun (save_point, _) ->
+    State.Chain.caboose chain >>= fun (caboose, _) ->
+    State.history_mode (State.Chain.global_state chain) >>=? fun history_mode ->
+    return (checkpoint, save_point, caboose, history_mode)
   end ;
 
   (* blocks *)

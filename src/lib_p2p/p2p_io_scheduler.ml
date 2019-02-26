@@ -25,21 +25,7 @@
 
 (* TODO decide whether we need to preallocate buffers or not. *)
 
-let () =
-  (* Otherwise some writes trigger a SIGPIPE instead of raising an
-     Lwt_unit exception. In the node, this is already done by
-     Cohttp, so this is only useful when using the P2P layer as a
-     stand alone library.  *)
-  if Sys.os_type <> "Win32" then
-    Sys.(set_signal sigpipe Signal_ignore)
-
 include Logging.Make (struct let name = "p2p.io-scheduler" end)
-
-module Inttbl = Hashtbl.Make(struct
-    type t = int
-    let equal (x: int) (y: int) = x = y
-    let hash = Hashtbl.hash
-  end)
 
 let alpha = 0.2
 
@@ -241,12 +227,12 @@ end
 
 module ReadScheduler = Scheduler(struct
     let name = "io_scheduler(read)"
-    type in_param = Lwt_unix.file_descr * int
+    type in_param = P2p_fd.t * int
     let pop (fd, maxlen) =
       Lwt.catch
         (fun () ->
            let buf = MBytes.create maxlen in
-           Lwt_bytes.read fd buf 0 maxlen >>= fun len ->
+           P2p_fd.read fd buf 0 maxlen >>= fun len ->
            if len = 0 then
              fail P2p_errors.Connection_closed
            else
@@ -274,11 +260,11 @@ module WriteScheduler = Scheduler(struct
       Lwt.catch
         (fun () -> Lwt_pipe.pop p >>= return)
         (fun _ -> fail (Exn Lwt_pipe.Closed))
-    type out_param = Lwt_unix.file_descr
+    type out_param = P2p_fd.t
     let push fd buf =
       Lwt.catch
         (fun () ->
-           Lwt_utils_unix.write_mbytes fd buf >>= return)
+           P2p_fd.write fd buf >>= return)
         (function
           | Unix.Unix_error(Unix.ECONNRESET, _, _)
           | Unix.Unix_error(Unix.EPIPE, _, _)
@@ -291,9 +277,8 @@ module WriteScheduler = Scheduler(struct
   end)
 
 type connection = {
-  id: int ;
   sched: t ;
-  conn: Lwt_unix.file_descr ;
+  conn: P2p_fd.t;
   canceler: Lwt_canceler.t ;
   read_conn: ReadScheduler.connection ;
   read_queue: MBytes.t tzresult Lwt_pipe.t ;
@@ -304,7 +289,7 @@ type connection = {
 
 and t = {
   mutable closed: bool ;
-  connected: connection Inttbl.t ;
+  connected: connection P2p_fd.Table.t ;
   read_scheduler: ReadScheduler.t ;
   write_scheduler: WriteScheduler.t ;
   max_upload_speed: int option ; (* bytes per second. *)
@@ -320,11 +305,11 @@ let reset_quota st =
     Moving_average.stat st.read_scheduler.counter
   and { Moving_average.average = current_outflow } =
     Moving_average.stat st.write_scheduler.counter in
-  let nb_conn = Inttbl.length st.connected in
+  let nb_conn = P2p_fd.Table.length st.connected in
   if nb_conn > 0 then begin
     let fair_read_quota = current_inflow / nb_conn
     and fair_write_quota = current_outflow / nb_conn in
-    Inttbl.iter
+    P2p_fd.Table.iter
       (fun _id conn ->
          conn.read_conn.last_quota <- fair_read_quota ;
          conn.read_conn.quota <-
@@ -345,7 +330,7 @@ let create
   log_info "--> create" ;
   let st = {
     closed = false ;
-    connected = Inttbl.create 53 ;
+    connected = P2p_fd.Table.create 53 ;
     read_scheduler = ReadScheduler.create max_download_speed ;
     write_scheduler = WriteScheduler.create max_upload_speed ;
     max_upload_speed ;
@@ -367,45 +352,43 @@ let read_size = function
 let write_size mbytes =
   (Sys.word_size / 8) * 6 + MBytes.length mbytes + Lwt_pipe.push_overhead
 
-let register =
-  let cpt = ref 0 in
-  fun st conn ->
-    if st.closed then begin
-      Lwt.async (fun () -> Lwt_utils_unix.safe_close conn) ;
-      raise Closed
-    end else begin
-      let id = incr cpt; !cpt in
-      let canceler = Lwt_canceler.create () in
-      let read_size =
-        Option.map st.read_queue_size ~f:(fun v -> v, read_size) in
-      let write_size =
-        Option.map st.write_queue_size ~f:(fun v -> v, write_size) in
-      let read_queue = Lwt_pipe.create ?size:read_size () in
-      let write_queue = Lwt_pipe.create ?size:write_size () in
-      let read_conn =
-        ReadScheduler.create_connection
-          st.read_scheduler (conn, st.read_buffer_size) read_queue canceler id
-      and write_conn =
-        WriteScheduler.create_connection
-          st.write_scheduler write_queue conn canceler id in
-      Lwt_canceler.on_cancel canceler begin fun () ->
-        Inttbl.remove st.connected id ;
-        Moving_average.destroy read_conn.counter ;
-        Moving_average.destroy write_conn.counter ;
-        Lwt_pipe.close write_queue ;
-        Lwt_pipe.close read_queue ;
-        Lwt_utils_unix.safe_close conn
-      end ;
-      let conn = {
-        sched = st ; id ; conn ; canceler ;
-        read_queue ; read_conn ;
-        write_queue ; write_conn ;
-        partial_read = None ;
-      } in
-      Inttbl.add st.connected id conn ;
-      log_info "--> register (%d)" conn.id ;
-      conn
-    end
+let register st conn =
+  if st.closed then begin
+    Lwt.async (fun () -> P2p_fd.close conn) ;
+    raise Closed
+  end else begin
+    let id = P2p_fd.id conn in
+    let canceler = Lwt_canceler.create () in
+    let read_size =
+      Option.map st.read_queue_size ~f:(fun v -> v, read_size) in
+    let write_size =
+      Option.map st.write_queue_size ~f:(fun v -> v, write_size) in
+    let read_queue = Lwt_pipe.create ?size:read_size () in
+    let write_queue = Lwt_pipe.create ?size:write_size () in
+    let read_conn =
+      ReadScheduler.create_connection
+        st.read_scheduler (conn, st.read_buffer_size) read_queue canceler id
+    and write_conn =
+      WriteScheduler.create_connection
+        st.write_scheduler write_queue conn canceler id in
+    Lwt_canceler.on_cancel canceler begin fun () ->
+      P2p_fd.Table.remove st.connected conn ;
+      Moving_average.destroy read_conn.counter ;
+      Moving_average.destroy write_conn.counter ;
+      Lwt_pipe.close write_queue ;
+      Lwt_pipe.close read_queue ;
+      P2p_fd.close conn
+    end ;
+    let conn = {
+      sched = st ; conn ; canceler ;
+      read_queue ; read_conn ;
+      write_queue ; write_conn ;
+      partial_read = None ;
+    } in
+    P2p_fd.Table.add st.connected conn.conn conn ;
+    log_info "--> register (%d)" id ;
+    conn
+  end
 
 let write { write_queue } msg =
   Lwt.catch
@@ -487,8 +470,9 @@ let stat { read_conn ; write_conn} =
   convert ~rs ~ws
 
 let close ?timeout conn =
-  lwt_log_info "--> close (%d)" conn.id >>= fun () ->
-  Inttbl.remove conn.sched.connected conn.id ;
+  let id = P2p_fd.id conn.conn in
+  lwt_log_info "--> close (%d)" id >>= fun () ->
+  P2p_fd.Table.remove conn.sched.connected conn.conn ;
   Lwt_pipe.close conn.write_queue ;
   begin
     match timeout with
@@ -501,20 +485,22 @@ let close ?timeout conn =
           (fun canceler -> return (Lwt_canceler.cancelation canceler))
   end >>=? fun _ ->
   conn.write_conn.current_push >>= fun res ->
-  lwt_log_info "<-- close (%d)" conn.id >>= fun () ->
+  lwt_log_info "<-- close (%d)" id >>= fun () ->
   Lwt.return res
 
 let iter_connection { connected } f =
-  Inttbl.iter f connected
+  P2p_fd.Table.iter (fun _ conn -> f conn) connected
 
 let shutdown ?timeout st =
   lwt_log_info "--> shutdown" >>= fun () ->
   st.closed <- true ;
   ReadScheduler.shutdown st.read_scheduler >>= fun () ->
-  Inttbl.fold
+  P2p_fd.Table.fold
     (fun _peer_id conn acc -> close ?timeout conn >>= fun _ -> acc)
     st.connected
     Lwt.return_unit >>= fun () ->
   WriteScheduler.shutdown st.write_scheduler >>= fun () ->
   lwt_log_info "<-- shutdown" >>= fun () ->
   Lwt.return_unit
+
+let id conn = P2p_fd.id conn.conn

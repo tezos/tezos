@@ -340,9 +340,23 @@ let hash ~time ?(message = "") context =
   Lwt.return x
 
 let commit ~time ?message context =
-  raw_commit ~time ?message context >>= fun commit ->
-  let h = GitStore.Commit.hash commit in
-  Lwt.return h
+  raw_commit ~time ?message context >|= fun commit ->
+  GitStore.Commit.hash commit
+
+let gc_in_progress = ref None
+
+let gc index ~roots =
+  let switch = Lwt_switch.create () in
+  gc_in_progress := Some switch;
+  GitStore.gc ~repo:index.repo ~switch roots >|= fun stats ->
+  gc_in_progress := None;
+  Fmt.pr "GC: live objects: %a\n%!" GitStore.pp_stats stats
+
+
+let close () =
+  match !gc_in_progress with
+  | None   -> Lwt.return ()
+  | Some s -> Lwt_switch.turn_off s
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 
@@ -440,7 +454,6 @@ let init ?patch_context ?mapsize ?readonly root =
 
 let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
-
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = GitStore.Tree.empty in
   let ctxt = { index ; tree ; parents = [] } in
@@ -495,3 +508,270 @@ let set_master index commit =
   | None -> assert false
   | Some commit ->
       GitStore.Branch.set index.repo GitStore.Branch.master commit
+
+(* Context dumping *)
+
+module Pruned_block = struct
+
+  type t = {
+    block_header : Block_header.t ;
+    operations : (int * Operation.t list ) list ;
+    operation_hashes : (int * Operation_hash.t list) list ;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { block_header ; operations ; operation_hashes} ->
+         (block_header, operations, operation_hashes))
+      (fun (block_header, operations, operation_hashes) ->
+         { block_header ; operations ; operation_hashes})
+      (obj3
+         (req "block_header" (dynamic_size Block_header.encoding))
+         (req "operations" (list (tup2 int31 (list (dynamic_size Operation.encoding)))))
+         (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
+      )
+
+  let to_bytes x =
+    Data_encoding.Binary.to_bytes_exn encoding x
+
+  let of_bytes x =
+    Data_encoding.Binary.of_bytes encoding x
+
+end
+
+module Block_data = struct
+
+  type t = {
+    block_header : Block_header.t ;
+    operations : Operation.t list list ;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { block_header  ;
+             operations} ->
+        (block_header,
+         operations))
+      (fun (block_header,
+            operations) ->
+        { block_header ;
+          operations})
+      (obj2
+         (req "block_header" (dynamic_size Block_header.encoding))
+         (req "operations"
+            (list (list (dynamic_size Operation.encoding))))
+      )
+
+  let to_bytes x =
+    Data_encoding.Binary.to_bytes_exn encoding x
+
+  let of_bytes x =
+    Data_encoding.Binary.of_bytes encoding x
+
+  let empty = {
+    block_header =
+      Block_header.{
+        protocol_data = MBytes.empty;
+        shell = {
+          level = 0l;
+          proto_level = 0;
+          predecessor = Block_hash.zero;
+          timestamp = Time.epoch;
+          validation_passes = 0;
+          operations_hash = Operation_list_list_hash.zero;
+          fitness = [];
+          context = Context_hash.zero;
+        } };
+    operations = [[]] ;
+  }
+
+end
+
+module Dumpable_context = struct
+  type nonrec index = index
+  type nonrec context = context
+  type tree = GitStore.tree
+  type hash = GitStore.Tree.hash
+  type step = string
+  type key = step list
+  type commit_info = Irmin.Info.t
+
+  let hash_export = function
+    | `Contents ( h, () ) -> `Blob, Context_hash.to_bytes h
+    | `Node h -> `Node, Context_hash.to_bytes h
+  let hash_import ty mb =
+    Context_hash.of_bytes mb >>? fun h ->
+    match ty with
+    | `Node -> ok @@ `Node h
+    | `Blob -> ok @@ `Contents ( h, () )
+  let hash_equal h1 h2 =
+    match h1, h2 with
+    | `Contents ( h1, () ), `Contents ( h2, () )
+    | `Node h1, `Node h2 -> Context_hash.( h1 = h2 )
+    | `Contents _, `Node _ | `Node _, `Contents _ -> false
+
+  let context_parents ctxt =
+    match ctxt with
+    | { parents = [commit]; _ } ->
+        (* XXX(samoht): fixed in irmin v2 *)
+        let key = GitStore.Commit.hash commit in
+        GitStore.Private.Commit.find
+          (GitStore.Private.Repo.commit_t ctxt.index.repo) key
+        >|= fun v ->
+        let commit = match v with None -> assert false | Some v -> v in
+        let parents = GitStore.Private.Commit.Val.parents commit in
+        List.sort Context_hash.compare parents
+    | _ -> assert false
+
+  let context_info = function
+    | { parents = [c]; _ } -> GitStore.Commit.info c
+    | _ -> assert false
+  let context_info_export i = Irmin.Info.( date i, author i, message i )
+  let context_info_import ( date, author, message) = Irmin.Info.v ~date ~author message
+
+  let get_context idx bh = checkout idx bh.Block_header.shell.context
+  let set_context ~info ~parents ctxt bh =
+    let parents = List.sort Context_hash.compare parents in
+    GitStore.Tree.hash ctxt.index.repo ctxt.tree >>= function
+    | `Node node ->
+        let v = GitStore.Private.Commit.Val.v ~info ~node ~parents in
+        GitStore.Private.Commit.add (GitStore.Private.Repo.commit_t ctxt.index.repo) v
+        >>= fun ctxt_h ->
+        if Context_hash.equal bh.Block_header.shell.context ctxt_h
+        then Lwt.return_some bh
+        else Lwt.return_none
+    | `Contents _ -> assert false
+
+  let context_tree ctxt = ctxt.tree
+  let tree_hash ctxt = function
+    | `Node _ as node -> GitStore.Tree.hash ctxt.index.repo node
+    | contents -> Lwt.return (tree_hash contents)
+  let sub_tree tree key = GitStore.Tree.find_tree tree key
+  let tree_list tree = GitStore.Tree.list tree []
+  let tree_content tree = GitStore.Tree.find tree []
+
+  let make_context index = { index ; tree = GitStore.Tree.empty ; parents = [] ; }
+  let update_context context tree = { context with tree ; }
+
+  let add_hash index tree key hash =
+    GitStore.Tree.of_hash index.repo hash >>= function
+    | None -> Lwt.return_none
+    | Some sub_tree ->
+        GitStore.Tree.add_tree tree key sub_tree >>=
+        Lwt.return_some
+
+
+  let add_mbytes index tree key bytes =
+    GitStore.Tree.hash index.repo (`Contents (bytes, ())) >>= fun _ignored  ->
+    GitStore.Tree.add tree key bytes
+
+  let add_dir index tree key l =
+    let rec fold_list sub_tree = function
+      | [] -> Lwt.return_some sub_tree
+      | ( step, hash ) :: tl ->
+          begin
+            add_hash index sub_tree [step] hash >>= function
+            | None -> Lwt.return_none
+            | Some sub_tree -> fold_list sub_tree tl
+          end
+    in
+    fold_list GitStore.Tree.empty l >>= function
+    | None -> Lwt.return_none
+    | Some sub_tree ->
+        GitStore.Tree.add_tree tree key sub_tree
+        >>= Lwt.return_some
+
+
+  module Commit_hash = Context_hash
+  module Block_header = Block_header
+  module Block_data = Block_data
+  module Pruned_block = Pruned_block
+end
+module Context_dumper = Context_dump.Make(Dumpable_context)
+
+include Context_dumper (* provides functions dump_contexts and restore_contexts *)
+
+type error += Cannot_create_file of string
+let () = register_error_kind `Permanent
+    ~id:"context_dump.write.cannot_open"
+    ~title:"Cannot open file for context dump"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Error while opening file for context dumping: %s@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_dump_cannot_open" string) )
+    (function Cannot_create_file e -> Some e
+            | _ -> None)
+    (fun e -> Cannot_create_file e)
+
+type error += Cannot_open_file of string
+let () = register_error_kind `Permanent
+    ~id:"context_dump.read.cannot_open"
+    ~title:"Cannot open file for context restoring"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Error while opening file for context restoring: %s@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_restore_cannot_open" string) )
+    (function Cannot_open_file e -> Some e
+            | _ -> None)
+    (fun e -> Cannot_open_file e)
+
+type error += Suspicious_file of int
+let () = register_error_kind `Permanent
+    ~id:"context_dump.read.suspicious"
+    ~title:"Suspicious file: data after end"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Remaining bytes in file after context restoring: %d@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_restore_suspicious" int31) )
+    (function Suspicious_file e -> Some e
+            | _ -> None)
+    (fun e -> Suspicious_file e)
+
+let dump_contexts idx block_headers ~filename =
+  let file_init () =
+    Lwt_unix.openfile filename Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o666
+    >>= return
+  in
+  Lwt.catch file_init
+    (function
+      | Unix.Unix_error (e,_,_) -> fail @@ Cannot_create_file (Unix.error_message e)
+      | exc ->
+          let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
+          fail (Cannot_create_file msg))
+  >>=? fun fd ->
+  dump_contexts_fd idx block_headers ~fd
+
+let restore_contexts idx ~filename =
+  let file_init () =
+    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY;] 0o600
+    >>= return
+  in
+  Lwt.catch file_init
+    (function
+      | Unix.Unix_error (e,_,_) -> fail @@ Cannot_open_file (Unix.error_message e)
+      | exc ->
+          let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
+          fail (Cannot_open_file msg))
+  >>=? fun fd ->
+  Lwt.finalize
+    (fun () ->
+       restore_contexts_fd idx ~fd
+       >>=? fun result ->
+       Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR
+       >>= fun current ->
+       Lwt_unix.fstat fd
+       >>= fun stats ->
+       let total = stats.Lwt_unix.st_size in
+       if current = total
+       then return result
+       else fail @@ Suspicious_file (total - current)
+    )
+    (fun () -> Lwt_unix.close fd)

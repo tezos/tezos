@@ -7,6 +7,7 @@
             tezos-client-base
             tezos-client-commands
             tezos-client-genesis
+            tezos-client-demo
             tezos-client-alpha
             tezos-stdlib-unix
             tezos-client-base-unix

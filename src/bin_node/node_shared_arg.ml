@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,6 +43,7 @@ type t = {
   peers: string list ;
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
+  discovery_addr: string option ;
   rpc_listen_addr: string option ;
   private_mode: bool ;
   disable_mempool: bool ;
@@ -50,15 +52,17 @@ type t = {
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging_unix.Output.t option ;
   bootstrap_threshold: int option ;
+  history_mode: History_mode.t option ;
 }
 
 let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr peers no_bootstrap_peers bootstrap_threshold private_mode disable_mempool
+    listen_addr discovery_addr peers no_bootstrap_peers
+    bootstrap_threshold private_mode disable_mempool
     expected_pow rpc_listen_addr rpc_tls
-    cors_origins cors_headers log_output =
+    cors_origins cors_headers log_output history_mode =
 
   let actual_data_dir =
     Option.unopt ~default:Node_config_file.default_data_dir data_dir in
@@ -100,6 +104,7 @@ let wrap
     peers ;
     no_bootstrap_peers ;
     listen_addr ;
+    discovery_addr ;
     rpc_listen_addr ;
     private_mode ;
     disable_mempool ;
@@ -109,6 +114,7 @@ let wrap
     log_output ;
     peer_table_size ;
     bootstrap_threshold ;
+    history_mode ;
   }
 
 module Manpage = struct
@@ -188,9 +194,7 @@ module Term = struct
 
   let binary_chunks_size =
     let doc =
-      Format.sprintf
-        "Size limit (in kB) of binary blocks that are sent to other peers."
-    in
+      "Size limit (in kB) of binary blocks that are sent to other peers." in
     Arg.(value & opt (some int) None &
          info ~docs ~doc ~docv:"NUM" ["binary-chunks-size"])
 
@@ -206,6 +210,11 @@ module Term = struct
       "The TCP address and port at which this instance can be reached." in
     Arg.(value & opt (some string) None &
          info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
+
+  let discovery_addr =
+    let doc = "The UDP address and port used for local peer discovery." in
+    Arg.(value & opt (some string) None &
+         info ~docs ~doc ~docv:"ADDR:PORT" ["discovery-addr"])
 
   let no_bootstrap_peers =
     let doc =
@@ -280,17 +289,39 @@ module Term = struct
     Arg.(value & opt_all string [] &
          info ~docs ~doc ~docv:"HEADER" ["cors-header"])
 
+  (* History mode. *)
+
+  let history_mode_converter =
+    let open History_mode in
+    let conv s = match s with
+      | "archive" -> `Ok Archive
+      | "full" -> `Ok Full
+      | "rolling" -> `Ok Rolling
+      | s -> `Error s in
+    let to_string = Format.asprintf "%a" History_mode.pp in
+    let pp fmt mode = Format.fprintf fmt "%s" (to_string mode) in
+    (conv, pp)
+
+  let history_mode =
+    let doc = "History mode." in
+    Arg.(value & opt (some history_mode_converter) None &
+         info ~docs ~doc ~docv:"History mode" ["history-mode"])
+
+  (* Args. *)
+
   let args =
     let open Term in
     const wrap $ data_dir $ config_file
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
+    $ listen_addr $ discovery_addr $ peers $ no_bootstrap_peers
+    $ bootstrap_threshold
     $ private_mode $ disable_mempool
     $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
+    $ history_mode
 
 end
 
@@ -308,11 +339,13 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         expected_pow ;
         peers ; no_bootstrap_peers ;
         listen_addr ; private_mode ;
+        discovery_addr ;
         disable_mempool ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
         log_output ;
         bootstrap_threshold ;
+        history_mode ;
       } = args in
   let bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers
@@ -325,6 +358,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
-    ~bootstrap_peers ?listen_addr ?rpc_listen_addr ~private_mode
+    ~bootstrap_peers ?listen_addr ?discovery_addr ?rpc_listen_addr ~private_mode
     ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
-    ?bootstrap_threshold cfg
+    ?bootstrap_threshold ?history_mode cfg

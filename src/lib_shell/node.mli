@@ -32,7 +32,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_chain_max_tll: int option ;
-  checkpoint: (Int32.t * Block_hash.t) option ;
+  checkpoint: Block_header.t option ;
 }
 
 and peer_validator_limits = {
@@ -68,6 +68,7 @@ val create:
   block_validator_limits ->
   prevalidator_limits ->
   chain_validator_limits ->
+  History_mode.t option ->
   t tzresult Lwt.t
 
 val shutdown: t -> unit Lwt.t

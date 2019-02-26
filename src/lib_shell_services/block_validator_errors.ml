@@ -49,6 +49,91 @@ type block_error =
                         allowed_pass: int list }
   | Cannot_parse_block_header
 
+let errno : Unix.error Data_encoding.t =
+  let open Data_encoding in
+  union [
+    case
+      ~title:"unknown_unix_error"
+      (Tag 0) int8
+      (function Unix.EUNKNOWNERR i -> Some i | _ -> None)
+      (fun i -> EUNKNOWNERR i) ;
+    case
+      ~title:"unix_error"
+      (Tag 1)
+      (string_enum
+         Unix.[
+           "2big", E2BIG ;
+           "acces", EACCES ;
+           "again", EAGAIN ;
+           "badf", EBADF ;
+           "busy", EBUSY ;
+           "child", ECHILD ;
+           "deadlk", EDEADLK ;
+           "dom", EDOM ;
+           "exist", EEXIST ;
+           "fault", EFAULT ;
+           "fbig", EFBIG ;
+           "intr", EINTR ;
+           "inval", EINVAL ;
+           "io", EIO ;
+           "isdir", EISDIR ;
+           "mfile", EMFILE ;
+           "mlink", EMLINK ;
+           "nametoolong", ENAMETOOLONG ;
+           "nfile", ENFILE ;
+           "nodev", ENODEV ;
+           "noent", ENOENT ;
+           "noexec", ENOEXEC ;
+           "nolck", ENOLCK ;
+           "nomem", ENOMEM ;
+           "nospc", ENOSPC ;
+           "nosys", ENOSYS ;
+           "notdir", ENOTDIR ;
+           "notempty", ENOTEMPTY ;
+           "notty", ENOTTY ;
+           "nxio", ENXIO ;
+           "perm", EPERM ;
+           "pipe", EPIPE ;
+           "range", ERANGE ;
+           "rofs", EROFS ;
+           "spipe", ESPIPE ;
+           "srch", ESRCH ;
+           "xdev", EXDEV ;
+           "wouldblock", EWOULDBLOCK ;
+           "inprogress", EINPROGRESS ;
+           "already", EALREADY ;
+           "notsock", ENOTSOCK ;
+           "destaddrreq", EDESTADDRREQ ;
+           "msgsize", EMSGSIZE ;
+           "prototype", EPROTOTYPE ;
+           "noprotoopt", ENOPROTOOPT ;
+           "protonosupport", EPROTONOSUPPORT ;
+           "socktnosupport", ESOCKTNOSUPPORT ;
+           "opnotsupp", EOPNOTSUPP ;
+           "pfnosupport", EPFNOSUPPORT ;
+           "afnosupport", EAFNOSUPPORT ;
+           "addrinuse", EADDRINUSE ;
+           "addrnotavail", EADDRNOTAVAIL ;
+           "netdown", ENETDOWN ;
+           "netunreach", ENETUNREACH ;
+           "netreset", ENETRESET ;
+           "connaborted", ECONNABORTED ;
+           "connreset", ECONNRESET ;
+           "nobufs", ENOBUFS ;
+           "isconn", EISCONN ;
+           "notconn", ENOTCONN ;
+           "shutdown", ESHUTDOWN ;
+           "toomanyrefs", ETOOMANYREFS ;
+           "timedout", ETIMEDOUT ;
+           "connrefused", ECONNREFUSED ;
+           "hostdown", EHOSTDOWN ;
+           "hostunreach", EHOSTUNREACH ;
+           "loop", ELOOP ;
+           "overflow", EOVERFLOW ])
+      (fun x -> Some x)
+      (fun x -> x)
+  ]
+
 let block_error_encoding =
   let open Data_encoding in
   union
@@ -256,6 +341,9 @@ type error +=
         expected: Operation_list_list_hash.t ;
         found: Operation_list_list_hash.t }
   | Failed_to_checkout_context of Context_hash.t
+  | System_error of { errno: Unix.error ;
+                      fn: string ;
+                      msg: string }
 
 let () =
   Error_monad.register_error_kind
@@ -335,6 +423,23 @@ let () =
     (function
       | Failed_to_checkout_context h -> Some h
       | _ -> None)
-    (fun h -> Failed_to_checkout_context h)
+    (fun h -> Failed_to_checkout_context h) ;
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:"Validator_process.system_error_while_validating"
+    ~title: "Failed to validate block because of a system error"
+    ~description: "The validator failed because of a system error"
+    ~pp:(fun ppf (errno, fn, msg) ->
+        Format.fprintf ppf
+          "System error while validating a block (in function %s(%s)):@ %s"
+          fn msg (Unix.error_message errno))
+    Data_encoding.(obj3
+                     (req "errno" errno)
+                     (req "function" string)
+                     (req "msg" string))
+    (function
+      | System_error { errno ; fn ; msg } -> Some (errno, fn, msg)
+      | _ -> None)
+    (fun (errno, fn, msg) -> System_error { errno ; fn ; msg })
 
 let invalid_block block error = Invalid_block { block ; error }

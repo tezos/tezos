@@ -25,6 +25,8 @@
 
 module Message = Distributed_db_message
 
+include Logging.Make(struct let name = "node.distributed_db" end)
+
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 type connection = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
 
@@ -837,11 +839,12 @@ let create disk p2p =
       active_chains ; protocol_db ;
       block_input ; operation_input ;
     } in
-  P2p.on_new_connection p2p (P2p_reader.run db) ;
-  P2p.iter_connections p2p (P2p_reader.run db) ;
   db
 
 let activate ({ p2p ; active_chains } as global_db) chain_state =
+  P2p.on_new_connection p2p (P2p_reader.run global_db) ;
+  P2p.iter_connections p2p (P2p_reader.run global_db) ;
+  P2p.activate p2p;
   let chain_id = State.Chain.id chain_state in
   match Chain_id.Table.find_opt active_chains chain_id with
   | None ->
@@ -1137,4 +1140,3 @@ module Advertise = struct
           ) (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
 end
-

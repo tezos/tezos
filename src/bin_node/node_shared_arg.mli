@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,6 +38,7 @@ type t = {
   peers: string list ;
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
+  discovery_addr: string option ;
   rpc_listen_addr: string option ;
   private_mode: bool ;
   disable_mempool: bool ;
@@ -45,6 +47,7 @@ type t = {
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging_unix.Output.t option ;
   bootstrap_threshold: int option ;
+  history_mode: History_mode.t option ;
 }
 
 module Term : sig
@@ -60,3 +63,4 @@ module Manpage : sig
   val args: Cmdliner.Manpage.block list
   val bugs: Cmdliner.Manpage.block list
 end
+

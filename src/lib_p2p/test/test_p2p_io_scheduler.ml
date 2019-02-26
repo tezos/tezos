@@ -48,7 +48,7 @@ let rec listen ?port addr =
   end
 
 let accept main_socket =
-  Lwt_unix.accept main_socket >>= fun (fd, _sockaddr) ->
+  P2p_fd.accept main_socket >>= fun (fd, _sockaddr) ->
   return fd
 
 let rec accept_n main_socket n =
@@ -60,10 +60,10 @@ let rec accept_n main_socket n =
     return (conn :: acc)
 
 let connect addr port =
-  let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
+  let fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
   let uaddr =
     Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  Lwt_unix.connect fd uaddr >>= fun () ->
+  P2p_fd.connect fd uaddr >>= fun () ->
   return fd
 
 let simple_msgs =
@@ -107,8 +107,11 @@ let server
     log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
     if display_client_stat then
       P2p_io_scheduler.iter_connection sched
-        (fun id conn ->
-           log_notice " client(%d) %a" id P2p_stat.pp (P2p_io_scheduler.stat conn)) ;
+        (fun conn ->
+           log_notice
+             " client(%d) %a"
+             (P2p_io_scheduler.id conn)
+             P2p_stat.pp (P2p_io_scheduler.stat conn)) ;
   end ;
   (* Accept and read message until the connection is closed. *)
   accept_n main_socket n >>=? fun conns ->

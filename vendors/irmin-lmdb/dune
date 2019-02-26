@@ -1,5 +1,5 @@
 (library
  (name        irmin_lmdb)
  (public_name irmin-lmdb)
- (libraries   irmin lmdb)
+ (libraries   irmin lmdb lwt.unix ocplib-endian)
  (flags (:standard -safe-string)))

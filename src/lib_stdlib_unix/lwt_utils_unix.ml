@@ -49,6 +49,11 @@ let read_bytes ?(pos = 0) ?len fd buf =
   in
   inner pos len
 
+let read_string ~len fd =
+  let b = Bytes.create len in
+  read_bytes fd b >>= fun () ->
+  Lwt.return @@ Bytes.to_string b
+
 let read_mbytes ?(pos=0) ?len fd buf =
   let len = match len with None -> MBytes.length buf - pos | Some l -> l in
   let rec inner pos len =
@@ -79,6 +84,17 @@ let write_bytes ?(pos=0) ?len descr buf =
       Lwt.return_unit
     else
       Lwt_unix.write descr buf pos len >>= function
+      | 0 -> Lwt.fail End_of_file (* other endpoint cleanly closed its connection *)
+      | nb_written -> inner (pos + nb_written) (len - nb_written) in
+  inner pos len
+
+let write_string ?(pos=0) ?len descr buf =
+  let len = match len with None -> String.length buf - pos | Some l -> l in
+  let rec inner pos len =
+    if len = 0 then
+      Lwt.return_unit
+    else
+      Lwt_unix.write_string descr buf pos len >>= function
       | 0 -> Lwt.fail End_of_file (* other endpoint cleanly closed its connection *)
       | nb_written -> inner (pos + nb_written) (len - nb_written) in
   inner pos len
@@ -125,14 +141,10 @@ let read_file fn =
     Lwt_io.read ch
   end
 
-
-
 let safe_close fd =
   Lwt.catch
     (fun () -> Lwt_unix.close fd)
     (fun _ -> Lwt.return_unit)
-
-
 
 let of_sockaddr = function
   | Unix.ADDR_UNIX _ -> None
@@ -288,7 +300,7 @@ module Socket = struct
     | Error (`Msg _) -> host
     | Ok ipaddr -> Ipaddr.to_string ipaddr
 
-  let connect = function
+  let connect ?(timeout=5.) = function
     | Unix path ->
         let addr = Lwt_unix.ADDR_UNIX path in
         let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
@@ -300,22 +312,24 @@ module Socket = struct
         | [] ->
             failwith "could not resolve host '%s'" host
         | addrs ->
-            let rec try_connect = function
+            let rec try_connect acc = function
               | [] ->
-                  failwith "could not connect to '%s'" host
+                  Lwt.return
+                    (Error (failure "could not connect to '%s'" host :: List.rev acc))
               | { Unix.ai_family; ai_socktype; ai_protocol; ai_addr } :: addrs ->
                   let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
-                  Lwt.catch
-                    (fun () ->
-                       Lwt_unix.connect sock ai_addr >>= fun () ->
-                       return sock)
-                    (fun exn ->
-                       Format.printf "@{<error>@{<title>Unable to connect to %s@}@}@.\
-                                     \  @[<h 0>%a@]@."
-                         host Format.pp_print_text (Printexc.to_string exn) ;
-                       Lwt_unix.close sock >>= fun () ->
-                       try_connect addrs) in
-            try_connect addrs
+                  protect ~on_error:begin fun e ->
+                    Lwt_unix.close sock >>= fun () ->
+                    Lwt.return (Error e)
+                  end begin fun () ->
+                    with_timeout (Lwt_unix.sleep timeout) (fun _c ->
+                        Lwt_unix.connect sock ai_addr >>= fun () ->
+                        return sock)
+                  end >>= function
+                  | Ok sock -> return sock
+                  | Error e ->
+                      try_connect (e @ acc) addrs in
+            try_connect [] addrs
 
   let bind ?(backlog = 10) = function
     | Unix path ->
@@ -399,7 +413,6 @@ module Socket = struct
 
 end
 
-
 let rec retry ?(log=(fun _ -> Lwt.return_unit)) ?(n=5) ?(sleep=1.) f =
   f () >>= function
   | Ok r -> Lwt.return (Ok r)
@@ -412,4 +425,3 @@ let rec retry ?(log=(fun _ -> Lwt.return_unit)) ?(n=5) ?(sleep=1.) f =
         end
       else
         Lwt.return x
-

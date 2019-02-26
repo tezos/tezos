@@ -214,11 +214,15 @@ let transfer_to_originate_with_fee () =
 
 let transfer_amount_of_contract_balance () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun b ->
+  Context.Contract.pkh contract_1 >>=? fun pkh1 ->
+  (* given that contract_1 no longer has a sufficient balance to bake,
+     make sure it cannot be chosen as baker *)
+  Incremental.begin_construction b ~policy:(Block.Excluding [pkh1]) >>=? fun b ->
   (* get the balance of the source contract *)
   Context.Contract.balance (I b) contract_1 >>=? fun balance ->
   (* transfer all the tez inside contract 1 *)
-  transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 balance >>=? fun (b,_) ->
+  transfer_and_check_balances ~loc:__LOC__
+    b contract_1 contract_2 balance >>=? fun (b,_) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
 
@@ -245,7 +249,10 @@ let transfers_to_self () =
 
 let missing_transaction () =
   register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun b ->
+  (* given that contract_1 no longer has a sufficient balance to bake,
+     make sure it cannot be chosen as baker *)
+  Context.Contract.pkh contract_1 >>=? fun pkh1 ->
+  Incremental.begin_construction b ~policy:(Block.Excluding [pkh1]) >>=? fun b ->
   two_nth_of_balance b contract_1 6L >>=? fun amount ->
   (* do the transfer 3 times from source contract to destination contract *)
   n_transactions 3 b contract_1 contract_2 amount >>=? fun b ->
@@ -580,9 +587,12 @@ let random_contract contract_array =
 let random_transfer () =
   Context.init 10 >>=? fun (b, contracts) ->
   let contracts = Array.of_list contracts in
-  Incremental.begin_construction b >>=? fun b ->
   let source = random_contract contracts in
   let dest = random_contract contracts in
+  Context.Contract.pkh source >>=? fun source_pkh ->
+  (* given that source may not have a sufficient balance for the transfer + to bake, 
+     make sure it cannot be chosen as baker *)
+  Incremental.begin_construction b ~policy:(Block.Excluding [source_pkh]) >>=? fun b ->
   Context.Contract.balance (I b) source >>=? fun amount ->
   begin
     if source = dest

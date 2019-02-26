@@ -53,11 +53,12 @@ let no_commitment () =
     | _ -> false
   end
 
-(** Tests that:
-    - after baking with a commitment the bond is frozen and the reward allocated
-    - revealing too early produces an error
-    - revealing at the right time but the wrong value produces an error
-    - revealing correctly rewards the baker with the tip
+(** Choose a baker, denote it by id. In the first cycle, make id bake only once.
+    Test that:
+    - after id bakes with a commitment the bond is frozen and the reward allocated
+    - when id reveals the nonce too early, there's an error
+    - when id reveals at the right time but the wrong value, there's an error
+    - when another baker reveals correctly, it receives the tip
     - revealing twice produces an error
     - after [preserved cycles] a committer that correctly revealed
       receives back the bond and the reward
@@ -73,15 +74,18 @@ let revelation_early_wrong_right_twice () =
   let blocks_per_commitment = Int32.to_int csts.parametric.blocks_per_commitment in
   let preserved_cycles = csts.parametric.preserved_cycles in
 
-  (* bake until commitment *)
-  Block.bake_n (blocks_per_commitment-2) b >>=? fun b ->
-  (* the next baker [id] will include a seed_nonce commitment *)
+  (* get the pkh of a baker *)
   Block.get_next_baker b >>=? fun (pkh,_,_) ->
   let id = Alpha_context.Contract.implicit_contract pkh in
+  let policy = Block.Excluding [pkh] in
+  (* bake until commitment, excluding id *)
+  Block.bake_n ~policy (blocks_per_commitment-2) b >>=? fun b ->
   Context.Contract.balance ~kind:Main (B b) id >>=? fun bal_main ->
   Context.Contract.balance ~kind:Deposit (B b) id >>=? fun bal_deposit ->
   Context.Contract.balance ~kind:Rewards (B b) id >>=? fun bal_rewards ->
-  Block.bake b >>=? fun b ->
+
+  (* the baker [id] will include a seed_nonce commitment *)
+  Block.bake ~policy:(Block.By_account pkh) b >>=? fun b ->
   Context.get_level (B b) >>=? fun level_commitment ->
   Context.get_seed_nonce_hash (B b) >>=? fun committed_hash ->
 
@@ -95,14 +99,14 @@ let revelation_early_wrong_right_twice () =
 
   (* test that revealing too early produces an error *)
   Op.seed_nonce_revelation (B b) level_commitment (Nonce.get committed_hash) >>=? fun operation ->
-  Block.bake ~operation b >>= fun e ->
+
+  Block.bake ~policy ~operation b >>= fun e ->
   let expected = function
     | Nonce_storage.Too_early_revelation -> true
     | _ -> false in
   Assert.proto_error ~loc:__LOC__ e expected >>=? fun () ->
 
-  (* finish the cycle excluding the committing baker *)
-  let policy = Block.Excluding [pkh] in
+  (* finish the cycle excluding the committing baker, id *)
   Block.bake_until_cycle_end ~policy b >>=? fun b ->
 
   (* test that revealing at the right time but the wrong value produces an error *)
@@ -121,6 +125,7 @@ let revelation_early_wrong_right_twice () =
   Context.Contract.balance ~kind:Main (B b) baker >>=? fun baker_bal_main ->
   Context.Contract.balance ~kind:Deposit (B b) baker >>=? fun baker_bal_deposit ->
   Context.Contract.balance ~kind:Rewards (B b) baker >>=? fun baker_bal_rewards ->
+
   (* bake the operation in a block *)
   Block.bake ~policy ~operation b >>=? fun b ->
 
@@ -135,7 +140,7 @@ let revelation_early_wrong_right_twice () =
 
   (* test that revealing twice produces an error *)
   Op.seed_nonce_revelation (B b) level_commitment (Nonce.get wrong_hash) >>=? fun operation ->
-  Block.bake ~operation b >>= fun e ->
+  Block.bake ~operation ~policy b >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e begin function
     | Nonce_storage.Previously_revealed_nonce -> true
     | _ -> false
@@ -146,6 +151,8 @@ let revelation_early_wrong_right_twice () =
     b (1 -- preserved_cycles) >>=? fun b ->
 
   (* test that [id] receives back the bond and the reward *)
+  (* note that in order to have that new_bal = bal_main + reward,
+     id can only bake once; this is why we exclude id from all other bake ops. *)
   balance_was_credited ~loc:__LOC__
     (B b) id ~kind:Main bal_main reward >>=? fun () ->
   balance_is ~loc:__LOC__

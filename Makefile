@@ -81,6 +81,9 @@ fix-indent:
 build-deps:
 	@./scripts/install_build_deps.sh
 
+build-dev-deps:
+	@./scripts/install_build_deps.sh --dev
+
 docker-image:
 	@./scripts/create_docker_image.sh
 

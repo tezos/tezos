@@ -29,8 +29,8 @@
 
     - the index of validation contexts; and
     - the persistent state of the node:
-      - the blockchain and its alternate heads ;
-      - the pool of pending operations of a chain. *)
+    - the blockchain and its alternate heads ;
+    - the pool of pending operations of a chain. *)
 
 type t
 type global_state = t
@@ -87,7 +87,11 @@ module Chain : sig
   val expiration: chain_state -> Time.t option
   val allow_forked_chain: chain_state -> bool
 
-  val checkpoint: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+  val checkpoint: chain_state -> Block_header.t Lwt.t
+
+  val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+  val caboose: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+
 
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
@@ -95,22 +99,23 @@ module Chain : sig
       invalid alternate heads are removed from the disk, either
       completely (when `level <= checkpoint`) or still tagged as
       invalid (when `level > checkpoint`). *)
-  val set_checkpoint:
-    chain_state ->
-    Int32.t * Block_hash.t ->
+  val set_checkpoint: chain_state -> Block_header.t -> unit Lwt.t
+
+  (** Apply [set_checkpoint] then [purge_full] (see {!History_mode.t}). *)
+  val set_checkpoint_then_purge_full: chain_state -> Block_header.t ->
+    unit Lwt.t
+
+  (** Apply [set_checkpoint] then [purge_rolling] (see {!History_mode.t}). *)
+  val set_checkpoint_then_purge_rolling: chain_state -> Block_header.t ->
     unit Lwt.t
 
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
-  val acceptable_block:
-    chain_state ->
-    Block_hash.t -> Block_header.t ->
-    bool Lwt.t
+  val acceptable_block: chain_state -> Block_header.t -> bool Lwt.t
 
 end
 
-(** {2 Block header manipulation} ******************************************)
-
+type error += Missing_block of Block_hash.t
 
 (** {2 Block database} *****************************************************)
 
@@ -133,9 +138,26 @@ module Block : sig
   val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
   val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Chain.t -> ?pred:int -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block option Lwt.t
-  val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block Lwt.t
+  val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
+  val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
+  val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
+
+  type partial =
+    | Full of block
+    | Header of {
+        chain_id: Chain_id.t ;
+        hash: Block_hash.t ;
+        header: Block_header.t
+      }
+    | Pruned
+
+  (** Will return the full block if the block has never been cleaned
+      (all blocks for nodes whose history-mode is set to archive), only
+      the header for nodes below the save point (nodes in full or
+      rolling history-mode) or even `Pruned` for blocks below the rock
+      bottom, only for nodes in rolling history-mode. Will fail with
+      `Not_found` if the given hash is unknown. *)
+  val read_predecessor: Chain.t -> pred:int -> ?below_save_point:bool -> Block_hash.t -> partial Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -152,16 +174,21 @@ module Block : sig
     bool tzresult Lwt.t
 
   module Header : sig
-    type t
+    type t = private {
+      chain_state: Chain.t ;
+      hash: Block_hash.t ;
+      header: Block_header.t ;
+    }
     type block_header = t
 
     val known: Chain.t -> Block_hash.t -> bool Lwt.t
 
-    val read: Chain.t -> ?pred:int -> Block_hash.t -> block_header tzresult Lwt.t
-    val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block_header option Lwt.t
-    val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block_header Lwt.t
+    val read: Chain.t -> Block_hash.t -> block_header tzresult Lwt.t
+    val read_opt: Chain.t -> Block_hash.t -> block_header option Lwt.t
+    val read_exn: Chain.t -> Block_hash.t -> block_header Lwt.t
+
     val of_block: block -> block_header
-    val to_block: Chain.t -> block_header -> block option Lwt.t
+    val to_block: block_header -> block option Lwt.t
 
     val compare: t -> t -> int
     val equal: t -> t -> bool
@@ -174,9 +201,9 @@ module Block : sig
     val validation_passes: t -> int
     val level: t -> Int32.t
 
-    val all_operation_hashes: Chain.t -> block_header -> Operation_hash.t list list Lwt.t
+    val all_operation_hashes: block_header -> Operation_hash.t list list Lwt.t
 
-    val predecessor : Chain.t -> block_header -> block_header option Lwt.t
+    val predecessor : block_header -> block_header option Lwt.t
     val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
 
   end
@@ -203,7 +230,7 @@ module Block : sig
   val predecessor: t -> block option Lwt.t
   val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
-  val is_valid_for_checkpoint: t -> (Int32.t * Block_hash.t) -> bool Lwt.t
+  val is_valid_for_checkpoint: t -> Block_header.t -> bool Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
@@ -225,7 +252,8 @@ module Block : sig
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
   val known_ancestor:
-    Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
+    Chain.t -> History_mode.t -> Block_locator.t ->
+    Block_locator.t option Lwt.t
   (** [known_ancestor chain_state locator] computes the first block of
       [locator] that is known to be a valid block. It also computes the
       'prefix' of [locator] with end at the first valid block.  The
@@ -238,19 +266,17 @@ module Block : sig
 end
 
 val read_block:
-  global_state -> ?pred:int -> Block_hash.t -> Block.t option Lwt.t
+  global_state -> Block_hash.t -> Block.t option Lwt.t
 
 val read_block_exn:
-  global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
+  global_state -> Block_hash.t -> Block.t Lwt.t
 
 val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 
 (** Computes the block with the best fitness amongst the known blocks
     which are compatible with the given checkpoint. *)
 val best_known_head_for_checkpoint:
-  Chain.t ->
-  Int32.t * Block_hash.t ->
-  Block.t Lwt.t
+  Chain.t -> Block_header.t -> Block.t Lwt.t
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
@@ -263,6 +289,8 @@ type chain_data = {
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
+  save_point: Int32.t * Block_hash.t ;
+  caboose: Int32.t * Block_hash.t ;
 }
 
 val read_chain_data:
@@ -316,6 +344,13 @@ module Current_mempool : sig
 
 end
 
+val history_mode: global_state -> History_mode.t tzresult Lwt.t
+
+val upgrade_0_0_1:
+  ?store_mapsize:Int64.t ->
+  store_root:string ->
+  unit -> unit tzresult Lwt.t
+
 (** Read the internal state of the node and initialize
     the databases. *)
 val init:
@@ -324,8 +359,9 @@ val init:
   ?context_mapsize:int64 ->
   store_root:string ->
   context_root:string ->
+  ?history_mode:History_mode.t ->
   Chain.genesis ->
-  (global_state * Chain.t * Context.index) tzresult Lwt.t
+  (global_state * Chain.t * Context.index * History_mode.t) tzresult Lwt.t
 
 val close:
   global_state -> unit Lwt.t

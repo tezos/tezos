@@ -100,6 +100,20 @@ module Make(N : sig val scheme : string end) = struct
       public_key ?interactive uri >>=? fun pk ->
       return (Signature.Public_key.hash pk, Some pk)
 
+    let get_signature base pkh msg =
+      RPC_client.call_service
+        ~logger: P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base Signer_services.authorized_keys () () ()
+      >>=? function
+      | Some authorized_keys ->
+          P.authenticate
+            authorized_keys
+            (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
+          return_some signature
+      | None -> return_none
+
     let sign ?watermark uri msg =
       parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
       let msg =
@@ -107,19 +121,7 @@ module Make(N : sig val scheme : string end) = struct
         | None -> msg
         | Some watermark ->
             MBytes.concat "" [ Signature.bytes_of_watermark watermark ; msg ] in
-      RPC_client.call_service
-        ~logger: P.logger
-        ?headers
-        Media_type.all_media_types
-        ~base Signer_services.authorized_keys () () () >>=? fun authorized_keys ->
-      begin match authorized_keys with
-        | Some authorized_keys ->
-            P.authenticate
-              authorized_keys
-              (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg) >>=? fun signature ->
-            return_some signature
-        | None -> return_none
-      end >>=? fun signature ->
+      get_signature base pkh msg >>=? fun signature ->
       RPC_client.call_service
         ~logger: P.logger
         ?headers
@@ -127,6 +129,40 @@ module Make(N : sig val scheme : string end) = struct
         ~base Signer_services.sign ((), pkh)
         signature
         msg
+
+    let deterministic_nonce uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      get_signature base pkh msg >>=? fun signature ->
+      RPC_client.call_service
+        ~logger: P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base Signer_services.deterministic_nonce ((), pkh)
+        signature
+        msg
+
+    let deterministic_nonce_hash uri msg =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      get_signature base pkh msg >>=? fun signature ->
+      RPC_client.call_service
+        ~logger: P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base Signer_services.deterministic_nonce_hash ((), pkh)
+        signature
+        msg
+
+    let supports_deterministic_nonces uri =
+      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      RPC_client.call_service
+        ~logger: P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base Signer_services.supports_deterministic_nonces ((), pkh) () () >>= function
+      | Ok ans -> return ans
+      | Error ((RPC_context.Not_found _) :: _) -> return false
+      | Error _ as res -> Lwt.return res
+
 
   end
 

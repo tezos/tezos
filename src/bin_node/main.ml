@@ -44,6 +44,8 @@ let description = [
   `P Node_identity_command.Manpage.command_description ;
   `P Node_run_command.Manpage.command_description ;
   `P Node_config_command.Manpage.command_description ;
+  `P Node_upgrade_command.Manpage.command_description ;
+  `P Node_snapshot_command.Manpage.command_description ;
 ]
 
 let man =
@@ -64,9 +66,12 @@ let commands = [
   Node_run_command.cmd ;
   Node_config_command.cmd ;
   Node_identity_command.cmd ;
+  Node_upgrade_command.cmd ;
+  Node_snapshot_command.cmd ;
 ]
 
 let () =
+  Random.self_init () ;
   match Cmdliner.Term.eval_choice (term, info) commands with
   | `Error _ -> exit 1
   | `Help -> exit 0

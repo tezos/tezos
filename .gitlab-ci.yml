@@ -2,7 +2,7 @@ variables:
   ## Please update `scripts/version.sh` accordingly
   build_deps_image_version: 9f0956e21f4dcd2803d83072903872eba196bef8
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
-  public_docker_image_name: docker.io/${CI_PROJECT_PATH}
+  public_docker_image_name: ${CI_REGISTRY}/${CI_PROJECT_PATH}
 
 stages:
   - doc
@@ -28,6 +28,7 @@ stages:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - mainnet-snapshots
   before_script:
     - opam list
     - . ./scripts/version.sh
@@ -115,10 +116,15 @@ test:p2p:pool:
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
-test:proto_alpha:
+test:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
+
+test:proto_alpha:lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_alpha/lib_client/test/runtest
 
 test:p2p:peerset:
   <<: *test_definition
@@ -208,6 +214,11 @@ test:validation:
   <<: *test_definition
   script:
     - dune build @src/lib_validation/runtest
+
+test:micheline:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_micheline/runtest
 
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
@@ -549,6 +560,10 @@ opam:63:tezos-baker-alpha-commands:
   variables:
     package: tezos-baker-alpha-commands
 
+opam:63:tezos-client-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-demo
 
 ##END_OPAM##
 
@@ -573,10 +588,14 @@ publish:docker:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - mainnet-snapshots
   before_script:
     - apk add git
-    - mkdir ~/.docker || true
-    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json
+    - if [ ! -z "${CI_DOCKER_AUTH}" ] ; then
+         mkdir ~/.docker || true ;
+         echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json ;
+      fi
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
   script:
     - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
     - ./scripts/create_docker_image.sh

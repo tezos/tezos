@@ -33,7 +33,7 @@ let in_block operation_hash operations =
                raise (Found (i,j))) ops)
       operations ;
     None
-  with Found (i,j) -> Some (i, j) 
+  with Found (i,j) -> Some (i, j)
 
 let wait_for_bootstrapped (ctxt : #Client_context.full) =
   let display = ref false in
@@ -59,12 +59,21 @@ let wait_for_bootstrapped (ctxt : #Client_context.full) =
   ctxt#answer "Node is bootstrapped, ready for injecting operations." >>= fun () ->
   return_unit
 
+type operation_status =
+  | Confirmed of (Block_hash.t * int * int)
+  | Pending
+  | Still_not_found
+
 let wait_for_operation_inclusion
     (ctxt : #Client_context.full)
     ~chain
     ?(predecessors = 10)
     ?(confirmations = 1)
+    ?branch
     operation_hash =
+
+  let exception WrapError of error list in
+  let exception Outdated of Operation_hash.t in
 
   (* Table of known blocks:
      - None: if neither the block or its predecessors contains the operation
@@ -109,27 +118,48 @@ let wait_for_operation_inclusion
           (n+1) Block_hash.pp hash >>= fun () ->
         Block_hash.Table.add blocks hash (Some (block_with_op, n+1)) ;
         if n+1 < confirmations then begin
-          return_none
+          return Pending
         end else
-          return_some block_with_op
+          return (Confirmed block_with_op)
     | None ->
         Shell_services.Blocks.Operation_hashes.operation_hashes
           ctxt ~chain ~block () >>=? fun operations ->
         match in_block operation_hash operations with
         | None ->
             Block_hash.Table.add blocks hash None ;
-            return_none
+            return Still_not_found
         | Some (i, j) -> begin
             ctxt#answer
               "Operation found in block: %a (pass: %d, offset: %d)"
               Block_hash.pp hash i j >>= fun () ->
             Block_hash.Table.add blocks hash (Some ((hash, i, j), 0)) ;
             if confirmations <= 0 then
-              return_some (hash, i, j)
-            else begin
-              return_none
-            end
+              return (Confirmed (hash, i, j))
+            else
+              return Pending
           end in
+
+  (* Checks if the given branch is considered alive.*)
+
+  let check_branch_alive () =
+    match branch with
+    | Some branch_hash ->
+        Shell_services.Blocks.live_blocks
+          ctxt ~chain ~block:(`Head 0) () >>= begin function
+          | Ok live_blocks ->
+              if Block_hash.Set.mem branch_hash live_blocks then
+                Lwt.return_unit
+              else
+                ctxt#error
+                  "The operation %a is outdated and may \
+                   never be included in the chain.@,\
+                   We recommand to use an external block explorer."
+                  Operation_hash.pp operation_hash >>= fun () ->
+                Lwt.fail (Outdated operation_hash)
+          | Error err -> Lwt.fail (WrapError err)
+        end
+    | None -> Lwt.return_unit
+  in
 
   Shell_services.Monitor.heads ctxt chain >>=? fun (stream, stop) ->
   Lwt_stream.get stream >>= function
@@ -137,26 +167,33 @@ let wait_for_operation_inclusion
   | Some (head, _) ->
       let rec loop n =
         if n >= 0 then
+          (*Search for the operation in the n head predecessors*)
           let block = `Hash (head, n) in
           Shell_services.Blocks.hash ctxt ~chain ~block () >>=? fun hash ->
           Shell_services.Blocks.Header.shell_header ctxt
             ~chain ~block () >>=? fun shell ->
           process hash shell >>=? function
-          | Some block ->
+          | Confirmed block ->
               stop () ;
               return block
-          | None ->
+          | Pending | Still_not_found ->
               loop (n-1)
         else
-          let exception WrapError of error list in
+          (*Search for the operation in new heads*)
           Lwt.catch
             (fun () ->
+               (*Fetching potential unknown blocks from potential new heads*)
                let stream = Lwt_stream.map_list_s fetch_predecessors stream in
                Lwt_stream.find_s
                  (fun (hash, header) ->
                     process hash header >>= function
-                    | Ok None -> Lwt.return_false
-                    | Ok (Some _) -> Lwt.return_true
+                    | Ok Pending ->
+                        Lwt.return_false
+                    | Ok Still_not_found ->
+                        check_branch_alive () >>= fun () ->
+                        Lwt.return_false
+                    | Ok (Confirmed _) ->
+                        Lwt.return_true
                     | Error err ->
                         Lwt.fail (WrapError err)) stream >>= return)
             (function
@@ -170,29 +207,42 @@ let wait_for_operation_inclusion
               | None | Some None -> assert false
               | Some (Some (hash, _)) ->
                   return hash in
+      begin
+        match branch with
+        | Some branch_hash ->
+            Shell_services.Blocks.Header.shell_header
+              ctxt ~chain ~block:(`Hash(branch_hash,0)) () >>=? fun branch_header ->
+            let branch_level = branch_header.Block_header.level in
+            Shell_services.Blocks.Header.shell_header
+              ctxt ~chain ~block:(`Hash (head,0)) () >>=? fun head_shell ->
+            let head_level = head_shell.Block_header.level in
+            return (Int32.(to_int (sub head_level branch_level)))
+        | None -> return predecessors
+      end
+      >>=? fun block_hook ->
       Block_services.Empty.hash
-        ctxt ~block:(`Hash (head, predecessors+1)) () >>=? fun oldest ->
+        ctxt ~block:(`Hash (head, block_hook+1)) () >>=? fun oldest ->
       Block_hash.Table.add blocks oldest None ;
-      loop predecessors
+      loop block_hook
 
 let lookup_operation_in_previous_block ctxt chain operation_hash i =
-  Block_services.Empty.hash ctxt ~block:(`Head i) () 
+  Block_services.Empty.hash ctxt ~block:(`Head i) ()
   >>=? fun block ->
-  Shell_services.Blocks.Operation_hashes.operation_hashes ctxt ~chain 
+  Shell_services.Blocks.Operation_hashes.operation_hashes ctxt ~chain
     ~block:(`Hash (block, 0)) ()
-  >>=? fun operations -> 
+  >>=? fun operations ->
   match in_block operation_hash operations with
   | None -> return_none
-  | Some (a, b) -> return_some (block, a, b) 
+  | Some (a, b) -> return_some (block, a, b)
 
 let lookup_operation_in_previous_blocks
     (ctxt : #Client_context.full)
     ~chain
     ~predecessors
     operation_hash =
-  let rec loop i = 
+  let rec loop i =
     if i = predecessors + 1 then
-      return_none 
+      return_none
     else begin
       lookup_operation_in_previous_block ctxt chain operation_hash i >>=?
       function

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,6 +36,7 @@ and p2p = {
   expected_pow : float ;
   bootstrap_peers : string list ;
   listen_addr : string option ;
+  discovery_addr : string option ;
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
@@ -57,6 +59,7 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
+  history_mode : History_mode.t option ;
 }
 
 val default_data_dir: string
@@ -77,6 +80,7 @@ val update:
   ?expected_pow:float ->
   ?bootstrap_peers:string list ->
   ?listen_addr:string ->
+  ?discovery_addr:string ->
   ?rpc_listen_addr:string ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
@@ -85,6 +89,7 @@ val update:
   ?rpc_tls:tls ->
   ?log_output:Logging_unix.Output.t ->
   ?bootstrap_threshold:int ->
+  ?history_mode:History_mode.t ->
   t -> t tzresult Lwt.t
 
 val to_string: t -> string
@@ -92,6 +97,7 @@ val read: string -> t tzresult Lwt.t
 val write: string -> t -> unit tzresult Lwt.t
 
 val resolve_listening_addrs: string -> (P2p_addr.t * int) list Lwt.t
+val resolve_discovery_addrs: string -> (Ipaddr.V4.t * int) list Lwt.t
 val resolve_rpc_listening_addrs: string -> (P2p_addr.t * int) list Lwt.t
 val resolve_bootstrap_addrs: string list -> (P2p_addr.t * int) list Lwt.t
 

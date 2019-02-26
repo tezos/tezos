@@ -70,7 +70,7 @@ module type SIGNER = sig
   val public_key :
     ?interactive: Client_context.io_wallet ->
     pk_uri -> Signature.Public_key.t tzresult Lwt.t
-  (** [public_key pk] is the Ed25519 version of [pk]. 
+  (** [public_key pk] is the Ed25519 version of [pk].
 
       Some signer implementations improve long-term security by
       requiring human/manual validation while importing keys, the
@@ -90,8 +90,22 @@ module type SIGNER = sig
   val sign :
     ?watermark: Signature.watermark ->
     sk_uri -> MBytes.t -> Signature.t tzresult Lwt.t
-    (** [sign ?watermark sk data] is signature obtained by signing [data] with
+  (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
+
+  val deterministic_nonce :
+    sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  (** [deterministic_nonce sk data] is a nonce obtained
+      deterministically from [data] and [sk]. *)
+
+  val deterministic_nonce_hash :
+    sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  (** [deterministic_nonce_hash sk data] is a nonce hash obtained
+      deterministically from [data] and [sk]. *)
+
+  val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+  (** [supports_deterministic_nonces] indicates whether the
+      [deterministic_nonce] functionality is supported. *)
 
 end
 
@@ -124,6 +138,15 @@ val append :
 val check :
   ?watermark:Signature.watermark ->
   pk_uri -> Signature.t -> MBytes.t -> bool tzresult Lwt.t
+
+val deterministic_nonce :
+  sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+
+val deterministic_nonce_hash :
+  sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+
+val supports_deterministic_nonces :
+  sk_uri -> bool tzresult Lwt.t
 
 val register_key :
   #Client_context.wallet ->
@@ -160,4 +183,3 @@ val force_switch : unit -> (bool, 'ctx) Clic.arg
 
 val make_pk_uri : Uri.t -> pk_uri
 val make_sk_uri : Uri.t -> sk_uri
-

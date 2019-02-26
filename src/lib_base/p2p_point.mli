@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,9 +28,11 @@ module Id : sig
 
   type t = P2p_addr.t * P2p_addr.port
   val compare : t -> t -> int
+  val equal :  t -> t -> bool
 
   val pp : Format.formatter -> t -> unit
   val pp_opt : Format.formatter -> t option -> unit
+  val pp_list : Format.formatter -> t list -> unit
 
   val of_string_exn : string -> t
   val of_string : string -> (t, string) result

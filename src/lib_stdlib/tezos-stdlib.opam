@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { build & >= "1.0.1" & < "1.7" } ## Incompatible with lwt<4
   "bigstring"
   "hex"
   "ocplib-endian"

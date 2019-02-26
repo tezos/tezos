@@ -57,6 +57,9 @@ include S.HASHABLE with type t := t
                     and type hash := Block_hash.t
 val of_bytes_exn: MBytes.t -> t
 
+val to_b58check: t -> string
+val of_b58check: string -> t option
+
 val bounded_encoding: ?max_size:int -> unit -> t Data_encoding.t
 
 val get_forced_protocol_upgrade: level:Int32.t -> Protocol_hash.t option

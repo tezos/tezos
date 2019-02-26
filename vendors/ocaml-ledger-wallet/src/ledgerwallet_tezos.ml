@@ -64,6 +64,8 @@ type ins =
   | Reset_high_watermark
   | Query_high_watermark
   | Get_authorized_key
+  | Setup
+  | Query_all_high_watermarks
 
 let int_of_ins = function
   | Version -> 0x00
@@ -76,6 +78,8 @@ let int_of_ins = function
   | Query_high_watermark -> 0x08
   | Git_commit -> 0x09
   | Get_authorized_key -> 0x07
+  | Setup -> 0x0A
+  | Query_all_high_watermarks -> 0x0B
 
 type curve =
   | Ed25519
@@ -154,10 +158,47 @@ let get_public_key ?(prompt=true) =
 
 let authorize_baking = get_public_key_like Authorize_baking
 
+let setup_baking ?pp ?buf h ~main_chain_id ~main_hwm ~test_hwm curve path =
+  let nb_derivations = List.length path in
+  if nb_derivations > 10 then
+    invalid_arg "Ledgerwallet_tezos.setup: max 10 derivations" ;
+  let lc =
+    (* [ chain-id | main-hwm | test-hwm | derivations-path ] *)
+    (* derivations-path = [ length | paths ] *)
+    (3 * 4) + 1 + (4 * nb_derivations) in
+  let data_init = Cstruct.create lc in
+  (* If the size of chain-ids changes, then all assumptions of this
+     binary format are broken (the ledger expects an int32). *)
+  assert (String.length main_chain_id = 4) ;
+  for ith = 0 to 3 do
+    Cstruct.set_uint8 data_init ith (int_of_char main_chain_id.[ith]) ;
+  done ;
+  Cstruct.BE.set_uint32 data_init 4 main_hwm ;
+  Cstruct.BE.set_uint32 data_init 8 test_hwm ;
+  Cstruct.set_uint8 data_init 12 nb_derivations ;
+  let (_ : Cstruct.t) =
+    let data = Cstruct.shift data_init (12 + 1) in
+    write_path data path in
+  let msg = "setup" in
+  let apdu =
+    Apdu.create
+      ~p2:(int_of_curve curve) ~lc ~data:data_init (wrap_ins Setup) in
+  Transport.apdu ~msg ?pp ?buf h apdu >>| fun addr ->
+  let keylen = Cstruct.get_uint8 addr 0 in
+  Cstruct.sub addr 1 keylen
+
 let get_high_watermark ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Query_high_watermark) in
   Transport.apdu ~msg:"get_high_watermark" ?pp ?buf h apdu >>| fun hwm ->
   Cstruct.BE.get_uint32 hwm 0
+
+let get_all_high_watermarks ?pp ?buf h =
+  let apdu = Apdu.create (wrap_ins Query_all_high_watermarks) in
+  Transport.apdu ~msg:"get_high_watermark" ?pp ?buf h apdu >>| fun tuple ->
+  let main_hwm = Cstruct.BE.get_uint32 tuple 0 in
+  let test_hwm = Cstruct.BE.get_uint32 tuple 4 in
+  let chain_id = Cstruct.copy tuple 8 4 in
+  (`Main_hwm main_hwm, `Test_hwm test_hwm, `Chain_id chain_id)
 
 let set_high_watermark ?pp ?buf h hwm =
   let data = Cstruct.create 4 in

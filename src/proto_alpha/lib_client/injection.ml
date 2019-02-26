@@ -35,6 +35,7 @@ let get_branch (rpc_config: #Proto_alpha.full)
     match block with
     | `Head n -> return (`Head (n+branch))
     | `Hash (h,n) -> return (`Hash (h,n+branch))
+    | `Alias (a,n) -> return (`Alias (a,n))
     | `Genesis -> return `Genesis
     | `Level i -> return (`Level i)
   end >>=? fun block ->
@@ -551,14 +552,14 @@ let inject_operation
       | None ->
           cctxt#message "@[<v 0>NOT waiting for the operation to be included.@,\
                          Use command@,\
-                        \  tezos-client wait for %a to be included --confirmations 30@,\
+                        \  tezos-client wait for %a to be included --confirmations 30 --branch %a@,\
                          and/or an external block explorer to make sure that it has been included.@]"
-            Operation_hash.pp oph >>= fun () ->
+            Operation_hash.pp oph Block_hash.pp op.shell.branch >>= fun () ->
           return result
       | Some confirmations ->
           cctxt#message "Waiting for the operation to be included..." >>= fun () ->
           Client_confirmations.wait_for_operation_inclusion
-            ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
+            ~branch:op.shell.branch ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
           Alpha_block_services.Operations.operation
             cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
           match op'.receipt with
@@ -594,9 +595,10 @@ let inject_operation
               "@[<v 0>The operation has only been included %d blocks ago.@,\
                We recommend to wait more.@,\
                Use command@,\
-              \  tezos-client wait for %a to be included --confirmations 30@,\
+              \  tezos-client wait for %a to be included --confirmations 30 \
+               --branch %a@,\
                and/or an external block explorer.@]"
-              number Operation_hash.pp oph
+              number Operation_hash.pp oph Block_hash.pp op.shell.branch
     end >>= fun () ->
     return (oph, op.protocol_data.contents, result.contents)
 

@@ -40,6 +40,10 @@ val init:
   string ->
   index Lwt.t
 
+val close: unit -> unit Lwt.t
+
+val gc: index -> roots:Context_hash.t list -> unit Lwt.t
+
 val commit_genesis:
   index ->
   chain_id:Chain_id.t ->
@@ -54,6 +58,8 @@ val commit_test_chain_genesis:
 (** {2 Generic interface} ****************************************************)
 
 type key = string list
+(** [key] indicates a path in a context. *)
+
 type value = MBytes.t
 
 val mem: context -> key -> bool Lwt.t
@@ -66,6 +72,8 @@ val remove_rec: context -> key -> t Lwt.t
 (** [copy] returns None if the [from] key is not bound *)
 val copy: context -> from:key -> to_:key -> context option Lwt.t
 
+(** [fold] iterates over elements under a path (not recursive). Iteration order
+    is undeterministic. *)
 val fold:
   context -> key -> init:'a ->
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
@@ -102,3 +110,43 @@ val reset_test_chain: context -> Block_hash.t -> Time.t -> context Lwt.t
 val fork_test_chain:
   context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
 val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
+
+(** {2 Context dumping} ******************************************************)
+
+module Pruned_block : sig
+
+  type t = {
+    block_header : Block_header.t ;
+    operations : ( int * Operation.t list ) list ;
+    operation_hashes : (int * Operation_hash.t list) list ;
+  }
+
+  val encoding : t Data_encoding.t
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+end
+
+module Block_data : sig
+
+  type t = {
+    block_header : Block_header.t ;
+    operations : Operation.t list list ;
+  }
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+  val empty : t
+  val encoding : t Data_encoding.t
+end
+
+val dump_contexts : index -> (Block_header.t * Block_data.t * Pruned_block.t list) list -> filename:string ->
+  unit tzresult Lwt.t
+val restore_contexts : index -> filename:string ->
+  (Block_header.t * Block_data.t * Pruned_block.t list) list tzresult Lwt.t
+
+
+val dump_contexts_fd : index -> (Block_header.t * Block_data.t * Pruned_block.t list) list -> fd:Lwt_unix.file_descr ->
+  unit tzresult Lwt.t
+val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+  (Block_header.t * Block_data.t * Pruned_block.t list) list tzresult Lwt.t

@@ -6,6 +6,7 @@ homepage:     "https://gitlab.com/tezos/irmin-lmdb"
 bug-reports:  "https://gitlab.com/tezos/irmin-lmdb/issues"
 dev-repo:     "git+https://gitlab.com/tezos/irmin-lmdb.git"
 doc:          "https://tezos.gitlab.io/irmin-lmdb/"
+synopsis:     "LMDB backend for Irmin"
 
 build: [
  ["dune" "subst"] {pinned}
@@ -15,6 +16,7 @@ run-test: ["dune" "runtest" "-p" name]
 
 depends: [
   "dune" {build & >= "1.0.1"}
+  "ocplib-endian" {>= "1.0"}
   "irmin"    {>= "1.4.0"}
   "lmdb"     {>= "0.1"}
 ]

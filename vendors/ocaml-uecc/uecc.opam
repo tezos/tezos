@@ -5,6 +5,7 @@ authors: "Vincent Bernardoff <vb@luminar.eu.org>"
 maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
 license: "ISC"
 homepage: "https://github.com/vbmithr/ocaml-uecc"
+synopsis: "Bindings for ECDH and ECDSA for 8-bit, 32-bit, and 64-bit processors"
 bug-reports: "https://github.com/vbmithr/ocaml-uecc/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-uecc"
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]

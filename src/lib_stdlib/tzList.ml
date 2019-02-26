@@ -126,8 +126,13 @@ end = struct
     if t.size < t.bound then begin
       t.size <- t.size + 1 ;
       t.data <- push x t.data
-    end else if E.compare (List.hd t.data) x < 0 then
-      t.data <- push x (List.tl t.data)
+    end else begin
+      match t.data with
+      | [] -> assert false
+      | hd :: tl ->
+          if E.compare hd x < 0 then
+            t.data <- push x tl
+    end
 
   let get { data ; _ } = data
 

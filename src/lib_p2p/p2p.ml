@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -53,14 +54,17 @@ type 'msg message_config = 'msg P2p_pool.message_config = {
 }
 
 type config = {
-  listening_port : P2p_addr.port option;
-  listening_addr : P2p_addr.t option;
+  listening_port : P2p_addr.port option ;
+  listening_addr : P2p_addr.t option ;
+  discovery_port : P2p_addr.port option ;
+  discovery_addr : Ipaddr.V4.t option ;
   trusted_points : P2p_point.Id.t list ;
   peers_file : string ;
   private_mode : bool ;
   identity : P2p_identity.t ;
   proof_of_work_target : Crypto_box.target ;
   disable_mempool : bool ;
+  trust_discovered_peers : bool ;
 }
 
 type limits = {
@@ -138,6 +142,17 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     P2p_pool.create pool_cfg meta_cfg conn_meta_cfg msg_cfg io_sched in
   pool
 
+let may_create_discovery_worker _limits config pool =
+  match (config.listening_port, config.discovery_port, config.discovery_addr) with
+  | (Some listening_port, Some discovery_port, Some discovery_addr) ->
+      Some (P2p_discovery.create pool
+              config.identity.peer_id
+              ~listening_port
+              ~discovery_port ~discovery_addr
+              ~trust_discovered_peers:config.trust_discovered_peers)
+  | (_, _, _) ->
+      None
+
 let bounds ~min ~expected ~max =
   assert (min <= expected) ;
   assert (expected <= max) ;
@@ -151,20 +166,22 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max ;
   }
 
-let create_maintenance_worker limits pool =
+let create_maintenance_worker limits pool config =
   let bounds =
     bounds
       ~min:limits.min_connections
       ~expected:limits.expected_connections
       ~max:limits.max_connections
   in
-  P2p_maintenance.run bounds pool
+  let discovery =
+    may_create_discovery_worker limits config pool in
+  P2p_maintenance.create ?discovery bounds pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
   | None -> Lwt.return_none
   | Some port ->
-      P2p_welcome.run
+      P2p_welcome.create
         ~backlog:limits.backlog pool
         ?addr:config.listening_addr
         port >>= fun w ->
@@ -188,7 +205,7 @@ module Real = struct
     let io_sched = create_scheduler limits in
     create_connection_pool
       config limits meta_cfg conn_meta_cfg msg_cfg io_sched >>= fun pool ->
-    let maintenance = create_maintenance_worker limits pool in
+    let maintenance = create_maintenance_worker limits pool config in
     may_create_welcome_worker config limits pool >>= fun welcome ->
     return {
       config ;
@@ -201,8 +218,20 @@ module Real = struct
 
   let peer_id { config } = config.identity.peer_id
 
+
   let maintain { maintenance } () =
     P2p_maintenance.maintain maintenance
+
+  let activate t () =
+    log_info "activate";
+    begin
+      match t.welcome with
+      | None -> ()
+      | Some w -> P2p_welcome.activate w
+    end ;
+    P2p_maintenance.activate t.maintenance ;
+    Lwt.async (fun () -> P2p_maintenance.maintain t.maintenance) ;
+    ()
 
   let roll _net () = Lwt.return_unit (* TODO implement *)
 
@@ -377,6 +406,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   on_new_connection :
     (P2p_peer.Id.t ->
      ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit ;
+  activate : unit -> unit ;
 }
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
@@ -446,7 +476,12 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
     fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f) ;
     iter_connections = Real.iter_connections net ;
     on_new_connection = Real.on_new_connection net ;
+    activate = Real.activate net ;
   }
+
+let activate t =
+  log_info "activate P2P layer !";
+  t.activate ()
 
 let faked_network peer_cfg faked_metadata = {
   versions = [] ;
@@ -472,7 +507,8 @@ let faked_network peer_cfg faked_metadata = {
   iter_connections = (fun _f -> ()) ;
   on_new_connection = (fun _f -> ()) ;
   broadcast = ignore ;
-  pool = None
+  pool = None ;
+  activate = (fun _ -> ()) ;
 }
 
 let peer_id net = net.peer_id

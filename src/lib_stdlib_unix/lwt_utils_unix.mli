@@ -25,12 +25,16 @@
 
 open Error_monad
 
+val read_string: len:int -> Lwt_unix.file_descr -> string Lwt.t
+
 val read_bytes:
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> bytes -> unit Lwt.t
 
 val read_mbytes:
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> MBytes.t -> unit Lwt.t
 
+val write_string:
+  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> string -> unit Lwt.t
 val write_bytes:
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> bytes -> unit Lwt.t
 val write_mbytes:
@@ -78,7 +82,18 @@ module Socket : sig
     | Unix of string
     | Tcp of string * string * Unix.getaddrinfo_option list
 
-  val connect: addr -> Lwt_unix.file_descr tzresult Lwt.t
+  val connect:
+    ?timeout:float -> addr -> Lwt_unix.file_descr tzresult Lwt.t
+  (** [connect ?timeout addr] tries connecting to [addr] and returns
+      the resulting socket file descriptor on success. When using TCP,
+      [Unix.getaddrinfo] is used to resolve the hostname and service
+      (port). The different socket addresses returned by
+      [Unix.getaddrinfo] are tried sequentially, and the [?timeout]
+      argument (default: 5s) governs how long it waits to get a
+      connection. If a connection is not obtained in less than
+      [?timeout], the connection is canceled and and the next socket
+      address (if it exists) is tried. *)
+
   val bind:
     ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
 

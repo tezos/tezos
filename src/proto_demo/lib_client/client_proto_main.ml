@@ -23,78 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Proto_demo
+
 let protocol =
   Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
-let demo cctxt =
-  let block = Client_commands.(cctxt.config.block) in
-  cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
+let bake (cctxt : full) : unit tzresult Lwt.t =
+  let protocol_data = MBytes.create 0 in
+  Demo_block_services.Helpers.Preapply.block cctxt [] ~protocol_data >>=? fun (shell, _) ->
+  let block : Block_header.t = { shell = shell; protocol_data } in
+  Demo_block_services.Helpers.Forge.block_header cctxt block >>=? fun encoded_header ->
+  Shell_services.Injection.block cctxt encoded_header [] >>=? fun block_hash ->
+  cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
+  return_unit
+
+let demo (cctxt : full) : unit tzresult Lwt.t =
+  let block = cctxt#block in
+  let chain = `Main in
   let msg = "test" in
-  Client_proto_rpcs.echo cctxt.rpc_config block msg >>=? fun reply ->
-  fail_unless (reply = msg) (failure "...") >>=? fun () ->
-  begin
-    cctxt.message "Calling the 'failing' RPC." >>= fun () ->
-    Client_proto_rpcs.failing cctxt.rpc_config block 3 >>= function
-    | Error [Environment.Ecoproto_error [Error.Demo_error 3]] ->
-        return_unit
-    | _ -> failwith "..."
-  end >>=? fun () ->
-  cctxt.message "Direct call to `demo_error`." >>= fun () ->
-  begin Error.demo_error 101010 >|= Environment.wrap_error >>= function
-    | Error [Environment.Ecoproto_error [Error.Demo_error 101010]] ->
-        return_unit
-    | _ -> failwith "...."
-  end >>=? fun () ->
-  cctxt.answer "All good!" >>= fun () ->
+  cctxt#message "Calling the 'echo' RPC with value %s." msg >>= fun () ->
+  Services.echo cctxt (chain, block) msg >>=? fun reply ->
+  cctxt#message "Received value: %s" reply >>= fun () ->
   return_unit
 
-let bake cctxt =
-  Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
-  let fitness =
-    match bi.fitness with
-    | [ v ; b ] ->
-        let f = MBytes.get_int64 b 0 in
-        MBytes.set_int64 b 0 (Int64.succ f) ;
-        [ v ; b ]
-    | _ ->
-        Lwt.ignore_result
-          (cctxt.message "Cannot parse fitness: %a" Environment.Fitness.pp bi.fitness);
-        exit 2 in
-  Client_node_rpcs.forge_block_header cctxt.rpc_config
-    { shell = { predecessor = bi.hash ;
-                proto_level = bi.proto_level ;
-                level = Int32.succ bi.level ;
-                timestamp = Time.now () ;
-                fitness ;
-                validation_passes = 0 ;
-                operations_hash = Operation_list_list_hash.empty } ;
-      proto = MBytes.create 0 } >>=? fun bytes ->
-  Client_node_rpcs.inject_block cctxt.rpc_config ~chain_id:bi.chain_id bytes [] >>=? fun hash ->
-  cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+let error (cctxt : full) : unit tzresult Lwt.t =
+  let block = cctxt#block in
+  let chain = `Main in
+  Services.failing cctxt (chain, block) 42 >>=? fun () ->
   return_unit
 
-let handle_error cctxt = function
-  | Ok res ->
-      Lwt.return res
-  | Error exns ->
-      pp_print_error Format.err_formatter exns ;
-      cctxt.Client_commands.error "%s" "cannot continue"
-
-let commands () =
+let commands () : full Clic.command list =
   let open Clic in
   let group = {name = "demo" ; title = "Some demo command" } in
   [
     command ~group ~desc: "A demo command"
       no_options
       (fixed [ "demo" ])
-      (fun () cctxt -> demo cctxt) ;
+      (fun () (cctxt : full) -> demo cctxt) ;
     command ~group ~desc: "A failing command"
       no_options
       (fixed [ "fail" ])
-      (fun () _cctxt ->
-         Error.demo_error 101010
-         >|= Environment.wrap_error) ;
+      (fun () (cctxt : full) -> error cctxt) ;
     command ~group ~desc: "Bake an empty block"
       no_options
       (fixed [ "bake" ])
@@ -102,5 +72,6 @@ let commands () =
   ]
 
 let () =
-  Client_commands.register protocol @@
+  Client_commands.register protocol @@ fun _network ->
+  List.map (Clic.map_command (new wrap_full)) @@
   commands ()
