@@ -481,6 +481,7 @@ module Chain = struct
     Store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Store.Chain.Genesis_protocol.store chain_store genesis.protocol >>= fun () ->
     Store.Chain_data.Current_head.store chain_data_store genesis.block >>= fun () ->
+    Store.Chain_data.Checkpoint.store chain_data_store genesis_header >>= fun () ->
     Store.Chain_data.Known_heads.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Save_point.store chain_data_store save_point >>= fun () ->
     Store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
