@@ -72,7 +72,7 @@ type limits = {
   connection_timeout : float ;
   authentication_timeout : float ;
   greylist_timeout : int ;
-  maintenance_idle_time: float ;
+  maintenance_idle_time : float ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -127,8 +127,6 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     max_incoming_connections = limits.max_incoming_connections ;
     connection_timeout = limits.connection_timeout ;
     authentication_timeout = limits.authentication_timeout ;
-    greylist_timeout = limits.greylist_timeout ;
-    maintenance_idle_time = limits.maintenance_idle_time ;
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;
@@ -173,11 +171,15 @@ let create_maintenance_worker limits pool config =
     bounds
       ~min:limits.min_connections
       ~expected:limits.expected_connections
-      ~max:limits.max_connections
-  in
-  let discovery =
-    may_create_discovery_worker limits config pool in
-  P2p_maintenance.create ?discovery bounds pool
+      ~max:limits.max_connections in
+  let maintenance_config = {
+    P2p_maintenance.
+    maintenance_idle_time = limits.maintenance_idle_time ;
+    greylist_timeout = limits.greylist_timeout ;
+    private_mode = config.private_mode ;
+  } in
+  let discovery = may_create_discovery_worker limits config pool in
+  P2p_maintenance.create ?discovery maintenance_config bounds pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
