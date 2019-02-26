@@ -182,9 +182,9 @@ module Protocol : sig
 
 end
 
-(** {2 Temporary test chain genesis header store} ***************************)
+(** {2 Temporary test chain forking block store} *****************************)
 
-module Forked_genesis_header : MAP_STORE
+module Forking_block_hash : MAP_STORE
   with type t = global_store
    and type key := Chain_id.t
-   and type value := Block_header.t
+   and type value := Block_hash.t

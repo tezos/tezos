@@ -81,16 +81,16 @@ module Chain = struct
 end
 
 (**************************************************************************
- * Temporary test chain genesis header store under "forked_genesis_header/"
+ * Temporary test chain forking block store under "forking_block_hash/"
  **************************************************************************)
 
-module Forked_genesis_header =
+module Forking_block_hash =
   Store_helpers.Make_map
     (Store_helpers.Make_substore
        (Raw_store)
-       (struct let name = ["forked_genesis_header"] end))
+       (struct let name = ["forking_block_hash"] end))
     (Chain_id)
-    (Store_helpers.Make_value(Block_header))
+    (Store_helpers.Make_value(Block_hash))
 
 (**************************************************************************
  * Block_header store under "chain/<id>/blocks/"

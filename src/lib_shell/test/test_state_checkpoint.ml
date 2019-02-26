@@ -129,7 +129,7 @@ let build_valid_chain state vtbl pred names =
                last_allowed_fork_level = result.last_allowed_fork_level
              } in
            State.Block.store state
-             block zero [[op]] [[zero]] validation_store >>=? fun _vblock ->
+             block zero [[op]] [[zero]] validation_store ~forking_testchain:false >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock
