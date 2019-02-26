@@ -70,13 +70,8 @@ class unix_wallet ~base_dir ~password_filename : wallet = object (self)
           "could not read the %s alias file" alias_name >>=? fun json ->
         match Data_encoding.Json.destruct encoding json with
         | exception e ->
-            lwt_log_error Tag.DSL.(fun f ->
-                f "did not understand the %s alias file %s : %a"
-                -% t event "load error"
-                -% s filename_tag alias_name
-                -% s filename_tag filename
-                -% a exn e) >>= fun () ->
-            failwith "did not understand the %s alias file %s" alias_name filename
+            failwith "did not understand the %s alias file %s : %s"
+              alias_name filename (Printexc.to_string e)
         | data ->
             return data
 
