@@ -51,10 +51,11 @@ let inject_endorsement
     () >>=? fun bytes ->
   let wallet = (cctxt :> Client_context.wallet) in
   (* Double-check the right to inject an endorsement *)
+  let open Client_baking_highwatermarks in
   wallet#with_lock begin fun () ->
-    Daemon_state.may_inject_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? function
+    may_inject_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? function
     | true ->
-        Daemon_state.record_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
+        record_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
         return_true
     | false -> return_false
   end >>=? fun is_allowed_to_endorse ->
@@ -69,7 +70,7 @@ let inject_endorsement
         f "Level %a : previously endorsed."
         -% t event "double_endorsement_near_miss"
         -% a level_tag level) >>= fun () ->
-    fail (Daemon_state.Level_previously_endorsed level)
+    fail (Level_previously_endorsed level)
 
 let forge_endorsement
     (cctxt : #Proto_alpha.full)
@@ -169,7 +170,7 @@ let allowed_to_endorse cctxt bi delegate  =
           -% s Client_keys.Logging.tag name
           -% a endorsement_slots_tag slots) >>= fun () ->
       cctxt#with_lock begin fun () ->
-        Daemon_state.may_inject_endorsement cctxt ~chain ~delegate level
+        Client_baking_highwatermarks.may_inject_endorsement cctxt ~chain ~delegate level
       end >>=? function
       | false ->
           lwt_debug Tag.DSL.(fun f ->
