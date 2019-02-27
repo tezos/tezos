@@ -404,7 +404,7 @@ let setup_formatter ppf format verbosity =
               | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
               | "opt" -> push_ansi_format (Some `Green, None, false, false)
               | "arg" -> push_ansi_format (Some `Yellow, None, false, false) ; Format.fprintf ppf "<"
-              | "kwd" -> push_ansi_format (Some `White, None, false, true)
+              | "kwd" -> push_ansi_format (None, None, false, true)
               | "error" -> push_ansi_format (Some `Red, None, true, true)
               | "warning" -> push_ansi_format (Some `Yellow, None, true, true)
               | "hilight" -> push_ansi_format (Some `White, Some `Yellow, true, true)
