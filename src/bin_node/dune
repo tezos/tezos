@@ -7,6 +7,7 @@
             tezos-rpc-http
             tezos-p2p
             tezos-shell
+	    tezos-storage
             tezos-protocol-updater
             tezos-embedded-protocol-genesis
             tezos-embedded-protocol-demo
@@ -22,6 +23,7 @@
                    -open Tezos_rpc_http
                    -open Tezos_p2p
                    -open Tezos_shell
+		   -open Tezos_storage
                    -open Tezos_protocol_updater
                    -linkall)))
 

@@ -31,6 +31,48 @@ let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
 
+let compute_export_limit
+    block_store _chain_data_store
+    block_header export_rolling =
+  let block_hash = Block_header.hash block_header in
+  Store.Block.Contents.read
+    (block_store, block_hash) >>=? fun block_content ->
+  let max_op_ttl = block_content.max_operations_ttl in
+  begin
+    if not export_rolling then
+      return 1l
+    else
+      return (Int32.(sub block_header.Block_header.shell.level (of_int max_op_ttl)))
+  end >>=? fun export_limit ->
+  (* never include genesis *)
+  return (max 1l export_limit)
+
+let load_pruned_blocks block_store block_header export_limit =
+  let cpt = ref 0 in
+  let rec load_pruned (bh : Block_header.t) acc limit =
+    Tezos_stdlib.Utils.display_progress
+      ~refresh_rate:(!cpt, 1_000)
+      "Retrieving history: %iK/%iK blocks"
+      (!cpt / 1_000)
+      ((!cpt + (Int32.to_int bh.shell.level - Int32.to_int limit)) / 1_000);
+    incr cpt;
+    if bh.shell.level <= limit then
+      return acc
+    else
+      let pbh = bh.shell.predecessor in
+      Store.Block.Header.read (block_store, pbh) >>=? fun pbhd ->
+      Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
+      Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
+      let pruned_block = ({
+          block_header = pbhd ;
+          operations ;
+          operation_hashes ;
+        } : Context.Pruned_block.t ) in
+      load_pruned pbhd (pruned_block :: acc) limit in
+  load_pruned block_header [] export_limit >>= fun pruned_blocks ->
+  Tezos_stdlib.Utils.display_progress_end () ;
+  Lwt.return pruned_blocks
+
 let export ?(export_rolling=false) data_dir filename block =
   let data_dir =
     match data_dir with
@@ -76,60 +118,33 @@ let export ?(export_rolling=false) data_dir filename block =
           (fun i -> Store.Block.Operations.read (block_store, block_hash) i)
           (0 -- (validations_passes - 1)) >>=? fun operations ->
 
-        (* Get block predecessor's content *)
-        Store.Block.Contents.read
-          (block_store, block_hash) >>=? fun block_content ->
-        (* Get the max_ttls previous block headers and their operation hashes*)
-        let max_op_ttl = block_content.max_operations_ttl in
-        begin
-          if not export_rolling then
-            return 1l
-          else
-            return (Int32.(sub block_header.shell.level (of_int max_op_ttl)))
-        end >>=? fun export_limit ->
-        let export_limit = max 1l export_limit (* never include genesis *) in
-        let cpt = ref 0 in
-        let rec load_pruned (bh : Block_header.t) acc limit =
-          if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
-            Format.eprintf "Retrieving history: %iK/%iK blocks%!\
-                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                            \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-              (!cpt / 1000)
-              ((!cpt + (Int32.to_int bh.shell.level - Int32.to_int limit)) / 1000);
-          incr cpt;
-          if bh.shell.level <= limit then
-            return acc
-          else
-            let pbh = bh.shell.predecessor in
-            Store.Block.Header.read (block_store, pbh) >>=? fun pbhd ->
-            (* Get operations *)
-            Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
-            (* Get operation hashes *)
-            Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
-            let pruned_block = ({
-                block_header = pbhd ;
-                operations ;
-                operation_hashes ;
-              } : Tezos_storage.Context.Pruned_block.t ) in
-            load_pruned pbhd (pruned_block :: acc) limit in
-        load_pruned block_header [] export_limit >>=? fun old_pruned_blocks_rev ->
-        if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+        compute_export_limit
+          block_store
+          chain_data_store
+          block_header
+          export_rolling >>=? fun export_limit ->
+
+        (* Retreive the list of pruned blocks to export *)
+        load_pruned_blocks
+          block_store
+          block_header
+          export_limit >>=? fun old_pruned_blocks_rev ->
+
         let block_data =
           ({block_header = block_header ;
-            operations } : Tezos_storage.Context.Block_data.t ) in
+            operations } : Context.Block_data.t ) in
         return (pred_block_header, block_data, List.rev old_pruned_blocks_rev)
   end
   >>=? fun data_to_dump ->
   Store.close store;
-  Tezos_storage.Context.init ~readonly:true context_root
+  Context.init ~readonly:true context_root
   >>= fun context_index ->
-  Tezos_storage.Context.dump_contexts
+  Context.dump_contexts
     context_index
     [ data_to_dump ]
     ~filename >>=? fun () ->
   lwt_log_notice "Sucessful export (in file %s)" filename >>= fun () ->
   return_unit
-
 (** Main *)
 
 module Term = struct
