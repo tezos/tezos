@@ -142,8 +142,27 @@ let headers_fetch_worker_loop pipeline =
     (* sender and receiver are inverted here because they are from
        the point of view of the node sending the locator *)
     let seed = {Block_locator.sender_id=pipeline.peer_id; receiver_id=sender_id } in
-    let steps = Block_locator.to_steps seed pipeline.locator in
-    iter_s (fetch_step pipeline) steps >>=? fun () ->
+    let chain_state = Distributed_db.chain_state pipeline.chain_db in
+    let state = State.Chain.global_state chain_state in
+    State.history_mode state >>= fun history_mode ->
+    begin match history_mode with
+      | History_mode.Archive ->
+          Lwt.return_none
+      | Full | Rolling ->
+          let chain_state = Distributed_db.chain_state pipeline.chain_db in
+          State.Chain.save_point chain_state >>= Lwt.return_some
+    end >>= begin fun save_point ->
+      let steps = match save_point with
+        | None ->
+            Block_locator.to_steps seed pipeline.locator
+        | Some (save_point_level, save_point) ->
+            let head, _ = (pipeline.locator : Block_locator.t :> _ * _) in
+            let head_level = head.shell.level in
+            let truncate_limit = Int32.(sub head_level save_point_level) in
+            Block_locator.to_steps_truncate ~limit:(Int32.to_int truncate_limit)
+              ~save_point seed pipeline.locator
+      in
+      iter_s (fetch_step pipeline) steps end >>=? fun () ->
     return_unit
   end >>= function
   | Ok () ->

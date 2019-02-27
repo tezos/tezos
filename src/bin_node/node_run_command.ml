@@ -184,6 +184,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     config.shell.block_validator_limits
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
+    config.shell.history_mode
 
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =

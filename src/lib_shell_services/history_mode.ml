@@ -35,7 +35,7 @@ let equal = function
   | (Archive, Archive)
   | (Full, Full)
   | (Rolling, Rolling) -> true
-  | _ -> false
+  | (Archive, _) | (Full, _) | (Rolling, _) -> false
 
 let pp ppf = function
   | Archive -> Format.fprintf ppf "archive"
