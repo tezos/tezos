@@ -144,6 +144,15 @@ module Make (Encoding : Resto.ENCODING) = struct
   }
 
   let internal_call meth (log : log) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
+    let host =
+      match Uri.host uri, Uri.port uri with
+      | None, _ -> None
+      | Some host, None -> Some host
+      | Some host, Some port -> Some (host ^ ":" ^ string_of_int port) in
+    let init_headers =
+      match host with
+      | None -> Header.init ()
+      | Some host -> Header.replace (Header.init ()) "host" host in
     let headers = List.fold_left (fun headers (header, value) ->
         let header = String.lowercase_ascii header in
         if header <> "host"
@@ -153,7 +162,7 @@ module Make (Encoding : Resto.ENCODING) = struct
             "Resto_cohttp.Client.call: \
              only headers \"host\" or starting with \"x-\" are supported"
         else Header.replace headers header value)
-        (Header.init ()) headers in
+        init_headers headers in
     let body, headers =
       match body, media with
       | None, _ -> Cohttp_lwt.Body.empty, headers
@@ -166,15 +175,6 @@ module Make (Encoding : Resto.ENCODING) = struct
       | None -> headers
       | Some ranges ->
           Header.add headers "accept" (Media_type.accept_header ranges) in
-    let host =
-      match Uri.host uri, Uri.port uri with
-      | None, _ -> None
-      | Some host, None -> Some host
-      | Some host, Some port -> Some (host ^ ":" ^ string_of_int port) in
-    let headers =
-      match host with
-      | None -> headers
-      | Some host -> Header.add headers "host" host in
     Lwt.catch begin fun () ->
       let rec call_and_retry_on_502 attempt delay =
         Cohttp_lwt_unix.Client.call
