@@ -68,8 +68,8 @@ let may_lock_pidfile = function
 let check_upgrade_baking_files (cctxt : #Client_context.full) =
   cctxt#with_lock begin fun () ->
     begin
-      Daemon_state.should_upgrade_blocks_file cctxt >>=? fun should_upgrade_blocks ->
-      Daemon_state.should_upgrade_endorsements_file cctxt >>=? fun should_upgrade_endorsements ->
+      Client_baking_highwatermarks.should_upgrade_blocks_file cctxt >>=? fun should_upgrade_blocks ->
+      Client_baking_highwatermarks.should_upgrade_endorsements_file cctxt >>=? fun should_upgrade_endorsements ->
       Client_baking_nonces.should_upgrade_nonce_file cctxt >>=? fun should_upgrade_nonce ->
       return (should_upgrade_blocks || should_upgrade_endorsements || should_upgrade_nonce)
     end >>=? fun should_upgrade ->
@@ -145,7 +145,7 @@ let delegate_commands () =
          cctxt#with_lock begin fun () ->
            Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
            Client_baking_nonces.upgrade_nonce_file ~main_chain_id cctxt >>=? fun () ->
-           Daemon_state.upgrade_files cctxt () >>=? fun () ->
+           Client_baking_highwatermarks.upgrade_files cctxt >>=? fun () ->
            return_unit
          end) ;
   ]
