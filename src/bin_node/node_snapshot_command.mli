@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,55 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  if Filename.basename Sys.argv.(0) = Updater.compiler_name then begin
-    try
-      Tezos_protocol_compiler.Compiler.main
-        Tezos_protocol_compiler_native.Native.driver ;
-      Pervasives.exit 0
-    with exn ->
-      Format.eprintf "%a\n%!" Opterrors.report_error exn;
-      Pervasives.exit 1
-  end
 
-let term =
-  let open Cmdliner.Term in
-  ret (const (`Help (`Pager, None)))
+val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
 
-let description = [
-  `S "DESCRIPTION" ;
-  `P "Entry point for initializing, configuring and running a Tezos node." ;
-  `P Node_identity_command.Manpage.command_description ;
-  `P Node_run_command.Manpage.command_description ;
-  `P Node_config_command.Manpage.command_description ;
-  `P Node_snapshot_command.Manpage.command_description ;
-]
-
-let man =
-  description @
-  Node_run_command.Manpage.examples
-
-let info =
-  let version =
-    Tezos_base.Current_git_info.abbreviated_commit_hash ^
-    " ("^Tezos_base.Current_git_info.committer_date^")" in
-  Cmdliner.Term.info
-    ~doc:"The Tezos node"
-    ~man
-    ~version
-    "tezos-node"
-
-let commands = [
-  Node_run_command.cmd ;
-  Node_config_command.cmd ;
-  Node_identity_command.cmd ;
-  Node_snapshot_command.cmd ;
-]
-
-let () =
-  Random.self_init () ;
-  match Cmdliner.Term.eval_choice (term, info) commands with
-  | `Error _ -> exit 1
-  | `Help -> exit 0
-  | `Version -> exit 1
-  | `Ok () -> exit 0
+module Manpage : sig
+  val command_description: string
+end
