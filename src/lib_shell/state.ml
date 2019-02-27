@@ -636,7 +636,7 @@ module Chain = struct
       Lwt.return state.data.caboose
     end
 
-  let purge_loop_full global_store store block_hash bottom =
+  let purge_loop_full global_store store ~genesis_hash block_hash bottom =
     let do_prune blocks =
       Store.with_atomic_rw global_store @@ fun () ->
       Lwt_list.iter_s (prune_block store) blocks in
@@ -649,7 +649,9 @@ module Chain = struct
       Store.Block.Header.read_opt (store, block_hash) >>= function
       | None -> assert false (* Should not happen *)
       | Some header ->
-          if header.shell.level = bottom then
+          if Block_hash.equal block_hash genesis_hash then
+            do_prune blocks
+          else if header.shell.level = bottom then
             do_prune (block_hash :: blocks)
           else
             loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks) in
@@ -660,7 +662,10 @@ module Chain = struct
     Shared.use chain_state.global_state.global_data begin fun global_data ->
       Shared.use chain_state.block_store begin fun store ->
         update_chain_data chain_state begin fun _ data ->
-          purge_loop_full global_data.global_store store hash (fst data.save_point) >>= fun () ->
+          purge_loop_full
+            global_data.global_store store
+            ~genesis_hash:chain_state.genesis.block hash
+            (fst data.save_point) >>= fun () ->
           let new_data = { data with save_point = (lvl, hash) ; } in
           Lwt.return (Some new_data, ())
         end >>= fun () ->
@@ -680,9 +685,12 @@ module Chain = struct
         Store.Block.Header.read_opt (store, block_hash) >>= function
         | None -> assert false (* Should not happen. *)
         | Some header ->
-            prune_block store block_hash >>= fun () ->
-            delete_loop header.shell.predecessor (0, []) >>= fun () ->
-            Lwt.return block_hash
+            if Block_hash.equal genesis_hash block_hash then
+              Lwt.return block_hash
+            else begin
+              prune_block store block_hash >>= fun () ->
+              delete_loop header.shell.predecessor (0, []) >>= fun () ->
+              Lwt.return block_hash end
       else
         Store.Block.Header.read_opt (store, block_hash) >>= function
         | None -> assert false (* Should not happen. *)
