@@ -522,11 +522,11 @@ module Pruned_block = struct
          (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
       )
 
-  let to_bytes =
-    Data_encoding.Binary.to_bytes_exn encoding
+  let to_bytes x =
+    Data_encoding.Binary.to_bytes_exn encoding x
 
-  let of_bytes =
-    Data_encoding.Binary.of_bytes encoding
+  let of_bytes x =
+    Data_encoding.Binary.of_bytes encoding x
 
 end
 
@@ -826,6 +826,34 @@ let () = register_error_kind `Permanent
             | _ -> None)
     (fun e -> Cannot_create_file e)
 
+type error += Cannot_open_file of string
+let () = register_error_kind `Permanent
+    ~id:"context_dump.read.cannot_open"
+    ~title:"Cannot open file for context restoring"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Error while opening file for context restoring: %s@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_restore_cannot_open" string) )
+    (function Cannot_open_file e -> Some e
+            | _ -> None)
+    (fun e -> Cannot_open_file e)
+
+type error += Suspicious_file of int
+let () = register_error_kind `Permanent
+    ~id:"context_dump.read.suspicious"
+    ~title:"Suspicious file: data after end"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Remaining bytes in file after context restoring: %d@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_restore_suspicious" int31) )
+    (function Suspicious_file e -> Some e
+            | _ -> None)
+    (fun e -> Suspicious_file e)
+
 let dump_contexts idx block_headers ~filename =
   let file_init () =
     Lwt_unix.openfile filename Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o666
@@ -839,3 +867,30 @@ let dump_contexts idx block_headers ~filename =
           fail (Cannot_create_file msg))
   >>=? fun fd ->
   dump_contexts_fd idx block_headers ~fd
+
+let restore_contexts idx ~filename =
+  let file_init () =
+    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY;] 0o600
+    >>= return
+  in
+  Lwt.catch file_init
+    (function
+      | Unix.Unix_error (e,_,_) -> fail @@ Cannot_open_file (Unix.error_message e)
+      | exc ->
+          let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
+          fail (Cannot_open_file msg))
+  >>=? fun fd ->
+  Lwt.finalize
+    (fun () ->
+       restore_contexts_fd idx ~fd
+       >>=? fun result ->
+       Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR
+       >>= fun current ->
+       Lwt_unix.fstat fd
+       >>= fun stats ->
+       let total = stats.Lwt_unix.st_size in
+       if current = total
+       then return result
+       else fail @@ Suspicious_file (total - current)
+    )
+    (fun () -> Lwt_unix.close fd)

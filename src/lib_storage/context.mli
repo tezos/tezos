@@ -181,3 +181,9 @@ val dump_contexts_fd :
   (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
   fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
+
+val restore_contexts : index -> filename:string ->
+  (Block_header.t * Block_data.t * Pruned_block.t list) list tzresult Lwt.t
+
+val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+  (Block_header.t * Block_data.t * Pruned_block.t list) list tzresult Lwt.t
