@@ -138,7 +138,7 @@ let retrieve_highwatermark cctxt ~chain =
         else
           fail (Invalid_chain_id chain_id)
 
-let may_inject_block (cctxt : #Proto_alpha.full)  ~chain ~delegate level =
+let may_inject_block (cctxt : #Client_context.full)  ~chain ~delegate level =
   retrieve_highwatermark cctxt ~chain >>=? fun { block_highwatermark } ->
   match Signature.Public_key_hash.Map.find_opt delegate block_highwatermark with
   | None -> return_true
@@ -238,7 +238,7 @@ let should_upgrade_endorsements_file (cctxt : #Client_context.full) =
   | Ok endorsements when endorsements <> [] -> return_true
   | _ -> return_false (* upgrade not needed or already occured *)
 
-let upgrade_files (wallet : #Proto_alpha.full) () =
+let upgrade_files (wallet : #Client_context.full) =
   load_watermarks wallet >>=? fun highwatermarks ->
   (* If the file is not empty, it means the upgrade already occured *)
   if highwatermarks <> empty then

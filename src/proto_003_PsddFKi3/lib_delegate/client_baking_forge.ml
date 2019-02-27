@@ -150,10 +150,11 @@ let inject_block
   forge_block_header cctxt ~chain block
     delegate_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   (* Record baked blocks to prevent double baking  *)
+  let open Client_baking_highwatermarks in
   cctxt#with_lock begin fun () ->
-    Daemon_state.may_inject_block cctxt ~chain ~delegate:delegate_pkh level >>=? function
+    may_inject_block cctxt ~chain ~delegate:delegate_pkh level >>=? function
     | true ->
-        Daemon_state.record_block cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
+        record_block cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
         return_true
     | false ->
         lwt_log_error Tag.DSL.(fun f ->
@@ -162,7 +163,7 @@ let inject_block
             -% a level_tag level)
         >>= fun () -> return_false
   end >>=? function
-  | false -> fail (Daemon_state.Level_previously_baked level)
+  | false -> fail (Level_previously_baked level)
   | true ->
       Shell_services.Injection.block cctxt
         ?force ~chain signed_header operations >>=? fun block_hash ->
