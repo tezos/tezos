@@ -406,7 +406,7 @@ let update_caboose chain_data block_header oldest_header max_op_ttl =
     chain_data
     (caboose_level, caboose_hash)
 
-let import data_dir filename =
+let import data_dir filename block =
   let data_dir =
     match data_dir with
     | None -> Node_config_file.default_data_dir
@@ -439,6 +439,22 @@ let import data_dir filename =
     let ({ block_header ; operations } :
            Block_data.t) = meta in
     let block_hash = Block_header.hash block_header in
+    (* Checks that the block hash imported by the snapshot is the expected one *)
+    begin
+      match block with
+      | Some str ->
+          let bh = Block_hash.of_b58check_exn str in
+          fail_unless
+            (Block_hash.equal bh block_hash)
+            (failure
+               "The block hash contained in the file is %a instead of %a"
+               Block_hash.pp bh
+               Block_hash.pp block_hash)
+      | None ->
+          lwt_log_notice "You should consider using the --block <block_hash> \
+                          argument to check that the block imported using the \
+                          snapshot is the one you expect." >>= fun () -> return ()
+    end >>=? fun () ->
     Store.Block.Contents.known (block_store,block_hash) >>= fun known ->
     if known then
       lwt_log_notice "Skipping already known block %a"
@@ -514,11 +530,11 @@ module Term = struct
 
   type subcommand = Export | Import
 
-  let process subcommand config_file file blocks export_rolling =
+  let process subcommand config_file file block export_rolling =
     let res =
       match subcommand with
-      | Export -> export ~export_rolling config_file file blocks
-      | Import -> import config_file file
+      | Export -> export ~export_rolling config_file file block
+      | Import -> import config_file file block
     in
     match Lwt_main.run res with
     | Ok () -> `Ok ()
@@ -545,7 +561,7 @@ module Term = struct
 
   let blocks =
     let open Cmdliner.Arg in
-    let doc ="Block hash of the block to export." in
+    let doc ="Block hash of the block to export/import." in
     value & opt (some string) None & info ~docv:"<block_hash>" ~doc ["block"]
 
   let export_rolling =
