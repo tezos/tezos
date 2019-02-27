@@ -544,11 +544,10 @@ module Make (I:Dump_interface)
                   then Lwt.return_unit
                   else
                     begin
-                      if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
-                        Format.eprintf "Context: %dK elements, %dMiB written%!\b\b\b\b\
-                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-                          (!cpt / 1000) (!written / 1_048_576) ;
+                      Tezos_stdlib.Utils.display_progress
+                        ~refresh_rate:(!cpt, 1_000)
+                        "Context: %dK elements, %dMiB written%!"
+                        (!cpt / 1_000) (!written / 1_048_576) ;
                       incr cpt ;
                       set_visit hash; (* There cannot be a cycle *)
                       match kind with
@@ -586,15 +585,14 @@ module Make (I:Dump_interface)
            | Some ctxt ->
                let tree = I.context_tree ctxt in
                fold_tree_path ctxt [] tree >>= fun () ->
-               if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+               Tezos_stdlib.Utils.display_progress_end ();
                I.context_parents ctxt >>= fun parents ->
                set_meta buf meta_tbl (I.Block_data.to_bytes meta) >>= fun meta_h ->
                Lwt_list.fold_left_s (fun cpt pruned ->
-                   if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-                     Format.eprintf "History: %dK block, %dMiB written%!\b\b\b\b\b\
-                                     \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                                     \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-                       (cpt / 1000) (!written / 1_048_576) ;
+                   Tezos_stdlib.Utils.display_progress
+                     ~refresh_rate:(cpt, 1_000)
+                     "History: %dK block, %dMiB written"
+                     (cpt / 1_000) (!written / 1_048_576) ;
                    set_command buf Proot ;
                    let mbhash = I.Pruned_block.to_bytes pruned in
                    set_mbytes buf mbhash ;
@@ -607,7 +605,7 @@ module Make (I:Dump_interface)
       >>=? fun () ->
       set_command buf End;
       flush () >>= fun () ->
-      if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+      Tezos_stdlib.Utils.display_progress_end ();
       return_unit
     end
       begin function
@@ -681,11 +679,10 @@ module Make (I:Dump_interface)
           end >>=? fun meta ->
           return (bh, meta) in
     let rec loop ctxt acc cpt =
-      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-        Format.eprintf "Context: %dK elements, %dMiB read%!\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-          (cpt / 1000) (!read / 1_048_576) ;
+      Tezos_stdlib.Utils.display_progress
+        ~refresh_rate:(cpt, 1_000)
+        "Context: %dK elements, %dMiB read"
+        (cpt / 1_000) (!read / 1_048_576) ;
       get_command rbuf >>=?
       function
       | Root ->
@@ -700,21 +697,20 @@ module Make (I:Dump_interface)
           fun ( hash, path, blob ) -> add_blob ctxt path hash blob >>=?
           fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
       | End ->
-          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          Tezos_stdlib.Utils.display_progress_end ();
           return acc
       | Meta -> get_meta rbuf meta_tbl >>=? fun () -> loop ctxt acc (succ cpt)
       | Proot ->
-          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          Tezos_stdlib.Utils.display_progress_end ();
           loop_pruned [] 0 >>=? fun pruned ->
-          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          Tezos_stdlib.Utils.display_progress_end ();
           finalize_root ctxt >>=? fun (bh, meta) ->
           loop (I.make_context index) ((bh, meta, pruned) :: acc) (succ cpt)
     and loop_pruned acc cpt =
-      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-        Format.eprintf "History: %dK blocks, %dMiB read%!\b\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-          (cpt / 1000) (!read / 1_048_576) ;
+      Tezos_stdlib.Utils.display_progress
+        ~refresh_rate:(cpt, 1_000)
+        "History: %dK blocks, %dMiB read"
+        (cpt / 1_000) (!read / 1_048_576) ;
       get_mbytes rbuf >>= fun bytes ->
       match I.Pruned_block.of_bytes bytes with
       | None -> fail @@ Bad_read "wrong pruned block"
