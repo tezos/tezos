@@ -38,3 +38,10 @@ val display_paragraph: Format.formatter -> string -> unit
 
 (** [finalize f g ] ensures g() called after f(), even if exception raised **)
 val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
+
+(**  Print string over the current line **)
+val display_progress: ?refresh_rate: int * int ->
+  ('a, Format.formatter, unit, unit) format4 -> 'a
+
+(** Finalizes progress display **)
+val display_progress_end: unit -> unit
