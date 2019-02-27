@@ -112,6 +112,10 @@ module type S = sig
     index ->
     (block_header * block_data * pruned_block list * protocol_data list) list ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+
+  val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+    (block_header * block_data * pruned_block list) list tzresult Lwt.t
+
 end
 
 type error += Writing_error of string
@@ -645,4 +649,129 @@ module Make (I:Dump_interface)
             Error_monad.pp_exn Format.err_formatter err ;
             fail @@ Writing_error "unknown error"
       end
+
+  (* Restoring *)
+
+  let restore_contexts_fd index ~fd =
+
+    let read = ref 0 in
+    let rbuf = ref (fd, Bytes.empty, 0, read) in
+
+    (* Magic check *)
+    let magic_check () =
+      let magic_length = String.length context_dump_magic in
+      read_string ~len:magic_length rbuf >>= fun magic ->
+      if magic <> context_dump_magic
+      then fail @@ Bad_read "wrong magic"
+      else return ()
+    in
+
+    (* Check if a hash is right for you *)
+    let check_hash his hshould =
+      if I.hash_equal his hshould
+      then return ()
+      else fail @@ Bad_hash ("tree", snd @@ I.hash_export his, snd @@ I.hash_export hshould)
+    in
+
+    (* Editing the repository *)
+    let add_blob ctxt path hash blob =
+      I.add_mbytes index (I.context_tree ctxt) path blob >>= fun tree ->
+      I.sub_tree tree path >>= function
+      | None -> assert false
+      | Some sub_tree -> begin
+          I.tree_hash ctxt sub_tree >>= fun his ->
+          check_hash his hash >>=? fun () ->
+          return tree
+        end
+    in
+    let add_dir ctxt hash path keys =
+      I.add_dir index (I.context_tree ctxt) path keys >>= function
+      | None -> fail @@ Bad_read "cannot add directory"
+      | Some tree ->
+          I.sub_tree tree path >>= function
+          | None -> assert false
+          | Some st ->
+              I.tree_hash ctxt st >>= fun his ->
+              check_hash his hash >>=? fun () ->
+              return tree
+    in
+
+    (* Meta table declaration *)
+    let meta_tbl : ( Context_hash.t, MBytes.t ) Hashtbl.t = Hashtbl.create 127 in
+
+    (* The big loop *)
+    let finalize_root ctxt =
+      get_root rbuf meta_tbl >>=? fun ( bh_should, info, parents, meta) ->
+      I.set_context ~info ~parents ctxt bh_should >>= function
+      | None -> fail @@ Bad_read "context_hash does not correspond for block"
+      | Some bh ->
+          begin
+            match I.Block_data.of_bytes meta with
+            | Some md -> return md
+            | None -> fail @@ Bad_read "wrong meta data"
+          end >>=? fun meta ->
+          return (bh, meta) in
+    let rec loop ctxt acc cpt =
+      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+        Format.eprintf "Context: %dK elements, %dMiB read%!\b\b\b\b\b\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+          (cpt / 1000) (!read / 1_048_576) ;
+      get_command rbuf >>=?
+      function
+      | Root ->
+          finalize_root ctxt >>=? fun (bh, meta) ->
+          loop (I.make_context index) ((bh, meta, []) :: acc) (succ cpt)
+      | Directory ->
+          get_dir rbuf >>=?
+          fun ( hash, path, keys ) -> add_dir ctxt hash path keys >>=?
+          fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
+      | Blob ->
+          get_blob rbuf >>=?
+          fun ( hash, path, blob ) -> add_blob ctxt path hash blob >>=?
+          fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
+      | End ->
+          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          return acc
+      | Meta -> get_meta rbuf meta_tbl >>=? fun () -> loop ctxt acc (succ cpt)
+      | Proot ->
+          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          loop_pruned [] 0 >>=? fun pruned ->
+          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          finalize_root ctxt >>=? fun (bh, meta) ->
+          loop (I.make_context index) ((bh, meta, pruned) :: acc) (succ cpt)
+    and loop_pruned acc cpt =
+      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
+        Format.eprintf "History: %dK blocks, %dMiB read%!\b\b\b\b\b\b\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
+                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+          (cpt / 1000) (!read / 1_048_576) ;
+      get_mbytes rbuf >>= fun bytes ->
+      match I.Pruned_block.of_bytes bytes with
+      | None -> fail @@ Bad_read "wrong pruned block"
+      | Some block ->
+          get_command rbuf >>=? function
+          | Proot -> loop_pruned (block :: acc) (succ cpt)
+          | Root -> return (List.rev (block :: acc))
+          | _ ->
+              fail @@ Bad_read "invalid command in the middle of block history"
+    in
+
+    (* Execution *)
+    Lwt.catch (fun () ->
+        magic_check () >>=? fun () ->
+        loop (I.make_context index) [] 0
+      )
+      (function
+        | Unix.Unix_error (e,_,_) -> fail @@ Bad_read (Unix.error_message e)
+        | Assert_failure (s,l,c) ->
+            fail @@ Bad_read (Printf.sprintf "Bad assert at %s %d %d" s l c)
+        | exc ->
+            let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
+            fail (Bad_read msg)
+      )
+
+    >>=? fun l ->
+    return @@ List.rev l
+
 end
