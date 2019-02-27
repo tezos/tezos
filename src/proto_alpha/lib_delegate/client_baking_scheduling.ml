@@ -83,7 +83,7 @@ let main
       -% s worker_tag name) >>= fun () ->
 
   wait_for_first_event ~name stream >>= fun first_event ->
-  Shell_services.Blocks.hash cctxt ~block:`Genesis () >>=? fun genesis_hash ->
+  Shell_services.Blocks.hash cctxt ~block:(`Level 0l) () >>=? fun genesis_hash ->
 
   (* statefulness *)
   let last_get_event = ref None in
