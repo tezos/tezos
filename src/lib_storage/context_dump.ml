@@ -712,11 +712,10 @@ module Make (I:Dump_interface)
           end >>=? fun meta ->
           return (bh, meta) in
     let rec loop ctxt acc cpt =
-      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-        Format.eprintf "Context: %dK elements, %dMiB read%!\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-          (cpt / 1000) (!read / 1_048_576) ;
+      Tezos_stdlib.Utils.display_progress
+        ~refresh_rate:(cpt, 1_000)
+        "Context: %dK elements, %dMiB read"
+        (cpt / 1_000) (!read / 1_048_576) ;
       get_command rbuf >>=?
       function
       | Root ->
@@ -731,21 +730,20 @@ module Make (I:Dump_interface)
           fun ( hash, path, blob ) -> add_blob ctxt path hash blob >>=?
           fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
       | End ->
-          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          Tezos_stdlib.Utils.display_progress_end ();
           return acc
       | Meta -> get_meta rbuf meta_tbl >>=? fun () -> loop ctxt acc (succ cpt)
       | Proot ->
-          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          Tezos_stdlib.Utils.display_progress_end ();
           loop_pruned [] 0 >>=? fun pruned ->
-          if Unix.isatty Unix.stderr then Format.eprintf "@." ;
+          Tezos_stdlib.Utils.display_progress_end ();
           finalize_root ctxt >>=? fun (bh, meta) ->
           loop (I.make_context index) ((bh, meta, pruned) :: acc) (succ cpt)
     and loop_pruned acc cpt =
-      if Unix.isatty Unix.stderr && cpt mod 1000 = 0 then
-        Format.eprintf "History: %dK blocks, %dMiB read%!\b\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\
-                        \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-          (cpt / 1000) (!read / 1_048_576) ;
+      Tezos_stdlib.Utils.display_progress
+        ~refresh_rate:(cpt, 1_000)
+        "History: %dK blocks, %dMiB read"
+        (cpt / 1_000) (!read / 1_048_576) ;
       get_mbytes rbuf >>= fun bytes ->
       match I.Pruned_block.of_bytes bytes with
       | None -> fail @@ Bad_read "wrong pruned block"
