@@ -40,8 +40,17 @@ val open_with_atomic_rw:
 
 val with_atomic_rw:
   t ->
-  (unit -> 'a Error_monad.tzresult Lwt.t) ->
-  'a tzresult Lwt.t
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
+
+(** {2 Configuration} **********************************************************)
+
+module Configuration : sig
+
+  module History_mode : SINGLE_STORE
+    with type t := global_store
+     and type value := History_mode.t
+end
 
 (** {2 Chain store} **********************************************************)
 
@@ -103,6 +112,14 @@ module Chain_data : sig
   module Checkpoint : SINGLE_STORE
     with type t := store
      and type value := Block_header.t
+
+  module Save_point : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
+  module Caboose : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
 
 end
 

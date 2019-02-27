@@ -78,6 +78,7 @@ let fork_node ?exe ?(timeout = 4) ?(port = 18732) ?sandbox () =
     Unix.create_process exe
       [| "tezos-node" ;
          "run" ;
+         "--history-mode=archive" ;
          "--data-dir"; data_dir ;
          (match sandbox with
           | None -> "--sandbox"

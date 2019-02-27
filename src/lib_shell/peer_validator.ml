@@ -106,7 +106,7 @@ let set_bootstrapped pv =
     pv.parameters.notify_bootstrapped () ;
   end
 
-let bootstrap_new_branch w _ancestor _head unknown_prefix =
+let bootstrap_new_branch w _head unknown_prefix =
   let pv = Worker.state w in
   let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
   (* sender and receiver are inverted here because they are from
@@ -254,8 +254,8 @@ let may_validate_new_branch w distant_hash locator =
         Block_hash.pp_short distant_hash
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
-  | Some (ancestor, unknown_prefix) ->
-      bootstrap_new_branch w ancestor distant_header unknown_prefix
+  | Some unknown_prefix ->
+      bootstrap_new_branch w distant_header unknown_prefix
 
 let on_no_request w =
   let pv = Worker.state w in

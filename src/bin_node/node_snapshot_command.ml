@@ -157,12 +157,11 @@ let export ?(export_rolling=false) data_dir filename block =
     | Some block_hash ->
         return (Block_hash.of_b58check_exn block_hash)
     | None ->
-        Store.Chain_data.Checkpoint.read_exn
-          (chain_data_store) >>= fun (last_checkpoint_level, last_checkpoint_hash) ->
-        if last_checkpoint_level = 0l then
+        Store.Chain_data.Checkpoint.read_exn (chain_data_store) >>= fun last_checkpoint ->
+        if last_checkpoint.shell.level = 0l then
           fail @@ Wrong_block_export (genesis.block, Too_few_predecessors)
         else
-          return last_checkpoint_hash >>=? fun last_checkpoint_hash ->
+          return @@ Block_header.hash last_checkpoint >>=? fun last_checkpoint_hash ->
           lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (last checkpoint)"
             Block_hash.pp last_checkpoint_hash >>= fun () ->
           return last_checkpoint_hash
