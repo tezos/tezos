@@ -25,17 +25,7 @@
 (*****************************************************************************)
 
 open Node_logging
-
-let genesis : State.Chain.genesis = {
-  time =
-    Time.of_notation_exn "2018-06-30T16:07:32Z" ;
-  block =
-    Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
-  protocol =
-    Protocol_hash.of_b58check_exn
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
-}
+open Genesis_chain
 
 type error += Non_private_sandbox of P2p_addr.t
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
