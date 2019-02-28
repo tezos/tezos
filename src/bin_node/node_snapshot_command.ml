@@ -27,6 +27,70 @@
 open Genesis_chain
 open Node_logging
 
+type error += Wrong_snapshot_export of History_mode.t * History_mode.t
+type error += Export_unknown_block of Block_hash.t
+type error += Inconsistent_imported_block of Block_hash.t * Block_hash.t
+type error += Snapshot_import_failure of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"WrongSnapshotExport"
+    ~title:"Wrong snapshot export"
+    ~description:"Snapshot exports is not compatible with the current configuration."
+    ~pp:begin fun ppf (src,dst) ->
+      Format.fprintf ppf
+        "Cannot export a %a snapshot from a %a node."
+        History_mode.pp dst History_mode.pp src
+    end
+    Data_encoding.(obj2
+                     (req "src" History_mode.encoding)
+                     (req "dst" History_mode.encoding))
+    (function Wrong_snapshot_export (src,dst) -> Some (src, dst) | _ -> None)
+    (fun (src, dst) -> Wrong_snapshot_export (src, dst));
+  register_error_kind
+    `Permanent
+    ~id:"ExportUnknownBlock"
+    ~title:"Export unknown block"
+    ~description:"The block to export in the snapshot cannot be found."
+    ~pp:begin fun ppf bh ->
+      Format.fprintf ppf
+        "Fails to export snapshot as the block with block_hash %a cannot be found."
+        Block_hash.pp bh
+    end
+    Data_encoding.(obj1 (req "block_hash" Block_hash.encoding))
+    (function Export_unknown_block bh -> Some bh | _ -> None)
+    (fun bh -> Export_unknown_block bh);
+  register_error_kind
+    `Permanent
+    ~id:"InconsistentImportedBlock"
+    ~title:"Inconsistent imported block"
+    ~description:"The imported block is not the expected one."
+    ~pp:begin fun ppf (got,exp) ->
+      Format.fprintf ppf
+        "The block contained in the file is %a instead of %a."
+        Block_hash.pp got Block_hash.pp exp
+    end
+    Data_encoding.(obj2
+                     (req "block_hash" Block_hash.encoding)
+                     (req "block_hash_expected" Block_hash.encoding))
+    (function Inconsistent_imported_block (got, exp) -> Some (got, exp) | _ -> None)
+    (fun (got, exp) -> Inconsistent_imported_block (got, exp));
+  register_error_kind
+    `Permanent
+    ~id:"SnapshotImportFailure"
+    ~title:"Snapshot import failure"
+    ~description:"The imported snapshot is malformed."
+    ~pp:begin fun ppf msg ->
+      Format.fprintf ppf
+        "The data contained in the snapshot is not valid. The import mechanism \
+         failed to validate the file: %s."
+        msg
+    end
+    Data_encoding.(obj1 (req "message" string))
+    (function Snapshot_import_failure str -> Some str | _ -> None)
+    (fun str -> Snapshot_import_failure str)
+
 let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
@@ -92,8 +156,7 @@ let export ?(export_rolling=false) data_dir filename block =
     | Archive | Full -> return_unit
     | Rolling ->
         if export_rolling then return_unit else
-          failwith "cannot export a full snapshot from a %a node"
-            History_mode.pp history_mode
+          fail @@ Wrong_snapshot_export (history_mode, History_mode.Rolling)
   end >>=? fun () ->
   begin
     match block with
@@ -109,8 +172,7 @@ let export ?(export_rolling=false) data_dir filename block =
   Store.Block.Header.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
-        failwith "Skipping unknown block %a"
-          Block_hash.pp block_hash
+        fail @@ Export_unknown_block block_hash
     | Some block_header ->
         lwt_log_notice "Dumping: %a"
           Block_hash.pp block_hash >>= fun () ->
@@ -255,13 +317,15 @@ let store_pruned_blocks
   loop_on_chunks 0 >>= fun () ->
   Lwt.return @@ Tezos_stdlib.Utils.display_progress_end ()
 
-let check_context_hash_consistency block_validation_result block_header =
+let check_context_hash_consistency
+    (block_validation_result : Tezos_validation.Block_validation.result)
+    (block_header : Block_header.t) =
   (* we expect to match the context_hash …*)
-  fail_when
-    (not (Context_hash.equal
-            block_validation_result.Tezos_validation.Block_validation.context_hash
-            block_header.Block_header.shell.context))
-    (failure "Resulting context hash does not match")
+  fail_unless
+    (Context_hash.equal
+       block_validation_result.context_hash
+       block_header.shell.context)
+    (Snapshot_import_failure "Resulting context hash does not match")
 
 let set_history_mode store history =
   begin if (snd history.(0)).Context.Pruned_block.block_header.shell.level = 1l then
@@ -374,10 +438,7 @@ let import data_dir filename block =
           let bh = Block_hash.of_b58check_exn str in
           fail_unless
             (Block_hash.equal bh block_hash)
-            (failure
-               "The block hash contained in the file is %a instead of %a"
-               Block_hash.pp bh
-               Block_hash.pp block_hash)
+            (Inconsistent_imported_block (bh,block_hash))
       | None ->
           lwt_log_notice "You should consider using the --block <block_hash> \
                           argument to check that the block imported using the \
