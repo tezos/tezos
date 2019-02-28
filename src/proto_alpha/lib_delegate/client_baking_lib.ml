@@ -144,9 +144,11 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   do_reveal cctxt ~chain ~block nonces
 
 let reveal_nonces cctxt ~chain ~block () =
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun block_hash ->
   Client_baking_forge.get_unrevealed_nonces
-    cctxt ~chain cctxt#block >>=? fun blocks ->
+    cctxt ~chain ~head:block_hash () >>=? fun blocks ->
   let nonces = List.map snd blocks in
   do_reveal cctxt ~chain ~block nonces >>=? fun () ->
-  Client_baking_forge.filter_outdated_nonces cctxt ~chain cctxt#block >>=? fun () ->
+  Client_baking_forge.filter_outdated_nonces
+    cctxt ~chain ~head:block_hash >>=? fun () ->
   return_unit

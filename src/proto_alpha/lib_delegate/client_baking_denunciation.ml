@@ -57,12 +57,6 @@ let create_state ~preserved_levels =
                preserved_levels ;
                highest_level_encountered = Raw_level.root (* 0l *) }
 
-(* get the delegate that had the right to bake for a specific level/slot *)
-let fetch_baker (cctxt : #Proto_alpha.full) ~chain ~block =
-  Alpha_block_services.metadata cctxt ~chain ~block () >>=? fun
-    { protocol_data = { Apply_results.baker  } } ->
-  return baker
-
 (* We choose a previous offset (5 blocks from head) to ensure that the
    injected operation is branched from a valid predecessor. *)
 let get_block_offset level =
