@@ -279,14 +279,6 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     protocol_data: Proto.block_header_data ;
   }
 
-  let b58_header shell protocol_data =
-    Option.map
-      (Data_encoding.Binary.to_bytes
-         Proto.block_header_data_encoding
-         protocol_data)
-      ~f:(fun protocol_data ->
-          Block_header.to_b58check { shell ; protocol_data })
-
   let block_header_encoding =
     def "block_header" @@
     conv
@@ -390,16 +382,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
   let block_info_encoding =
     conv
       (fun { chain_id ; hash ; header ; metadata ; operations } ->
-         let raw_header = b58_header header.shell header.protocol_data in
-         ((), chain_id, hash, header, raw_header, metadata, operations))
-      (fun ((), chain_id, hash, header, _, metadata, operations) ->
+         ((), chain_id, hash, header, metadata, operations))
+      (fun ((), chain_id, hash, header, metadata, operations) ->
          { chain_id ; hash ; header ; metadata ; operations })
-      (obj7
+      (obj6
          (req "protocol" (constant protocol_hash))
          (req "chain_id" Chain_id.encoding)
          (req "hash" Block_hash.encoding)
          (req "header" (dynamic_size raw_block_header_encoding))
-         (opt "encoded_header" string)
          (req "metadata" (dynamic_size block_metadata_encoding))
          (req "operations"
             (list (dynamic_size (list operation_encoding)))))
