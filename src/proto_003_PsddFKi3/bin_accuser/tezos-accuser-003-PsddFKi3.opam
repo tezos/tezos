@@ -9,13 +9,10 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.0.1" }
   "tezos-base"
-  "tezos-client-base"
-  "tezos-client-000-Ps9mPmXa"
   "tezos-client-003-PsddFKi3"
   "tezos-client-commands"
-  "tezos-client-base-unix"
-  "tezos-baking-003-PsddFKi3"
   "tezos-baking-003-PsddFKi3-commands"
+  "tezos-client-base-unix"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
