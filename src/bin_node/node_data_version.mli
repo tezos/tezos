@@ -35,7 +35,7 @@ val pp : Format.formatter -> t -> unit
 
 val version_encoding : t Data_encoding.encoding
 
-val ensure_data_dir : string -> unit tzresult Lwt.t
+val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
 
 val upgrade_data_dir : string -> unit tzresult Lwt.t
 
