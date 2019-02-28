@@ -27,6 +27,23 @@
 open Genesis_chain
 open Node_logging
 
+type error += Export_unknown_block of Block_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"ExportUnknownBlock"
+    ~title:"Export unknown block"
+    ~description:"The block to export in the snapshot cannot be found."
+    ~pp:begin fun ppf bh ->
+      Format.fprintf ppf
+        "Fails to export snapshot as the block with block_hash %a cannot be found."
+        Block_hash.pp bh
+    end
+    Data_encoding.(obj1 (req "block_hash" Block_hash.encoding))
+    (function Export_unknown_block bh -> Some bh | _ -> None)
+    (fun bh -> Export_unknown_block bh)
+
 let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
@@ -100,8 +117,7 @@ let export ?(export_rolling=false) data_dir filename block =
   Store.Block.Header.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
-        failwith "Skipping unknown block %a"
-          Block_hash.pp block_hash
+        fail @@ Export_unknown_block block_hash
     | Some block_header ->
         lwt_log_notice "Dumping: %a"
           Block_hash.pp block_hash >>= fun () ->
@@ -145,6 +161,7 @@ let export ?(export_rolling=false) data_dir filename block =
     ~filename >>=? fun () ->
   lwt_log_notice "Sucessful export (in file %s)" filename >>= fun () ->
   return_unit
+
 (** Main *)
 
 module Term = struct
