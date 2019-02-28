@@ -166,12 +166,17 @@ let write_version data_dir =
     (version_file data_dir)
     (Data_encoding.Json.construct version_encoding data_version)
 
-let ensure_data_dir data_dir =
+let ensure_data_dir bare data_dir  =
   let write_version () = write_version data_dir >>=? fun () -> return_none in
   try if Sys.file_exists data_dir then
       match Sys.readdir data_dir with
       | [||] -> write_version ()
       | [| single |] when single = default_identity_file_name -> write_version ()
+      | _ when bare ->
+          fail (Invalid_data_dir
+                  (Format.asprintf
+                     "Please provide a clean directory (only %s is allowed)."
+                     default_identity_file_name))
       | _ -> check_data_dir_version data_dir
     else begin
       Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
@@ -181,7 +186,7 @@ let ensure_data_dir data_dir =
     fail (Invalid_data_dir data_dir)
 
 let upgrade_data_dir data_dir =
-  ensure_data_dir data_dir >>=? function
+  ensure_data_dir false data_dir >>=? function
   | None ->
       Format.printf "Node data dir is up-to-date.@." ;
       return_unit
@@ -197,8 +202,8 @@ let upgrade_data_dir data_dir =
       Format.printf "The node data dir is now up-to-date!@." ;
       write_version data_dir
 
-let ensure_data_dir data_dir =
-  ensure_data_dir data_dir >>=? function
+let ensure_data_dir ?(bare = false ) data_dir =
+  ensure_data_dir bare data_dir >>=? function
   | None -> return_unit
   | Some (version, _) ->
       fail (Data_dir_needs_upgrade { expected = data_version ;
