@@ -1154,44 +1154,56 @@ let compute_best_slot_on_current_level
       (* Found at least a slot *)
       return_some best_slot
 
+let get_block_level (cctxt : #Proto_alpha.full) ~chain block_hash =
+  Shell_services.Blocks.Header.shell_header
+    cctxt ~chain ~block:(`Hash (block_hash, 0)) () >>= function
+  | Ok { level } -> return level
+  | Error errs as err ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "@[<v 2>Cannot retrieve block %a header associated to nonce:@ @[%a@]@]@."
+          -% t event "cannot_retrieve_block_header"
+          -% a Block_hash.Logging.tag block_hash
+          -% a errs_tag errs) >>= fun () ->
+      Lwt.return err
+
 (** [filter_outdated_nonces] removes nonces older than 5 cycles in the nonce file *)
 let filter_outdated_nonces
     (cctxt : #Proto_alpha.full)
     ~chain
-    head =
-  Alpha_block_services.metadata
-    cctxt ~chain ~block:head () >>=? fun { protocol_data = { level = current_level } } ->
-  let current_cycle = Cycle.to_int32 current_level.Level.cycle in
-  let is_older_than_5_cycles block_cycle =
-    Int32.sub current_cycle (Cycle.to_int32 block_cycle) > 5l in
+    ~(head : Block_hash.t) =
+  Alpha_services.Constants.all
+    cctxt (cctxt#chain, `Hash (head, 0)) >>=? fun { parametric = { blocks_per_cycle } } ->
+  get_block_level cctxt ~chain head >>=? fun level ->
+  let current_cycle = Int32.(div level blocks_per_cycle) in
+  let is_older_than_5_cycles block_level =
+    let block_cycle = Int32.(div block_level blocks_per_cycle) in
+    Int32.sub current_cycle block_cycle > 5l in
   cctxt#with_lock begin fun () ->
     let open Client_baking_nonces in
-    load cctxt >>=? fun chain_nonces ->
-    Chain_services.chain_id cctxt () >>=? fun chain_id ->
-    match find_chain_nonces_opt chain_nonces chain_id with
+    load cctxt >>=? fun registered_nonces ->
+    Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+    match find_chain_nonces_opt registered_nonces chain_id with
     | None -> return_unit
     | Some nonces ->
         Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
             acc >>=? fun acc ->
-            Alpha_block_services.metadata cctxt ~chain ~block:(`Hash (hash, 0)) ()
-            >>= function
-            | Result.Error _ -> return acc
-            | Result.Ok { protocol_data = { level = { Level.cycle } } } ->
-                if is_older_than_5_cycles cycle then
-                  return (remove chain_nonces chain_id hash)
+            get_block_level cctxt ~chain hash >>= function
+            | Ok level ->
+                if is_older_than_5_cycles level then
+                  return (remove acc chain_id hash)
                 else
                   return acc
-          )
-          nonces (return chain_nonces) >>=? fun new_nonces ->
+            | Error _ -> return acc)
+          nonces (return registered_nonces) >>=? fun new_nonces ->
         Client_baking_nonces.save cctxt new_nonces
   end
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 let get_unrevealed_nonces
     (cctxt : #Proto_alpha.full) ?(force = false)
-    ~chain head =
+    ~chain ~head () =
   Client_baking_blocks.blocks_from_current_cycle cctxt ~chain
-    head ~offset:(-1l) () >>=? fun blocks ->
+    (`Hash (head, 0)) ~offset:(-1l) () >>=? fun blocks ->
   cctxt#with_lock begin fun () ->
     Client_baking_nonces.load cctxt
   end >>=? fun nonces ->
@@ -1200,30 +1212,34 @@ let get_unrevealed_nonces
       match Client_baking_nonces.find_opt nonces chain_id hash with
       | None -> return_none
       | Some nonce ->
-          Alpha_block_services.metadata
-            cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { protocol_data = { level } } ->
-          if force then
-            return_some (hash, (level.level, nonce))
-          else
-            Alpha_services.Nonce.get
-              cctxt (chain, head) level.level >>=? function
-            | Missing nonce_hash
-              when Nonce.check_hash nonce nonce_hash ->
-                lwt_log_notice Tag.DSL.(fun f ->
-                    f "Found nonce to reveal for %a (level: %a)"
-                    -% t event "found_nonce"
-                    -% a Block_hash.Logging.tag hash
-                    -% a level_tag level.level)
-                >>= fun () ->
-                return_some (hash, (level.level, nonce))
-            | Missing _nonce_hash ->
-                lwt_log_error Tag.DSL.(fun f ->
-                    f "Incoherent nonce for level %a"
-                    -% t event "bad_nonce"
-                    -% a level_tag level.level)
-                >>= fun () -> return_none
-            | Forgotten -> return_none
-            | Revealed _ -> return_none)
+          begin get_block_level cctxt ~chain hash >>= function
+            | Ok level -> begin
+                Lwt.return
+                  (Alpha_environment.wrap_error (Raw_level.of_int32 level)) >>=? fun level ->
+                if force then
+                  return_some (hash, (level, nonce))
+                else
+                  Alpha_services.Nonce.get cctxt (chain, (`Hash (head, 0))) level >>=? function
+                  | Missing nonce_hash
+                    when Nonce.check_hash nonce nonce_hash ->
+                      lwt_log_notice Tag.DSL.(fun f ->
+                          f "Found nonce to reveal for %a (level: %a)"
+                          -% t event "found_nonce"
+                          -% a Block_hash.Logging.tag hash
+                          -% a level_tag level)
+                      >>= fun () ->
+                      return_some (hash, (level, nonce))
+                  | Missing _nonce_hash ->
+                      lwt_log_error Tag.DSL.(fun f ->
+                          f "Incoherent nonce for level %a"
+                          -% t event "bad_nonce"
+                          -% a level_tag level)
+                      >>= fun () -> return_none
+                  | Forgotten -> return_none
+                  | Revealed _ -> return_none
+              end
+            | Error _ -> return_none
+          end)
     blocks >>=? function
   | [] -> return_nil
   | x ->
@@ -1231,15 +1247,15 @@ let get_unrevealed_nonces
          - We entered a new cycle and we can clear old nonces ;
          - A revelation was not included yet in the cycle beggining.
          So, it is safe to only filter outdated_nonces there *)
-      filter_outdated_nonces cctxt ~chain head >>=? fun () ->
+      filter_outdated_nonces cctxt ~chain ~head >>=? fun () ->
       return x
 
 (** [reveal_potential_nonces] reveal registered nonces *)
-let reveal_potential_nonces cctxt ~chain new_head =
-  get_unrevealed_nonces cctxt ~chain new_head >>= function
+let reveal_potential_nonces cctxt ~chain block_hash =
+  get_unrevealed_nonces cctxt ~chain ~head:block_hash () >>= function
   | Ok nonces ->
       Client_baking_revelation.inject_seed_nonce_revelation
-        cctxt ~chain ~block:new_head (List.map snd nonces)
+        cctxt ~chain ~block:(`Hash (block_hash, 0)) (List.map snd nonces)
   | Error err ->
       lwt_warn Tag.DSL.(fun f ->
           f "Cannot read nonces: %a"
@@ -1273,9 +1289,8 @@ let create
   in
 
   let event_k cctxt state new_head =
-    let block = `Hash (new_head.Client_baking_blocks.hash, 0) in
     reveal_potential_nonces cctxt
-      ~chain:cctxt#chain block >>= fun _ignore_nonce_err ->
+      ~chain:cctxt#chain new_head.Client_baking_blocks.hash >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->
     state.best_slot <- slot ;
     return_unit
