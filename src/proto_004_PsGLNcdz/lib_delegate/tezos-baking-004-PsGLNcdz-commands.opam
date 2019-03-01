@@ -1,0 +1,23 @@
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: [ "Tezos devteam" ]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "ocamlfind" { build }
+  "dune" { build & >= "1.0.1" }
+  "tezos-base"
+  "tezos-protocol-environment"
+  "tezos-protocol-004-PsGLNcdz"
+  "tezos-shell-services"
+  "tezos-client-base"
+  "tezos-client-commands"
+  "tezos-client-004-PsGLNcdz"
+  "tezos-baking-004-PsGLNcdz"
+  "tezos-signer-backends" { with-test }
+]
+build: [
+  [ "dune" "build" "-p" name "-j" jobs ]
+]
