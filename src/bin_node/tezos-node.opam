@@ -16,6 +16,7 @@ depends: [
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-demo"
   "tezos-embedded-protocol-alpha"
+  "tezos-embedded-protocol-004-PsGLNcdz"
   "cmdliner"
   "tls"
   "cstruct" { < "3.4.0" } ## Because "tls" depends on a version of "nocrypto"
