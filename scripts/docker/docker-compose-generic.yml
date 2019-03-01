@@ -1,12 +1,16 @@
-version: "2"
-services:
+version: '3'
 
+volumes:
+  client_data:
+  node_data:
+
+services:
   node:
-    image: tezos/tezos:latest
+    image: tezos/tezos:zeronet
     hostname: node
     command: tezos-node
     ports:
-      - 9732:9732
+      - 19732:19732
     expose:
       - '8732'
     volumes:
@@ -17,7 +21,7 @@ services:
   ## Duplicate the `baker/endorser/accuser` containers for each PROTOCOL
   ## in file `active_protocol_versions`
   baker-alpha:
-    image: tezos/tezos:latest
+    image: tezos/tezos:zeronet
     hostname: baker-alpha
     environment:
       - PROTOCOL=alpha
@@ -25,11 +29,12 @@ services:
     links:
       - node
     volumes:
+      - node_data:/var/run/tezos/node:ro
       - client_data:/var/run/tezos/client
     restart: on-failure
 
   endorser-alpha:
-    image: tezos/tezos:latest
+    image: tezos/tezos:zeronet
     hostname: endorser-alpha
     environment:
       - PROTOCOL=alpha
@@ -41,7 +46,7 @@ services:
     restart: on-failure
 
   accuser-alpha:
-    image: tezos/tezos:latest
+    image: tezos/tezos:zeronet
     hostname: accuser-alpha
     environment:
       - PROTOCOL=alpha
@@ -52,6 +57,152 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-volumes:
-  node_data:
-  client_data:
+    # protocol A
+  baker-004-PsGLNcdz:
+    image: tezos/tezos:zeronet
+    hostname: baker-004-PsGLNcdz
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-baker
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-004-PsGLNcdz:
+    image: tezos/tezos:zeronet
+    hostname: endorser-004-PsGLNcdz
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-endorser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-004-PsGLNcdz:
+    image: tezos/tezos:zeronet
+    hostname: accuser-004-PsGLNcdz
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-accuser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  baker-004-PsGLNcdz-test:
+    image: tezos/tezos:zeronet
+    hostname: baker-004-PsGLNcdz-test
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-baker-test
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-004-PsGLNcdz-test:
+    image: tezos/tezos:zeronet
+    hostname: endorser-004-PsGLNcdz-test
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-endorser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-004-PsGLNcdz-test:
+    image: tezos/tezos:zeronet
+    hostname: accuser-004-PsGLNcdz-test
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-accuser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+    # protocol B
+  baker-004-PshR5rQT:
+    image: tezos/tezos:zeronet
+    hostname: baker-004-PshR5rQT
+    environment:
+      - PROTOCOL=004-PshR5rQT
+    command: tezos-baker
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-004-PshR5rQT:
+    image: tezos/tezos:zeronet
+    hostname: endorser-004-PshR5rQT
+    environment:
+      - PROTOCOL=004-PshR5rQT
+    command: tezos-endorser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-004-PshR5rQT:
+    image: tezos/tezos:zeronet
+    hostname: accuser-004-PshR5rQT
+    environment:
+      - PROTOCOL=004-PshR5rQT
+    command: tezos-accuser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  baker-004-PshR5rQT-test:
+    image: tezos/tezos:zeronet
+    hostname: baker-004-PshR5rQT-test
+    environment:
+      - PROTOCOL=004-PshR5rQT
+    command: tezos-baker-test
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-004-PshR5rQT-test:
+    image: tezos/tezos:zeronet
+    hostname: endorser-004-PshR5rQT-test
+    environment:
+      - PROTOCOL=004-PshR5rQT
+    command: tezos-endorser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-004-PshR5rQT-test:
+    image: tezos/tezos:zeronet
+    hostname: accuser-004-PshR5rQT-test
+    environment:
+      - PROTOCOL=004-PshR5rQT
+    command: tezos-accuser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
