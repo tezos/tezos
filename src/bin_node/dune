@@ -11,6 +11,7 @@
             tezos-embedded-protocol-genesis
             tezos-embedded-protocol-demo
             tezos-embedded-protocol-alpha
+            tezos-embedded-protocol-004-PshR5rQT
             tezos-embedded-protocol-004-PsGLNcdz
             cmdliner
             tls)
