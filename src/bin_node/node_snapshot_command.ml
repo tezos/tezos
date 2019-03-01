@@ -444,8 +444,8 @@ let store_new_head
     validation_store >>=? fun new_head ->
   begin match new_head with
     | None ->
-        (*FIXME : raise nice exception*)
-        Lwt.fail_with "Failed to store block (already known)"
+        (* should not happen as the data-dir must be empty *)
+        assert false
     | Some new_head ->
         (* New head is set*)
         Store.Chain_data.Known_heads.remove chain_data genesis.block >>= fun () ->
@@ -481,6 +481,11 @@ let update_caboose chain_data block_header oldest_header max_op_ttl =
     chain_data
     (caboose_level, caboose_hash)
 
+let clean_directory data_dir =
+  lwt_log_notice "Cleaning directory %s" data_dir >>= fun () ->
+  Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
+  Lwt_utils_unix.remove_dir @@ context_dir data_dir
+
 let import data_dir filename block =
   let data_dir =
     match data_dir with
@@ -490,7 +495,8 @@ let import data_dir filename block =
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.block in
-  Node_data_version.ensure_data_dir data_dir >>=? fun () ->
+  Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
+
   Lwt_lock_file.create
     ~unlink_on_exit:true (Node_data_version.lock_file data_dir) >>=? fun () ->
   (* FIXME: use config value ?*)
@@ -506,94 +512,105 @@ let import data_dir filename block =
 
   let open Context in
 
-  (* Restore context *)
-  restore_contexts context_index ~filename >>=? fun restored_data ->
+  Lwt.try_bind
+    (fun () ->
+       (* Restore context *)
+       restore_contexts context_index ~filename >>=? fun restored_data ->
 
-  (* Process data imported from snapshot *)
-  Error_monad.iter_s begin fun ((predecessor_block_header : Block_header.t), meta, old_blocks) ->
-    let ({ block_header ; operations } :
-           Block_data.t) = meta in
-    let block_hash = Block_header.hash block_header in
-    (* Checks that the block hash imported by the snapshot is the expected one *)
-    begin
-      match block with
-      | Some str ->
-          let bh = Block_hash.of_b58check_exn str in
-          fail_unless
-            (Block_hash.equal bh block_hash)
-            (Inconsistent_imported_block (bh,block_hash))
-      | None ->
-          lwt_log_notice "You should consider using the --block <block_hash> \
-                          argument to check that the block imported using the \
-                          snapshot is the one you expect." >>= fun () -> return ()
-    end >>=? fun () ->
-    Store.Block.Contents.known (block_store,block_hash) >>= fun known ->
-    if known then
-      lwt_log_notice "Skipping already known block %a"
-        Block_hash.pp block_hash >>= return
-    else
-      begin
-        lwt_log_notice "Importing block %a"
-          Block_hash.pp (Block_header.hash block_header) >>= fun () ->
-        (* To validate block_header we need … *)
-        (* … its predecessor context … *)
-        let pred_context_hash = predecessor_block_header.shell.context in
-        checkout_exn
-          context_index
-          pred_context_hash >>= fun predecessor_context ->
+       (* Process data imported from snapshot *)
+       Error_monad.iter_s begin fun ((predecessor_block_header : Block_header.t), meta, old_blocks) ->
+         let ({ block_header ; operations } :
+                Block_data.t) = meta in
+         let block_hash = Block_header.hash block_header in
+         (* Checks that the block hash imported by the snapshot is the expected one *)
+         begin
+           match block with
+           | Some str ->
+               let bh = Block_hash.of_b58check_exn str in
+               fail_unless
+                 (Block_hash.equal bh block_hash)
+                 (Inconsistent_imported_block (bh,block_hash))
+           | None ->
+               lwt_log_notice "You should consider using the --block <block_hash> \
+                               argument to check that the block imported using the \
+                               snapshot is the one you expect." >>= fun () -> return ()
+         end >>=? fun () ->
+         Store.Block.Contents.known (block_store, block_hash) >>= fun known ->
+         if known then
+           (* should not happen as the data-dir must be empty *)
+           assert false
+         else
+           begin
+             lwt_log_notice "Importing block %a"
+               Block_hash.pp (Block_header.hash block_header) >>= fun () ->
+             (* To validate block_header we need … *)
+             (* … its predecessor context … *)
+             let pred_context_hash = predecessor_block_header.shell.context in
+             checkout_exn
+               context_index
+               pred_context_hash >>= fun predecessor_context ->
 
-        (* … we can now call apply … *)
-        Tezos_validation.Block_validation.apply
-          chain_id
-          ~max_operations_ttl:(max_int-1)
-          ~predecessor_block_header:predecessor_block_header
-          ~predecessor_context
-          ~block_header
-          operations >>=? fun block_validation_result ->
+             (* … we can now call apply … *)
+             Tezos_validation.Block_validation.apply
+               chain_id
+               ~max_operations_ttl:(max_int-1)
+               ~predecessor_block_header:predecessor_block_header
+               ~predecessor_context
+               ~block_header
+               operations >>=? fun block_validation_result ->
 
-        check_context_hash_consistency
-          block_validation_result
-          block_header >>=? fun () ->
+             check_context_hash_consistency
+               block_validation_result
+               block_header >>=? fun () ->
 
-        (* … we check the history …*)
-        let old_blocks = List.rev_map (fun pruned_block ->
-            let hash = Block_header.hash pruned_block.Pruned_block.block_header in
-            (hash, pruned_block))
-            old_blocks in
-        let history = Array.of_list old_blocks in
+             (* … we check the history and compute the predecessor tables …*)
+             let old_blocks = List.rev_map (fun pruned_block ->
+                 let hash = Block_header.hash pruned_block.Pruned_block.block_header in
+                 (hash, pruned_block))
+                 old_blocks in
+             let history = Array.of_list old_blocks in
 
-        lwt_log_notice "Checking history consistency" >>= fun () ->
-        check_history_consistency block_header history ;
+             lwt_log_notice "Checking history consistency" >>= fun () ->
+             check_history_consistency block_header history ;
 
-        (* … we set the history mode to full if it looks like a full snapshot … *)
-        set_history_mode store history >>= fun () ->
+             (* … we set the history mode to full if it looks like a full snapshot … *)
+             set_history_mode store history >>= fun () ->
 
-        (* … and we write data in store.*)
-        store_pruned_blocks store block_store chain_data history >>= fun () ->
+             (* … and we write data in store.*)
+             store_pruned_blocks store block_store chain_data history >>= fun () ->
 
-        (* Everything is ok. We can store the new hea d*)
-        store_new_head
-          chain_state
-          chain_data
-          block_header
-          operations
-          block_validation_result >>=? fun () ->
+             (* Everything is ok. We can store the new hea d*)
+             store_new_head
+               chain_state
+               chain_data
+               block_header
+               operations
+               block_validation_result >>=? fun () ->
 
-        (* Update history mode flags *)
-        update_checkpoint chain_state block_header >>= fun new_checkpoint ->
-        update_savepoint chain_data new_checkpoint >>= fun () ->
-        let oldest_header = (snd history.(0)).block_header in
-        update_caboose
-          chain_data
-          block_header
-          oldest_header
-          block_validation_result.validation_result.max_operations_ttl >>= fun () ->
-        return_unit
-      end
-  end
-    restored_data >>=? fun () ->
-  Store.close store;
-  lwt_log_notice "Sucessfull import (from file %s)" filename >>= fun () ->
+             (* Update history mode flags *)
+             update_checkpoint chain_state block_header >>= fun new_checkpoint ->
+             update_savepoint chain_data new_checkpoint >>= fun () ->
+             let oldest_header = (snd history.(0)).block_header in
+             update_caboose chain_data block_header oldest_header
+               block_validation_result.validation_result.max_operations_ttl >>= fun () ->
+             return_unit
+           end
+       end
+         restored_data >>=? fun () ->
+       return @@ Store.close store)
+    (function
+      | Ok () ->
+          lwt_log_notice "Sucessfull import (from file %s)" filename >>= fun () ->
+          Lwt.return ()
+      | Error errors ->
+          clean_directory data_dir >>= fun () ->
+          Format.kasprintf
+            Lwt.fail_with
+            "%a" Error_monad.pp_print_error errors
+    )
+    (fun exn ->
+       clean_directory data_dir >>= fun () ->
+       Lwt.fail exn) >>= fun () ->
   return_unit
 
 (** Main *)
