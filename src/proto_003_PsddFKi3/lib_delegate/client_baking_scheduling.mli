@@ -35,7 +35,7 @@ val main :
   name:string ->
   cctxt:(#Proto_alpha.full as 'a) ->
   stream:'event tzresult Lwt_stream.t ->
-  state_maker:(Block_hash.t -> 'event -> 'state tzresult Lwt.t) ->
+  state_maker:('event -> 'state tzresult Lwt.t) ->
   pre_loop:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->
   compute_timeout:('state -> 'timesup Lwt.t) ->
   timeout_k:('a -> 'state -> 'timesup -> unit tzresult Lwt.t) ->

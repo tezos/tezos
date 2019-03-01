@@ -225,7 +225,7 @@ let create
     block_stream
   =
 
-  let state_maker _ _ =
+  let state_maker _ =
     let state = create_state delegates (Int64.of_int delay) in
     return state
   in
