@@ -271,7 +271,7 @@ let create (cctxt : #Proto_alpha.full) ~preserved_levels valid_blocks_stream =
         >>= return
   in
 
-  let state_maker _ _ =
+  let state_maker _ =
     create_state ~preserved_levels >>= return
   in
 
