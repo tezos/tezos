@@ -101,6 +101,43 @@ for proto in $(cat "$active_protocol_versions") ; do
       - client_data:/var/run/tezos/client
     restart: on-failure
 
+  baker-$proto-test:
+    image: $docker_image
+    hostname: baker-$proto-test
+    environment:
+      - PROTOCOL=$proto
+    command: tezos-baker-test --max-priority 128
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-$proto-test:
+    image: $docker_image
+    hostname: endorser-$proto-test
+    environment:
+      - PROTOCOL=$proto
+    command: tezos-endorser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-$proto-test:
+    image: $docker_image
+    hostname: accuser-$proto-test
+    environment:
+      - PROTOCOL=$proto
+    command: tezos-accuser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
 EOF
 
 done
@@ -286,12 +323,14 @@ stop_node() {
 
 check_baker() {
     update_active_protocol_version
-    bakers="$(sed s/^/baker-/g "$active_protocol_versions")"
-    docker_baker_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_baker-\1_1/g" "$active_protocol_versions")"
-    res=$(docker inspect \
-                 --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_baker_containers")" 2>/dev/null || echo false)
-    [ "$res" = "true" ]
+    bakers="$(sed "s/^\(.*\)$/baker-\1 baker-\1-test/g" "$active_protocol_versions")"
+    docker_baker_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_baker-\1_1 ${docker_compose_name}_baker-\1-test_1/g" "$active_protocol_versions")"
+    for docker_baker_container in $docker_baker_containers; do
+        res=$(docker inspect \
+                     --format="{{ .State.Running }}" \
+                     --type=container "$(container_name "$docker_baker_container")" 2>/dev/null || echo false)
+        if ! [ "$res" = "true" ]; then return 1; fi
+    done
 }
 
 assert_baker() {
@@ -351,12 +390,14 @@ stop_baker() {
 
 check_endorser() {
     update_active_protocol_version
-    endorsers="$(sed s/^/endorser-/g "$active_protocol_versions")"
-    docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1/g" "$active_protocol_versions")"
-    res=$(docker inspect \
-                 --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_endorser_containers")" 2>/dev/null || echo false)
-    [ "$res" = "true" ]
+    endorsers="$(sed "s/^\(.*\)$/endorser-\1 endorser-\1-test/g" "$active_protocol_versions")"
+    docker_endorser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_endorser-\1_1 ${docker_compose_name}_endorser-\1-test_1/g" "$active_protocol_versions")"
+    for docker_endorser_container in $docker_endorser_containers; do
+        res=$(docker inspect \
+                     --format="{{ .State.Running }}" \
+                     --type=container "$(container_name "$docker_endorser_container")" 2>/dev/null || echo false)
+        if ! [ "$res" = "true" ]; then return 1; fi
+    done
 }
 
 assert_endorser() {
@@ -416,12 +457,14 @@ stop_endorser() {
 
 check_accuser() {
     update_active_protocol_version
-    accusers="$(sed s/^/accuser-/g "$active_protocol_versions")"
-    docker_accuser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_accuser-\1_1/g" "$active_protocol_versions")"
-    res=$(docker inspect \
-                 --format="{{ .State.Running }}" \
-                 --type=container "$(container_name "$docker_accuser_containers")" 2>/dev/null || echo false)
-    [ "$res" = "true" ]
+    accusers="$(sed "s/^\(.*\)$/accuser-\1 accuser-\1-test/g" "$active_protocol_versions")"
+    docker_accuser_containers="$(sed "s/^\(.*\)$/${docker_compose_name}_accuser-\1_1 ${docker_compose_name}_accuser-\1-test_1/g" "$active_protocol_versions")"
+    for docker_accuser_container in $docker_accuser_containers; do
+        res=$(docker inspect \
+                     --format="{{ .State.Running }}" \
+                     --type=container "$(container_name "$docker_accuser_container")" 2>/dev/null || echo false)
+        if ! [ "$res" = "true" ]; then return 1; fi
+    done
 }
 
 assert_accuser() {
