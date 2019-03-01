@@ -59,8 +59,7 @@ let main
     ~(name: string)
     ~(cctxt: #Proto_alpha.full)
     ~(stream: 'event tzresult Lwt_stream.t)
-    ~(state_maker: (Block_hash.t ->
-                    'event ->
+    ~(state_maker: ('event ->
                     'state tzresult Lwt.t))
     ~(pre_loop: (#Proto_alpha.full ->
                  'state ->
@@ -83,7 +82,6 @@ let main
       -% s worker_tag name) >>= fun () ->
 
   wait_for_first_event ~name stream >>= fun first_event ->
-  Shell_services.Blocks.hash cctxt ~block:(`Level 0l) () >>=? fun genesis_hash ->
 
   (* statefulness *)
   let last_get_event = ref None in
@@ -94,7 +92,7 @@ let main
         last_get_event := Some t ;
         t
     | Some t -> t in
-  state_maker genesis_hash first_event >>=? fun state ->
+  state_maker first_event >>=? fun state ->
 
   log_errors_and_continue ~name @@ pre_loop cctxt state first_event >>= fun () ->
 

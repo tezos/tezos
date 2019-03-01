@@ -45,13 +45,12 @@ let default_minimal_nanotez_per_byte = Z.zero
 let default_await_endorsements = true
 
 type state = {
-  genesis: Block_hash.t ;
   context_path: string ;
   mutable index : Context.index ;
   (* see [get_delegates] below to find delegates when the list is empty *)
   delegates: public_key_hash list ;
   (* lazy-initialisation with retry-on-error *)
-  constants: Constants.t tzlazy ;
+  constants: Constants.t ;
   (* Minimal operation fee required to include an operation in a block *)
   minimal_fees : Tez.t ;
   (* Minimal operation fee per gas required to include an operation in a block *)
@@ -69,9 +68,8 @@ let create_state
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
     ?(await_endorsements = default_await_endorsements)
-    genesis context_path index delegates constants =
-  { genesis ;
-    context_path ;
+    context_path index delegates constants =
+  { context_path ;
     index ;
     delegates ;
     constants ;
@@ -528,8 +526,7 @@ let filter_and_apply_operations
   Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   finalize_construction inc >>=? fun _ ->
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
-  tzforce state.constants >>=? fun
-    { Constants.parametric = { endorsers_per_block ; hard_gas_limit_per_block ; } } ->
+  let  { Constants.endorsers_per_block ; hard_gas_limit_per_block } = state.constants.parametric in
   let endorsements =
     List.sub (List.rev endorsements) endorsers_per_block
   in
@@ -678,13 +675,11 @@ let forge_block
         assert best_effort ;
         Context.init ~readonly:true context_path >>= fun index ->
         Client_baking_blocks.info cctxt ~chain block >>=? fun bi ->
+        Alpha_services.Constants.all cctxt (chain, `Head 0) >>=? fun constants ->
         let state = {
           context_path ;
           index ;
-          genesis =
-            Block_hash.of_b58check_exn
-              "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
-          constants = tzlazy (fun () -> Alpha_services.Constants.all cctxt (chain, `Head 0)) ;
+          constants ;
           delegates = [] ;
           best_slot = None ;
           await_endorsements ;
@@ -787,7 +782,7 @@ let filter_outdated_endorsements expected_level ops =
     ) ops
 
 let next_baking_delay state priority =
-  tzforce state.constants >>=? fun { Constants.parametric = { time_between_blocks }} ->
+  let { Constants.parametric = { time_between_blocks }} = state.constants in
   let rec associated_period durations prio =
     if List.length durations = 0 then
       (* Mimic [Baking.minimal_time] behaviour *)
@@ -851,8 +846,8 @@ let fetch_operations
       let operations = ref (filter_outdated_endorsements head.Client_baking_blocks.level current_mempool) in
       Client_baking_simulator.begin_construction ~timestamp state.index head >>=? fun inc ->
       count_slots_endorsements inc slot !operations >>= fun nb_arrived_endorsements ->
-      tzforce state.constants >>=? fun { Constants.parametric = { endorsers_per_block }} ->
       (* If 100% of the endorsements arrived, we don't need to wait *)
+      let endorsers_per_block = state.constants.parametric.endorsers_per_block in
       if (not state.await_endorsements) || nb_arrived_endorsements = endorsers_per_block then
         return_some !operations
       else
@@ -934,11 +929,6 @@ let build_block
       Some seed_nonce_hash
     else
       None in
-  let timestamp =
-    if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then
-      Time.now ()
-    else
-      timestamp in
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
 
   lwt_debug Tag.DSL.(fun f ->
@@ -956,7 +946,7 @@ let build_block
           -% t event "new_head_received") >>= fun () ->
       return_none
   | Some operations ->
-      tzforce state.constants >>=? fun Constants.{ parametric = { hard_gas_limit_per_block } } ->
+      let hard_gas_limit_per_block = state.constants.parametric.hard_gas_limit_per_block in
       classify_operations cctxt
         ~chain
         ~hard_gas_limit_per_block
@@ -1276,15 +1266,15 @@ let create
     ~context_path
     delegates
     block_stream =
-  let state_maker genesis_hash bi =
-    let constants =
-      tzlazy (fun () -> Alpha_services.Constants.all cctxt (cctxt#chain, `Hash (bi.Client_baking_blocks.hash, 0))) in
+  let state_maker bi =
+    Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0) >>=? fun constants ->
     Client_baking_simulator.load_context ~context_path >>= fun index ->
-    Client_baking_simulator.check_context_consistency index bi.context >>=? fun () ->
+    Client_baking_simulator.check_context_consistency
+      index bi.Client_baking_blocks.context >>=? fun () ->
     let state = create_state
         ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
         ?await_endorsements
-        genesis_hash context_path index delegates constants in
+        context_path index delegates constants in
     return state
   in
 
