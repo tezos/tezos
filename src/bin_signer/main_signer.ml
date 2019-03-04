@@ -266,7 +266,6 @@ let commands base_dir require_auth : Client_context.full command list =
           Handler.Authorized_key.add ~force:false cctxt name key)
    ])
 
-
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
 let default_base_dir =

@@ -429,6 +429,7 @@ module Manpage = struct
   let man =
     description @
     Node_shared_arg.Manpage.args @
+    debug @
     examples @
     Node_shared_arg.Manpage.bugs
 

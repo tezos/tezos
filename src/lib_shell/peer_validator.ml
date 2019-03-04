@@ -389,7 +389,7 @@ let create
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return_unit
+    let on_no_request = on_no_request
   end in
   Worker.launch table ~timeout: limits.new_head_request_timeout limits.worker_limits
     name parameters
