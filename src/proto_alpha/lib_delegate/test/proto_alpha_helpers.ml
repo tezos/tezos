@@ -27,8 +27,6 @@
 open Proto_alpha
 open Alpha_context
 
-let (//) = Filename.concat
-
 let () = Random.self_init ()
 
 let rpc_config = ref {
@@ -361,11 +359,6 @@ module Protocol = struct
 
   open Account
 
-  let voting_period_kind ?(block = `Head 0) () =
-    Alpha_block_services.metadata
-      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { voting_period_kind } } ->
-    return voting_period_kind
-
   let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_services.Helpers.current_level
@@ -584,16 +577,6 @@ module Endorse = struct
     let contents =
       Single (Endorsement { level }) in
     sign ~watermark:(Endorsement Chain_id.zero) src_sk shell (Contents_list contents)
-
-  let signing_slots
-      block
-      delegate
-      level =
-    Alpha_services.Delegate.Endorsing_rights.get
-      !rpc_ctxt ~delegates:[delegate] ~levels:[level]
-      (`Main, block) >>=? function
-    | [{ slots }] -> return slots
-    | _ -> return_nil
 
   let endorse
       (contract : Account.t)

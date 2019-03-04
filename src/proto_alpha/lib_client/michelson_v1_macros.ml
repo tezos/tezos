@@ -65,21 +65,6 @@ let expand_caddadr original =
         ok None
   | _ -> ok None
 
-let extract_first_annot annot char =
-  let rec extract_first_annot others = function
-    | [] -> None, List.rev others
-    | a :: rest ->
-        try
-          if a.[0] = char
-          then Some a, List.rev_append others rest
-          else extract_first_annot (a :: others) rest
-        with Invalid_argument _ -> extract_first_annot (a :: others) rest
-  in
-  extract_first_annot [] annot
-
-let extract_first_field_annot annot = extract_first_annot annot '%'
-let extract_first_var_annot annot = extract_first_annot annot '@'
-
 let extract_field_annots annot =
   List.partition (fun a ->
       match a.[0] with

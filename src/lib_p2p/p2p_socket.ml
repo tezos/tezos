@@ -35,11 +35,6 @@ module Crypto = struct
   let header_length = 2
   let max_content_length = bufsize - Crypto_box.zerobytes
 
-  (* The header length is only stored in the encrypted message, but
-     within the space allowed by boxzerobytes, so it does not cost in
-     space in the buffer. *)
-  let max_encrypted_length = bufsize - Crypto_box.boxzerobytes
-
   (* The size of extra data added by encryption. *)
   let boxextrabytes = Crypto_box.zerobytes - Crypto_box.boxzerobytes
   (* The number of bytes added by encryption + header *)

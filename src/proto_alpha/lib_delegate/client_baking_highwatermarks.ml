@@ -70,12 +70,6 @@ let encoding =
 
 let empty = []
 
-let resolve_blocks_filename cctxt ~chain =
-  Client_baking_files.resolve_location cctxt ~chain `Block
-
-let resolve_endorsements_filename cctxt ~chain =
-  Client_baking_files.resolve_location cctxt ~chain `Endorsement
-
 (* We do not lock these functions. The caller will be already locked. *)
 let load_highwatermarks (cctxt : #Proto_alpha.full) filename : t tzresult Lwt.t =
   cctxt#load filename encoding ~default:empty

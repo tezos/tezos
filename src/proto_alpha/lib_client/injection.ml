@@ -266,15 +266,6 @@ let estimated_gas_single
        Ok (Z.add acc gas))
     (consumed_gas operation_result) internal_operation_results
 
-let rec estimated_gas :
-  type kind. kind Kind.manager contents_result_list -> _ =
-  function
-  | Single_result res -> estimated_gas_single res
-  | Cons_result (res, rest) ->
-      estimated_gas_single res >>? fun gas1 ->
-      estimated_gas rest >>? fun gas2 ->
-      Ok (Z.add gas1 gas2)
-
 let estimated_storage_single
     (type kind)
     origination_size

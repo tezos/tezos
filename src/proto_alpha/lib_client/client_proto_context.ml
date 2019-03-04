@@ -435,12 +435,6 @@ type ballots_info = {
   ballots : Vote.ballots ;
 }
 
-(* Should be moved to src/proto_alpha/lib_protocol/src/vote_storage.ml *)
-let ballot_list_encoding =
-  Data_encoding.(list (obj2
-                         (req "delegate" Signature.Public_key_hash.encoding)
-                         (req "ballot" Vote.ballot_encoding)))
-
 let get_ballots_info
     (cctxt : #Proto_alpha.full)
     ~chain ~block =

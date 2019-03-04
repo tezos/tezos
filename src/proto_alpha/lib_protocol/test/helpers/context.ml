@@ -147,11 +147,6 @@ module Vote = struct
     | None -> assert false
     | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
 
-  let get_protocol (b:Block.t) =
-    Alpha_environment.Context.get b.context ["protocol"] >>= function
-    | None -> assert false
-    | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
-
 end
 
 module Contract = struct

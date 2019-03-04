@@ -351,7 +351,6 @@ module Real = struct
   let on_new_connection { pool } f =
     P2p_pool.on_new_connection pool f
 
-  let pool { pool } = pool
 end
 
 module Fake = struct

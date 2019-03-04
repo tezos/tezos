@@ -254,9 +254,6 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       let hash = Operation.hash raw_op in
       Operation_hash.Table.find_opt t.table hash
 
-    let find_hash_opt t hash =
-      Operation_hash.Table.find_opt t.table hash
-
     let rem t hash =
       (* NOTE: hashes are not removed from the ring. As a result, the cache size
        * bound can be lowered. This is a non-issue because it's only a cache. *)
@@ -410,9 +407,6 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
   type t = Worker.infinite Worker.queue Worker.t
 
   let parsed_cache = ParsedCache.create ()
-
-  let debug w =
-    Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
   let shutdown w =
     Worker.shutdown w

@@ -25,10 +25,6 @@
 
 (* Commands used to introspect the node's state *)
 
-let skip_line ppf =
-  Format.pp_print_newline ppf ();
-  return @@ Format.pp_print_newline ppf ()
-
 let print_invalid_blocks ppf (b: Shell_services.Chain.invalid_block) =
   Format.fprintf ppf
     "@[<v 2>Hash: %a\

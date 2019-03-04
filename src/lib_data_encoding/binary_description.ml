@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let unopt_lazy func = function
-  | None -> func ()
-  | Some x -> x
-
 type recursives = string list
 type references = { descriptions : (string * Binary_schema.toplevel_encoding) list } [@@unwrapped]
 
@@ -39,7 +35,6 @@ module UF : sig
   val find : t -> string -> Binary_schema.description
   val union : t -> new_cannonical:Binary_schema.description -> existing:string -> unit
   val empty : unit -> t
-  val pp : Format.formatter -> t -> unit
 end = struct
   open Binary_schema
   type ele = Ref of string | Root of description
@@ -59,14 +54,6 @@ end = struct
 
   let empty () = Hashtbl.create 128
 
-  let pp ppf tbl =
-    Format.fprintf ppf "@[<v 2>UF:@,%a@]"
-      (fun ppf ->
-         (Hashtbl.iter (fun k v ->
-              Format.fprintf ppf "'%s' ---> %a@,"
-                k (fun ppf -> function
-                    | Root { title } -> Format.fprintf ppf "Root '%s'" title
-                    | Ref s -> Format.fprintf ppf "Ref '%s'" s) v))) tbl
 end
 
 let fixup_references uf =

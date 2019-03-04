@@ -305,12 +305,6 @@ let cannot_destruct fmt =
 
 type t = json
 
-let to_root = function
-  | `O ctns -> `O ctns
-  | `A ctns -> `A ctns
-  | `Null -> `O []
-  | oth -> `A [ oth ]
-
 let to_string ?(newline = false) ?minify j =
   Format.asprintf "%a%s"
     Json_repr.(pp ?compact:minify (module Ezjsonm)) j

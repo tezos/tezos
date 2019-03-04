@@ -90,15 +90,6 @@ let check_chain_liveness chain_db hash (header: Block_header.t) =
                       timestamp = header.shell.timestamp }
   | None | Some _ -> return_unit
 
-let get_proto pred hash =
-  State.Block.context pred >>= fun pred_context ->
-  Context.get_protocol pred_context >>= fun pred_protocol_hash ->
-  match Registered_protocol.get pred_protocol_hash with
-  | None ->
-      fail (Unavailable_protocol { block = hash ;
-                                   protocol = pred_protocol_hash })
-  | Some p -> return p
-
 let on_request
   : type r. t -> r Request.t -> r tzresult Lwt.t
   = fun w

@@ -99,7 +99,6 @@ module Atom = struct
   let uint30 = int `Uint30
   let int31 = int `Int31
 
-  let char state v = int8 state (int_of_char v)
   let bool state v = uint8 state (if v then 255 else 0)
 
   let int32 state v =

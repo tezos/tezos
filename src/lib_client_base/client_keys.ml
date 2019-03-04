@@ -63,12 +63,6 @@ module Logging = struct
   let tag = Tag.def ~doc:"Identity" "pk_alias" Format.pp_print_text
 end
 
-module type KEY = sig
-  type t
-  val to_b58check : t -> string
-  val of_b58check_exn : string -> t
-end
-
 let uri_encoding =
   Data_encoding.(conv Uri.to_string Uri.of_string string)
 
@@ -108,7 +102,6 @@ module Secret_key =
   Client_aliases.Alias (struct
     let name = "secret_key"
     type t = Uri.t
-    let pp = Uri.pp_hum
     let of_source s = return (Uri.of_string s)
     let to_source t = return (Uri.to_string t)
     let encoding = uri_encoding
@@ -118,7 +111,6 @@ module Public_key =
   Client_aliases.Alias (struct
     let name = "public_key"
     type t = Uri.t * Signature.Public_key.t option
-    let pp ppf (loc, _) = Uri.pp_hum ppf loc
     let of_source s = return (Uri.of_string s, None)
     let to_source (t, _) = return (Uri.to_string t)
     let encoding =

@@ -254,11 +254,6 @@ module Hack = struct
 
   let sort_entries = List.fast_sort Sort_key.compare
 
-  let pp_hex ppf x =
-    let buf = IrminBlake2B.to_raw x in
-    let `Hex hex = Hex.of_cstruct buf in
-    Fmt.string ppf hex
-
   module Entry = struct
     type kind = [ `Node | `Contents of Metadata.t ]
     type entry = { kind : kind; name : string; node : IrminBlake2B.t; }
@@ -347,9 +342,6 @@ let commit ~time ?message context =
 (*-- Generic Store Primitives ------------------------------------------------*)
 
 let data_key key = "data" :: key
-let undata_key = function
-  | "data" :: key -> key
-  | _ -> assert false
 
 type key = string list
 type value = MBytes.t

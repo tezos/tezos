@@ -453,9 +453,6 @@ module Encoding = struct
                    | _ -> None)
            (fun () -> `Variable) ])
 
-  let kind_enum_encoding =
-    def "schema.kind.enum" @@ union (kind_enum_cases ())
-
   let kind_t_encoding =
     def "schema.kind" @@
     union

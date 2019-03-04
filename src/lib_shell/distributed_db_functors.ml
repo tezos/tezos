@@ -340,8 +340,6 @@ module Make_request_scheduler
     (Hash : sig
        type t
        val name : string
-       val encoding : t Data_encoding.t
-       val pp : Format.formatter -> t -> unit
 
        module Logging : sig
          val tag : t Tag.def

@@ -233,14 +233,6 @@ module Raw_operation_hashes = struct
             None
       end)
 
-  let inject_all table hash operations =
-    Lwt_list.mapi_p
-      (fun i ops -> Table.inject table (hash, i) ops)
-      operations >>= Lwt_list.for_all_s (fun x -> Lwt.return x)
-
-  let read_all table hash n =
-    map_p (fun i -> Table.read table (hash, i)) (0 -- (n-1))
-
   let clear_all table hash n =
     List.iter (fun i -> Table.clear_or_cancel table (hash, i)) (0 -- (n-1))
 
@@ -305,14 +297,6 @@ module Raw_operations = struct
           else
             None
       end)
-
-  let inject_all table hash operations =
-    Lwt_list.mapi_p
-      (fun i ops -> Table.inject table (hash, i) ops)
-      operations >>= Lwt_list.for_all_s (fun x -> Lwt.return x)
-
-  let read_all table hash n =
-    map_p (fun i -> Table.read table (hash, i)) (0 -- (n-1))
 
   let clear_all table hash n =
     List.iter (fun i -> Table.clear_or_cancel table (hash, i)) (0 -- (n-1))

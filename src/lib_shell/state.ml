@@ -736,7 +736,6 @@ module Block = struct
   let timestamp b = (shell_header b).timestamp
   let fitness b = (shell_header b).fitness
   let level b = (shell_header b).level
-  let proto_level b = (shell_header b).proto_level
   let validation_passes b = (shell_header b).validation_passes
   let message { contents = { message } } = message
   let max_operations_ttl { contents = { max_operations_ttl } } =
@@ -821,18 +820,6 @@ module Block = struct
       Store.Block.Header.read_opt (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
       Lwt.return { chain_state ; hash ; contents ; header }
     end
-
-  (* Quick accessor to be optimized ?? *)
-  let read_predecessor chain_state hash =
-    Header.read chain_state hash >>=? fun { Header.header } ->
-    return header.shell.predecessor
-  let read_predecessor_opt chain_state hash =
-    read_predecessor chain_state hash >>= function
-    | Error _ -> Lwt.return_none
-    | Ok v -> Lwt.return_some v
-  let read_predecessor_exn chain_state hash =
-    Header.read_exn chain_state hash >>= fun { Header.header } ->
-    Lwt.return header.shell.predecessor
 
   let predecessor { chain_state ; header ; hash } =
     if Block_hash.equal hash header.shell.predecessor then

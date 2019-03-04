@@ -196,9 +196,6 @@ module Alias = functor (Entity : Entity) -> struct
         list in
     wallet#write Entity.name list wallet_encoding
 
-  let save wallet list =
-    wallet#write Entity.name wallet_encoding list
-
   include Entity
 
   let alias_parameter () = parameter

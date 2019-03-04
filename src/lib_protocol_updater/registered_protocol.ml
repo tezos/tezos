@@ -101,9 +101,6 @@ module Register_embedded
     match Source.hash with
     | None -> Protocol.hash Source.sources
     | Some hash -> hash
-  module Name = struct
-    let name = Protocol_hash.to_b58check hash
-  end
   module Self = struct
     module P = struct
       let hash = hash

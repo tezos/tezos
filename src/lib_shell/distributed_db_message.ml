@@ -108,9 +108,6 @@ module Bounded_encoding = struct
   let protocol_max_size = ref (Some (2 * 1024 * 1024)) (* FIXME: arbitrary *)
   let protocol_cache =
     ref (Protocol.bounded_encoding ?max_size:!protocol_max_size ())
-  let update_protocol_encoding () =
-    protocol_cache :=
-      Protocol.bounded_encoding ?max_size:!protocol_max_size ()
   let set_protocol_max_size max =
     protocol_max_size := max
   let protocol = delayed (fun () -> !protocol_cache)
@@ -118,9 +115,6 @@ module Bounded_encoding = struct
   let mempool_max_operations = ref None
   let mempool_cache =
     ref (Mempool.bounded_encoding ?max_operations:!mempool_max_operations ())
-  let update_mempool_encoding () =
-    mempool_cache :=
-      Mempool.bounded_encoding ?max_operations:!mempool_max_operations ()
   let set_mempool_max_operations max =
     mempool_max_operations := max
   let mempool = delayed (fun () -> !mempool_cache)

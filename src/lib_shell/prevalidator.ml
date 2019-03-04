@@ -276,38 +276,6 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       branch_refused = state.branch_refusals ;
       refused = Operation_hash.Map.empty }
 
-  let mempool_of_prevalidation_result (r : error Preapply_result.t) : Mempool.t =
-    { Mempool.known_valid = List.map fst r.applied ;
-      pending =
-        Operation_hash.Map.fold
-          (fun k _ s -> Operation_hash.Set.add k s)
-          r.branch_delayed @@
-        Operation_hash.Map.fold
-          (fun k _ s -> Operation_hash.Set.add k s)
-          r.branch_refused @@
-        Operation_hash.Set.empty }
-
-  let merge_validation_results ~old ~neu =
-    let open Preapply_result in
-    let merge _key a b =
-      match a, b with
-      | None, None -> None
-      | Some x, None -> Some x
-      | _, Some y -> Some y in
-    let filter_out s m =
-      List.fold_right (fun (h, _op) -> Operation_hash.Map.remove h) s m in
-    { applied = List.rev_append neu.applied old.applied ;
-      refused = Operation_hash.Map.empty ;
-      branch_refused =
-        Operation_hash.Map.merge merge
-          (* filtering should not be required if the protocol is sound *)
-          (filter_out neu.applied old.branch_refused)
-          neu.branch_refused ;
-      branch_delayed =
-        Operation_hash.Map.merge merge
-          (filter_out neu.applied old.branch_delayed)
-          neu.branch_delayed }
-
   let advertise (w : worker) pv mempool =
     match pv.advertisement with
     | `Pending { Mempool.known_valid ; pending } ->

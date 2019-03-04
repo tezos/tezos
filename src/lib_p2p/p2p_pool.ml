@@ -714,12 +714,6 @@ let fail_unless_disconnected_point point_info =
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
-let fail_unless_disconnected_peer_id peer_info =
-  match P2p_peer_state.get peer_info with
-  | Disconnected -> return_unit
-  | Accepted _ -> fail P2p_errors.Pending_connection
-  | Running _ -> fail P2p_errors.Connected
-
 let compare_known_point_info p1 p2 =
   (* The most-recently disconnected peers are greater. *)
   (* Then come long-standing connected peers. *)

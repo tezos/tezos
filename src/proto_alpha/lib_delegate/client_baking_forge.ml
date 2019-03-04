@@ -353,15 +353,6 @@ let classify_operations
   t.(managers_index) <- desired_manager_operations ;
   return ((Array.to_list t), overflowing_manager_operations)
 
-let parse (op : Operation.raw) : Operation.packed =
-  let protocol_data =
-    Data_encoding.Binary.of_bytes_exn
-      Alpha_context.Operation.protocol_data_encoding
-      op.proto in
-  { shell = op.shell ;
-    protocol_data ;
-  }
-
 let forge (op : Operation.packed) : Operation.raw =
   { shell = op.shell ;
     proto = Data_encoding.Binary.to_bytes_exn

@@ -27,8 +27,6 @@ open State_logging
 
 let block_hash_tag = Tag.def ~doc:"Block hash" "block_hash" Block_hash.pp_short
 
-let mempool_encoding = Mempool.encoding
-
 let genesis chain_state =
   let genesis = State.Chain.genesis chain_state in
   State.Block.read_opt chain_state genesis.block >|= Option.unopt_assert ~loc:__POS__

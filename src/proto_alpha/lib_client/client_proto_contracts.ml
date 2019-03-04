@@ -148,13 +148,3 @@ let get_manager cctxt ~chain ~block source =
 
 let get_delegate cctxt ~chain ~block source =
   Alpha_services.Contract.delegate_opt cctxt (chain, block) source
-
-let may_check_key sourcePubKey sourcePubKeyHash =
-  match sourcePubKey with
-  | Some sourcePubKey ->
-      fail_unless
-        (Ed25519.Public_key_hash.equal
-           (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
-        (failure "Invalid public key in `client_proto_endorsement`")
-  | None ->
-      return_unit

@@ -28,8 +28,6 @@ open Client_context
 include Internal_event.Legacy_logging.Make_semantic
     (struct let name = "client.context.unix" end)
 
-let filename_tag = Tag.def ~doc:"Filename" "filename"  Format.pp_print_string
-
 class unix_wallet ~base_dir ~password_filename : wallet = object (self)
 
   method password_filename = password_filename

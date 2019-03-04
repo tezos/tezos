@@ -44,11 +44,6 @@ let int64_parameter =
        try return (Int64.of_string p)
        with _ -> failwith "Cannot read int64"))
 
-let int_parameter =
-  (Clic.parameter (fun _ p ->
-       try return (int_of_string p)
-       with _ -> failwith "Cannot read int"))
-
 let file_parameter =
   Clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then

@@ -57,7 +57,6 @@ module Initialization_event = struct
       Format.fprintf ppf "%s initialization: %s"
         name (List.find (fun (_, s) -> s = status) status_names |> fst)
     let doc = "Status of the initialization of the P2P layer."
-    let legacy_section _ = Lwt_log_core.Section.make "node.worker"
     let level _ = Internal_event.Notice
   end
   module Event = Internal_event.Make(Definition)
