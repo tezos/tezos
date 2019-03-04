@@ -135,30 +135,36 @@ let may_toggle_bootstrapped_chain w =
     Lwt.wakeup_later nv.bootstrapped_wakener () ;
   end
 
-let may_activate_peer_validator history_mode w peer_id =
+let with_activated_peer_validator history_mode w peer_id f =
   let nv = Worker.state w in
-  match P2p_peer.Table.find_opt nv.active_peers peer_id with
-  | Some pv ->
-      pv
-  | None ->
-      let pv =
-        Peer_validator.create
-          ~notify_new_block:(notify_new_block w)
-          ~notify_bootstrapped: begin fun () ->
-            P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
-            may_toggle_bootstrapped_chain w
-          end
-          ~notify_termination: begin fun _pv ->
-            P2p_peer.Table.remove nv.active_peers peer_id ;
-            P2p_peer.Table.remove nv.bootstrapped_peers peer_id ;
-          end
-          history_mode
-          nv.parameters.peer_validator_limits
-          nv.parameters.block_validator
-          nv.parameters.chain_db
-          peer_id in
-      P2p_peer.Table.add nv.active_peers peer_id pv ;
-      pv
+  begin
+    match P2p_peer.Table.find_opt nv.active_peers peer_id with
+    | Some pv -> pv
+    | None ->
+        let pv =
+          Peer_validator.create
+            ~notify_new_block:(notify_new_block w)
+            ~notify_bootstrapped: begin fun () ->
+              P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
+              may_toggle_bootstrapped_chain w
+            end
+            ~notify_termination: begin fun _pv ->
+              P2p_peer.Table.remove nv.active_peers peer_id ;
+              P2p_peer.Table.remove nv.bootstrapped_peers peer_id ;
+            end
+            history_mode
+            nv.parameters.peer_validator_limits
+            nv.parameters.block_validator
+            nv.parameters.chain_db
+            peer_id in
+        P2p_peer.Table.add nv.active_peers peer_id pv ;
+        pv
+  end >>=? fun pv ->
+  match Peer_validator.status pv with
+  | Worker_types.Running _ -> f pv
+  | Worker_types.Closing (_, _)
+  | Worker_types.Closed (_, _, _)
+  | Worker_types.Launching _ -> return_unit
 
 let may_update_checkpoint chain_state new_head history_mode =
   State.Chain.checkpoint chain_state >>= fun checkpoint ->
@@ -443,15 +449,16 @@ let on_launch history_mode start_prevalidator w _ parameters =
   Distributed_db.set_callback parameters.chain_db {
     notify_branch = begin fun peer_id locator ->
       Lwt.async begin fun () ->
-        may_activate_peer_validator history_mode w peer_id >>=? fun pv ->
-        Peer_validator.notify_branch pv locator ;
-        return_unit
+        with_activated_peer_validator history_mode w peer_id (fun pv ->
+            Peer_validator.notify_branch pv locator ;
+            return_unit)
       end
     end ;
     notify_head = begin fun peer_id block ops ->
       Lwt.async begin fun () ->
-        may_activate_peer_validator history_mode w peer_id >>=? fun pv ->
-        Peer_validator.notify_head pv block ;
+        with_activated_peer_validator history_mode w peer_id (fun pv ->
+            Peer_validator.notify_head pv block ;
+            return_unit) >>=? fun () ->
         (* TODO notify prevalidator only if head is known ??? *)
         match nv.prevalidator with
         | Some prevalidator ->
