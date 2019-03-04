@@ -306,9 +306,9 @@ and t = {
 
 let reset_quota st =
   debug "--> reset quota" ;
-  let { Moving_average.average = current_inflow } =
+  let { Moving_average.average = current_inflow ; _ } =
     Moving_average.stat st.read_scheduler.counter
-  and { Moving_average.average = current_outflow } =
+  and { Moving_average.average = current_outflow ; _ } =
     Moving_average.stat st.write_scheduler.counter in
   let nb_conn = P2p_fd.Table.length st.connected in
   if nb_conn > 0 then begin
@@ -395,12 +395,12 @@ let register st conn =
     conn
   end
 
-let write ?canceler { write_queue } msg =
+let write ?canceler { write_queue ; _ } msg =
   trace P2p_errors.Connection_closed @@
   protect ?canceler begin fun () ->
     Lwt_pipe.push write_queue msg >>= return
   end
-let write_now { write_queue } msg = Lwt_pipe.push_now write_queue msg
+let write_now { write_queue ; _ } msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
   let maxlen = MBytes.length buf in
@@ -467,12 +467,12 @@ let convert ~ws ~rs =
     current_inflow = rs.average ;
   }
 
-let global_stat { read_scheduler ; write_scheduler } =
+let global_stat { read_scheduler ; write_scheduler ; _ } =
   let rs = Moving_average.stat read_scheduler.counter
   and ws = Moving_average.stat write_scheduler.counter in
   convert ~rs ~ws
 
-let stat { read_conn ; write_conn} =
+let stat { read_conn ; write_conn ; _ } =
   let rs = Moving_average.stat read_conn.counter
   and ws = Moving_average.stat write_conn.counter in
   convert ~rs ~ws
@@ -496,7 +496,7 @@ let close ?timeout conn =
   lwt_log_info "<-- close (%d)" id >>= fun () ->
   Lwt.return res
 
-let iter_connection { connected } f =
+let iter_connection { connected ; _ } f =
   P2p_fd.Table.iter (fun _ conn -> f conn) connected
 
 let shutdown ?timeout st =

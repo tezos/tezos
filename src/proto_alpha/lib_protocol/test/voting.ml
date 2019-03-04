@@ -97,7 +97,7 @@ let test_successful_vote num_delegates () =
   (* Because of a minor bug in the initialization of the voting state, the
      listings are not populated in the very first period. After that they get
      correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
   Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
 
   (* no ballots in proposal period *)
@@ -407,7 +407,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   (* Because of a minor bug in the initialization of the voting state, the
      listings are not populated in the very first period. After that they get
      correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
   Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
 
   (* proposal period *)
@@ -474,7 +474,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   (* Because of a minor bug in the initialization of the voting state, the
      listings are not populated in the very first period. After that they get
      correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
   Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
 
   Context.Vote.get_current_period_kind (B b) >>=? begin function
@@ -572,7 +572,7 @@ let test_multiple_identical_proposals_count_as_one () =
   (* Because of a minor bug in the initialization of the voting state, the
      listings are not populated in the very first period. After that they get
      correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
   Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
 
   Context.Vote.get_current_period_kind (B b) >>=? begin function
@@ -610,7 +610,7 @@ let test_multiple_identical_proposals_count_as_one () =
 let test_supermajority_in_proposal there_is_a_winner () =
   Context.init ~initial_balances:[1L; 1L; 1L] 10 >>=? fun (b,delegates) ->
   Context.get_constants (B b)
-  >>=? fun { parametric = {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll} } ->
+  >>=? fun { parametric = {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll; _ } ; _ } ->
 
   let del1 = List.nth delegates 0 in
   let del2 = List.nth delegates 1 in
@@ -668,7 +668,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
 let test_supermajority_in_testing_vote supermajority () =
   Context.init 100 >>=? fun (b,delegates) ->
 
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
   Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
 
   let del1 = List.nth delegates 0 in
@@ -737,7 +737,7 @@ let test_no_winning_proposal num_delegates () =
   (* Because of a minor bug in the initialization of the voting state, the
      listings are not populated in the very first period. After that they get
      correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
   Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
 
   (* beginning of proposal, denoted by _p1;

@@ -205,7 +205,7 @@ let () = begin
 end
 
 let get_manager_operation_gas_and_fee op =
-  let { protocol_data = Operation_data { contents } ; _ } = op in
+  let { protocol_data = Operation_data { contents ; _ } ; _ } = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
   fold_left_s (fun ((total_fee, total_gas) as acc) -> function
@@ -322,7 +322,7 @@ let classify_operations
   >>=? fun live_blocks ->
   (* Remove operations that are too old *)
   let ops =
-    List.filter (fun { shell = { branch } } ->
+    List.filter (fun { shell = { branch ; _ } ; _ } ->
         Block_hash.Set.mem branch live_blocks
       ) ops
   in
@@ -337,7 +337,7 @@ let classify_operations
   let t = Array.map List.rev t in
   (* Retrieve the optimist maximum paying manager operations *)
   let manager_operations = t.(managers_index) in
-  let { Alpha_environment.Updater.max_size } =
+  let { Alpha_environment.Updater.max_size ; _ } =
     List.nth Proto_alpha.Main.validation_passes managers_index in
   sort_manager_operations
     ~max_size
@@ -404,7 +404,7 @@ let decode_priority cctxt chain block = function
     end
   | `Auto (src_pkh, max_priority) ->
       Alpha_services.Helpers.current_level
-        cctxt ~offset:1l (chain, block)>>=? fun { level } ->
+        cctxt ~offset:1l (chain, block)>>=? fun { level ; _ } ->
       Alpha_services.Delegate.Baking_rights.get cctxt
         ?max_priority
         ~levels:[level]
@@ -412,7 +412,7 @@ let decode_priority cctxt chain block = function
         (chain, block)  >>=? fun possibilities ->
       try
         let { Alpha_services.Delegate.Baking_rights.priority = prio ;
-              timestamp = time } =
+              timestamp = time ; _ } =
           List.find
             (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
             possibilities in
@@ -524,7 +524,8 @@ let filter_and_apply_operations
   Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   finalize_construction inc >>=? fun _ ->
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
-  let  { Constants.endorsers_per_block ; hard_gas_limit_per_block } = state.constants.parametric in
+  let  { Constants.endorsers_per_block ; hard_gas_limit_per_block ; _ } =
+    state.constants.parametric in
   let endorsements =
     List.sub (List.rev endorsements) endorsers_per_block
   in
@@ -537,8 +538,8 @@ let filter_and_apply_operations
       (List.rev anonymous)
       (List.nth quota anonymous_index) in
   let is_evidence  = function
-    | { protocol_data = Operation_data { contents = Single (Double_baking_evidence _ ) } } -> true
-    | { protocol_data = Operation_data { contents = Single (Double_endorsement_evidence _ ) } } -> true
+    | { protocol_data = Operation_data { contents = Single (Double_baking_evidence _ ) ; _ } ; _ } -> true
+    | { protocol_data = Operation_data { contents = Single (Double_endorsement_evidence _ ) ; _ } ; _ } -> true
     | _ -> false in
   let evidences, anonymous = List.partition is_evidence anonymous in
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
@@ -579,7 +580,7 @@ let finalize_block_header
       ) in
   begin Context.get_test_chain context >>= function
     | Not_running -> return context
-    | Running { expiration } ->
+    | Running { expiration ; _ } ->
         if Time.(expiration <= timestamp) then
           Context.set_test_chain context Not_running >>= fun context ->
           return context
@@ -626,7 +627,7 @@ let forge_block
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_services.Constants.all cctxt (chain, block) >>=?
-  fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block } } ->
+  fun Constants.{ parametric = { hard_gas_limit_per_block ; endorsers_per_block ; _ } ; _  } ->
   classify_operations
     cctxt
     ~chain
@@ -776,13 +777,13 @@ let shell_prevalidation
 let filter_outdated_endorsements expected_level ops =
   List.filter (function
       | { Alpha_context.protocol_data =
-            Operation_data { contents = Single (Endorsement { level }) }} ->
+            Operation_data { contents = Single (Endorsement { level ; _ }) ; _ } ; _} ->
           Raw_level.equal expected_level level
       | _ -> true
     ) ops
 
 let next_baking_delay state priority =
-  let { Constants.parametric = { time_between_blocks }} = state.constants in
+  let { Constants.parametric = { time_between_blocks ; _ } ; _ } = state.constants in
   let rec associated_period durations prio =
     if List.length durations = 0 then
       (* Mimic [Baking.minimal_time] behaviour *)
@@ -804,14 +805,14 @@ let next_baking_delay state priority =
 let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) operations =
   Lwt_list.fold_left_s (fun acc -> function
       | { Alpha_context.protocol_data =
-            Operation_data { contents = Single (Endorsement { level }) }} as op
+            Operation_data { contents = Single (Endorsement { level ; _ }) ; _ } ; _ } as op
         when Raw_level.(level = head.Client_baking_blocks.level) ->
           begin
             let open Apply_results in
             Client_baking_simulator.add_operation inc op >>= function
             | Ok (_inc,
                   Operation_metadata
-                    { contents = Single_result (Endorsement_result { slots })} ) ->
+                    { contents = Single_result (Endorsement_result { slots ; _ })} ) ->
                 Lwt.return (acc + List.length slots)
             | Error _ | _ ->
                 (* We do not handle errors here *)
@@ -1096,8 +1097,8 @@ let get_baking_slots cctxt
   | Ok slots ->
       let slots = List.filter_map
           (function
-            | { Alpha_services.Delegate.Baking_rights.timestamp = None } -> None
-            | { timestamp = Some timestamp ; priority ; delegate } ->
+            | { Alpha_services.Delegate.Baking_rights.timestamp = None ; _ } -> None
+            | { timestamp = Some timestamp ; priority ; delegate ; _ } ->
                 Some (timestamp, (new_head, priority, delegate))
           )
           slots in

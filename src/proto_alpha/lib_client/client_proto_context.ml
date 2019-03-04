@@ -55,7 +55,7 @@ let transfer (cctxt : #Proto_alpha.full)
     () =
   begin match arg with
     | Some arg ->
-        parse_expression arg >>=? fun { expanded = arg } ->
+        parse_expression arg >>=? fun { expanded = arg ; _ } ->
         return_some arg
     | None -> return_none
   end >>=? fun parameters ->
@@ -267,7 +267,7 @@ let originate_contract
     () =
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
-  fun { Michelson_v1_parser.expanded = storage } ->
+  fun { Michelson_v1_parser.expanded = storage ; _ } ->
   let code = Script.lazy_expr code and storage = Script.lazy_expr storage in
   let origination =
     Origination { manager ;

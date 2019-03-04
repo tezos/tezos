@@ -91,7 +91,7 @@ end  = struct
 
 
   let keypairs = random_keypairs n
-  let public_keys = List.map (fun {public_key} -> public_key) keypairs
+  let public_keys = List.map (fun { public_key ; _ } -> public_key) keypairs
 
   let ((shares, commitments, proof),
        (other_shares, other_commitments, other_proof)) =

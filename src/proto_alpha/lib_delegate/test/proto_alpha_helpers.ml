@@ -164,7 +164,7 @@ let init ?exe ?vote ?rpc_port () =
 
 let level (chain, block) =
   Alpha_block_services.metadata
-    !rpc_ctxt ~chain ~block () >>=? fun { protocol_data = { level } } ->
+    !rpc_ctxt ~chain ~block () >>=? fun { protocol_data = { level ; _ } ; _ } ->
   return level
 
 let rpc_raw_context block path depth =
@@ -359,7 +359,7 @@ module Protocol = struct
 
   open Account
 
-  let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
+  let proposals ?(block = `Head 0) ~src:({ pkh; sk ; _ } : Account.t) proposals =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_services.Helpers.current_level
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
@@ -370,7 +370,7 @@ module Protocol = struct
                   proposals } in
     sign ~watermark:Generic_operation sk shell (Contents_list (Single contents))
 
-  let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
+  let ballot ?(block = `Head 0) ~src:({ pkh; sk ; _ } : Account.t) ~proposal ballot =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_services.Helpers.current_level
       !rpc_ctxt ~offset:1l (`Main, block) >>=? fun next_level ->
@@ -508,7 +508,7 @@ module Assert = struct
 
   let check_protocol ?msg ~block h =
     Block_services.protocols
-      !rpc_ctxt ~block () >>=? fun { next_protocol } ->
+      !rpc_ctxt ~block () >>=? fun { next_protocol ; _ } ->
     return @@ equal
       ?msg
       ~prn:Protocol_hash.to_b58check
@@ -517,7 +517,7 @@ module Assert = struct
 
   let check_voting_period_kind ?msg ~block kind =
     Alpha_block_services.metadata
-      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { voting_period_kind } } ->
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { voting_period_kind ; _ } ; _ } ->
     return @@ equal
       ?msg
       voting_period_kind
@@ -571,7 +571,7 @@ module Endorse = struct
     =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_block_services.metadata
-      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level ; _ } ; _ } ->
     let level = level.level in
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
@@ -590,13 +590,13 @@ module Endorse = struct
         !rpc_ctxt (`Main, block)
         ~delegates:[account.pkh]
         ~levels:[level] >>|? function
-      | [{ slots }] ->
+      | [{ slots ; _ }] ->
           List.iter (fun s -> result.(s) <- account) slots
       | _ -> () in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 32 b1 in
     Alpha_block_services.metadata
-      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level ; _ } ; _ } ->
     let level = level.level in
     get_endorser_list result b1 level block >>=? fun () ->
     get_endorser_list result b2 level block >>=? fun () ->
@@ -608,7 +608,7 @@ module Endorse = struct
   let endorsement_rights
       (contract : Account.t) block =
     Alpha_block_services.metadata
-      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+      !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level ; _ } ; _ } ->
     let level = level.level in
     let delegate = contract.pkh in
     Alpha_services.Delegate.Endorsing_rights.get
@@ -616,14 +616,14 @@ module Endorse = struct
       ~levels:[level]
       ~delegates:[delegate]
       (`Main, block) >>=? function
-    | [{ level ; slots }] -> return (List.map (fun s -> (level, s)) slots)
+    | [{ level ; slots ; _ }] -> return (List.map (fun s -> (level, s)) slots)
     | _ -> return_nil
 
 end
 
 let display_level block =
   Alpha_block_services.metadata
-    !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level } } ->
+    !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level ; _ } ; _ } ->
   Format.eprintf "Level: %a@." Level.pp_full level ;
   return_unit
 

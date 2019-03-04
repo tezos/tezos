@@ -64,7 +64,7 @@ let c = function
   | None -> None
   | Some s -> Some (MBytes.to_string s)
 
-let test_simple { block2 = ctxt } =
+let test_simple { block2 = ctxt ; _ } =
   Context.get ctxt ["version"] >>= fun version ->
   Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
   Context.get ctxt ["a";"b"] >>= fun novembre ->
@@ -73,7 +73,7 @@ let test_simple { block2 = ctxt } =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   Lwt.return_unit
 
-let test_continuation { block3a = ctxt } =
+let test_continuation { block3a = ctxt ; _ } =
   Context.get ctxt ["version"] >>= fun version ->
   Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
   Context.get ctxt ["a";"b"] >>= fun novembre ->
@@ -84,7 +84,7 @@ let test_continuation { block3a = ctxt } =
   Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
   Lwt.return_unit
 
-let test_fork { block3b = ctxt } =
+let test_fork { block3b = ctxt ; _ } =
   Context.get ctxt ["version"] >>= fun version ->
   Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
   Context.get ctxt ["a";"b"] >>= fun novembre ->
@@ -95,7 +95,7 @@ let test_fork { block3b = ctxt } =
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
   Lwt.return_unit
 
-let test_replay { genesis = ctxt0 }  =
+let test_replay { genesis = ctxt0 ; _ }  =
   Context.set ctxt0 ["version"] (MBytes.of_string "0.0") >>= fun ctxt1 ->
   Context.set ctxt1 ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt2 ->
   Context.set ctxt2 ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt3 ->
@@ -124,7 +124,7 @@ let fold_keys s k ~init ~f =
   loop k init
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
-let test_fold { genesis = ctxt } =
+let test_fold { genesis = ctxt ; _ } =
   Context.set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
   Context.set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
   Context.set ctxt ["a"; "d"; "e"] (MBytes.of_string "Septembre") >>= fun ctxt ->

@@ -196,7 +196,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       (Prevalidator_worker_state.Request) (Types)
 
   (** Centralised operation stream for the RPCs *)
-  let notify_operation { operation_stream } result  { Operation.shell ; proto } =
+  let notify_operation { operation_stream ; _ } result  { Operation.shell ; proto } =
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.operation_data_encoding
@@ -458,7 +458,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     dir := RPC_directory.gen_register !dir
         (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-        begin fun { applied ; refusals = refused ; branch_refusals = branch_refused ; branch_delays = branch_delayed ; operation_stream } params () ->
+        begin fun { applied ; refusals = refused ; branch_refusals = branch_refused ; branch_delays = branch_delayed ; operation_stream ; _ } params () ->
           let op_stream, stopper = Lwt_watcher.create_stream operation_stream in
           (* Convert ops *)
           let map_op op =
@@ -633,7 +633,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       let chain_state = Distributed_db.chain_state chain_db in
       Chain.data chain_state >>= fun
         { current_head = predecessor ; current_mempool = mempool ;
-          live_blocks ; live_operations } ->
+          live_blocks ; live_operations ; _ } ->
       let timestamp = Time.now () in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       let fetching =

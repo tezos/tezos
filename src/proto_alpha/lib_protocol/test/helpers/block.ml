@@ -62,7 +62,7 @@ let get_next_baker_by_priority priority block =
     ~all:true
     ~max_priority:(priority+1) block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp} = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p } -> p = priority)  bakers in
+        timestamp; _ } = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p ; _ } -> p = priority)  bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
@@ -70,16 +70,16 @@ let get_next_baker_by_account pkh block =
     ~delegates:[pkh]
     ~max_priority:256 block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp ; priority } = List.hd bakers in
+        timestamp ; priority ; _ } = List.hd bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt
     ~max_priority:256 block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp ; priority } =
+        timestamp ; priority ; _ } =
     List.find
-      (fun { Alpha_services.Delegate.Baking_rights.delegate } ->
+      (fun { Alpha_services.Delegate.Baking_rights.delegate ; _ } ->
          not (List.mem delegate excludes))
       bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
@@ -153,8 +153,8 @@ module Forge = struct
     end >>=? fun fitness ->
     begin
       Alpha_services.Helpers.current_level ~offset:1l (rpc_ctxt) pred >>|? function
-      | { expected_commitment = true } -> Some (fst (Proto_Nonce.generate ()))
-      | { expected_commitment = false } -> None
+      | { expected_commitment = true ; _ } -> Some (fst (Proto_Nonce.generate ()))
+      | { expected_commitment = false ; _ } -> None
     end >>=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash = Operation_list_list_hash.compute
@@ -378,7 +378,7 @@ let bake_n ?policy n b =
     (fun b _ -> bake ?policy b) b (1 -- n)
 
 let bake_until_cycle_end ?policy b =
-  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle ; _ } ; _ } ->
   let current_level = b.header.shell.level in
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
@@ -389,7 +389,7 @@ let bake_until_n_cycle_end ?policy n b =
     (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let bake_until_cycle ?policy cycle (b:t) =
-  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle ; _ } ; _ } ->
   let rec loop (b:t) =
     let current_cycle =
       let current_level = b.header.shell.level in

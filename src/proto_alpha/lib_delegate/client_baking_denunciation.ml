@@ -131,7 +131,7 @@ let process_endorsements (cctxt : #Proto_alpha.full) state
 
 let process_block (cctxt : #Proto_alpha.full) state (header : Alpha_block_services.block_info) =
   let { Alpha_block_services.chain_id ; hash ;
-        metadata = { protocol_data = { baker ; level = { level } } } } = header in
+        metadata = { protocol_data = { baker ; level = { level ; _ } ; _ } ; _ } ; _ } = header in
   let chain = `Hash chain_id in
   let map = match HLevel.find_opt state.blocks_table (chain_id, level) with
     | None -> Delegate_Map.empty
@@ -148,10 +148,10 @@ let process_block (cctxt : #Proto_alpha.full) state (header : Alpha_block_servic
         (* If a previous endorsement made by this pkh is found for
            the same level we inject a double_endorsement *)
         Alpha_block_services.header cctxt ~chain ~block:(`Hash (existing_hash, 0)) () >>=?
-        fun ( { shell ; protocol_data } : Alpha_block_services.block_header) ->
+        fun ( { shell ; protocol_data ; _ } : Alpha_block_services.block_header) ->
         let bh1 = { Alpha_context.Block_header.shell = shell ; protocol_data = protocol_data } in
         Alpha_block_services.header cctxt ~chain ~block:(`Hash (hash, 0)) () >>=?
-        fun ( { shell ; protocol_data } : Alpha_block_services.block_header) ->
+        fun ( { shell ; protocol_data ; _ } : Alpha_block_services.block_header) ->
         let bh2 = { Alpha_context.Block_header.shell = shell ; protocol_data = protocol_data } in
         (* If the blocks are on different chains then skip it *)
         get_block_offset level >>= fun block ->
@@ -206,7 +206,7 @@ let endorsements_index = 0
    - Checking that every endorser operated only once at this level
    - Checking that every baker injected only once at this level
 *)
-let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; level ; protocol ; next_protocol } =
+let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; level ; protocol ; next_protocol ; _ } =
   if Protocol_hash.(protocol <> next_protocol) then
     lwt_log_error Tag.DSL.(fun f ->
         f "Protocol changing detected. Skipping the block."

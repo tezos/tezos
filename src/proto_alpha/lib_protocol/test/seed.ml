@@ -36,7 +36,7 @@ open Test_tez
     [seed_nonce_hash] commitment fails with [Invalid_commitment] *)
 let no_commitment () =
   Context.init 5 >>=? fun (b,_) ->
-  Context.get_constants (B b) >>=? fun { parametric = { blocks_per_commitment } } ->
+  Context.get_constants (B b) >>=? fun { parametric = { blocks_per_commitment ; _ } ; _ } ->
   let blocks_per_commitment = Int32.to_int blocks_per_commitment in
 
   (* Bake normally until before the commitment *)

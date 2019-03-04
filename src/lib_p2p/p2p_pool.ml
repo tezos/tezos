@@ -92,7 +92,7 @@ module Message = struct
            (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ;
        ] @
        ListLabels.map msg_encoding
-         ~f:(function Encoding { tag ; title ; encoding ; wrap ; unwrap } ->
+         ~f:(function Encoding { tag ; title ; encoding ; wrap ; unwrap ; max_length = _ (* ?? *) } ->
              Data_encoding.case (Tag tag)
                ~title
                encoding
@@ -297,8 +297,8 @@ module Pool_event = struct
     Lwt_condition.wait pool.events.new_connection
 end
 
-let watch { watcher } = Lwt_watcher.create_stream watcher
-let log { watcher } event = Lwt_watcher.notify watcher event
+let watch { watcher ; _ } = Lwt_watcher.create_stream watcher
+let log { watcher ; _ } event = Lwt_watcher.notify watcher event
 let private_node_warn fmt =
   Format.kasprintf (fun s -> lwt_warn "[private node] %s" s) fmt
 
@@ -307,7 +307,7 @@ module Gc_point_set = List.Bounded(struct
     let compare (x, _) (y, _) = - (Time.compare x y)
   end)
 
-let gc_points ({ config = { max_known_points } ; known_points } as pool) =
+let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool) =
   match max_known_points with
   | None -> ()
   | Some (_, target) ->
@@ -370,9 +370,9 @@ module Gc_peer_set = List.Bounded(struct
       if score_cmp = 0 then Time.compare t t' else - score_cmp
   end)
 
-let gc_peer_ids ({ peer_meta_config = { score } ;
-                   config = { max_known_peer_ids } ;
-                   known_peer_ids ; } as pool) =
+let gc_peer_ids ({ peer_meta_config = { score ; _ } ;
+                   config = { max_known_peer_ids ; _ } ;
+                   known_peer_ids ; _ } as pool) =
   match max_known_peer_ids with
   | None -> ()
   | Some (_, target) ->
@@ -410,7 +410,7 @@ let register_peer pool peer_id =
 
 (***************************************************************************)
 
-let read { messages ; conn } =
+let read { messages ; conn ; _ } =
   Lwt.catch
     (fun () ->
        Lwt_pipe.pop messages >>= fun (s, msg) ->
@@ -419,28 +419,28 @@ let read { messages ; conn } =
        return msg)
     (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
-let is_readable { messages } =
+let is_readable { messages ; _ } =
   Lwt.catch
     (fun () -> Lwt_pipe.values_available messages >>= return)
     (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
-let write { conn } msg =
+let write { conn ; _ } msg =
   P2p_socket.write conn (Message msg)
 
-let write_sync { conn } msg =
+let write_sync { conn ; _ } msg =
   P2p_socket.write_sync conn (Message msg)
 
-let raw_write_sync { conn } buf =
+let raw_write_sync { conn ; _ } buf =
   P2p_socket.raw_write_sync conn buf
 
-let write_now { conn } msg =
+let write_now { conn ; _ } msg =
   P2p_socket.write_now conn (Message msg)
 
 let write_all pool msg =
   P2p_peer.Table.iter
     (fun _peer_id peer_info ->
        match P2p_peer_state.get peer_info with
-       | Running { data = conn } ->
+       | Running { data = conn ; _ } ->
            ignore (write_now conn msg : bool tzresult )
        | _ -> ())
     pool.connected_peer_ids
@@ -450,7 +450,7 @@ let broadcast_bootstrap_msg pool =
     P2p_peer.Table.iter
       (fun _peer_id peer_info ->
          match P2p_peer_state.get peer_info with
-         | Running { data = { conn } } ->
+         | Running { data = { conn ; _ } ; _ } ->
              (* should not ask private nodes for the list of their
                 known peers*)
              if not (P2p_socket.private_node conn) then
@@ -467,7 +467,7 @@ let connection_of_peer_id pool peer_id =
   Option.apply
     (P2p_peer.Table.find_opt pool.known_peer_ids peer_id) ~f:begin fun p ->
     match P2p_peer_state.get p with
-    | Running { data } -> Some data
+    | Running { data ; _ } -> Some data
     | _ -> None
   end
 
@@ -478,7 +478,7 @@ let connections_of_addr pool addr =
        if Ipaddr.V6.compare addr addr' = 0
        then
          match P2p_point_state.get p with
-         | P2p_point_state.Running { data } -> data :: acc
+         | P2p_point_state.Running { data ; _ } -> data :: acc
          | _ -> acc
        else acc
     ) pool.connected_points []
@@ -493,7 +493,7 @@ module Points = struct
   type ('msg, 'peer_meta, 'conn_meta) info =
     ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t
 
-  let info { known_points } point =
+  let info { known_points ; _ } point =
     P2p_point.Table.find_opt known_points point
 
   let get_trusted pool point =
@@ -542,7 +542,7 @@ module Peers = struct
   type ('msg, 'peer_meta, 'conn_meta) info =
     (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t
 
-  let info { known_peer_ids } peer_id =
+  let info { known_peer_ids ; _ } peer_id =
     try Some (P2p_peer.Table.find known_peer_ids peer_id)
     with Not_found -> None
 
@@ -611,7 +611,7 @@ module Connection = struct
   let fold pool ~init ~f =
     Peers.fold_connected pool ~init ~f:begin fun peer_id peer_info acc ->
       match P2p_peer_state.get peer_info with
-      | Running { data } -> f peer_id data acc
+      | Running { data ; _ } -> f peer_id data acc
       | _ -> acc
     end
 
@@ -654,16 +654,16 @@ module Connection = struct
     | _ :: _ ->
         Some (List.nth candidates (Random.int @@ List.length candidates))
 
-  let stat { conn } =
+  let stat { conn ; _ } =
     P2p_socket.stat conn
 
-  let info { conn } =
+  let info { conn ; _ } =
     P2p_socket.info conn
 
-  let local_metadata { conn } =
+  let local_metadata { conn ; _ } =
     P2p_socket.local_metadata conn
 
-  let remote_metadata { conn } =
+  let remote_metadata { conn ; _ } =
     P2p_socket.remote_metadata conn
 
   let find_by_peer_id pool peer_id =
@@ -671,7 +671,7 @@ module Connection = struct
       (Peers.info pool peer_id)
       ~f:(fun p ->
           match P2p_peer_state.get p with
-          | Running { data } -> Some data
+          | Running { data ; _ } -> Some data
           | _ -> None)
 
   let find_by_point pool point =
@@ -679,7 +679,7 @@ module Connection = struct
       (Points.info pool point)
       ~f:(fun p ->
           match P2p_point_state.get p with
-          | Running { data } -> Some data
+          | Running { data ; _ } -> Some data
           | _ -> None)
 
 end
@@ -699,12 +699,12 @@ let acl_clear pool =
 let gc_greylist ~older_than pool =
   P2p_acl.IPGreylist.remove_old ~older_than pool.acl
 
-let pool_stat { io_sched } =
+let pool_stat { io_sched ; _ } =
   P2p_io_scheduler.global_stat io_sched
 
-let config { config } = config
+let config { config ; _ } = config
 
-let score { peer_meta_config = { score }} meta = score meta
+let score { peer_meta_config = { score ; _ } ; _ } meta = score meta
 
 (***************************************************************************)
 
@@ -1267,7 +1267,7 @@ let create
         pp_print_error err ;
       Lwt.return pool
 
-let destroy ({ config ; peer_meta_config } as pool) =
+let destroy ({ config ; peer_meta_config ; _ } as pool) =
   lwt_log_info "Saving metadata in %s" config.peers_file >>= fun () ->
   begin
     P2p_peer_state.Info.File.save
@@ -1282,17 +1282,17 @@ let destroy ({ config ; peer_meta_config } as pool) =
   end >>= fun () ->
   P2p_point.Table.fold (fun _point point_info acc ->
       match P2p_point_state.get point_info with
-      | Requested { cancel } | Accepted { cancel } ->
+      | Requested { cancel } | Accepted { cancel ; _ } ->
           Lwt_canceler.cancel cancel >>= fun () -> acc
-      | Running { data = conn } ->
+      | Running { data = conn ; _ } ->
           disconnect conn >>= fun () -> acc
       | Disconnected -> acc)
     pool.known_points @@
   P2p_peer.Table.fold (fun _peer_id peer_info acc ->
       match P2p_peer_state.get peer_info with
-      | Accepted { cancel } ->
+      | Accepted { cancel ; _ } ->
           Lwt_canceler.cancel cancel >>= fun () -> acc
-      | Running { data = conn } ->
+      | Running { data = conn ; _ } ->
           disconnect conn >>= fun () -> acc
       | Disconnected -> acc)
     pool.known_peer_ids @@

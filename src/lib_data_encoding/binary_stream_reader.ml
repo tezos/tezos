@@ -282,16 +282,16 @@ let rec read_rec
     | List (max_length, e) ->
         let max_length = Option.unopt ~default:max_int max_length in
         read_list List_too_long max_length e state k
-    | (Obj (Req { encoding = e })) -> read_rec whole e state k
-    | (Obj (Dft { encoding = e })) -> read_rec whole e state k
-    | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
+    | (Obj (Req { encoding = e ; _ })) -> read_rec whole e state k
+    | (Obj (Dft { encoding = e ; _ })) -> read_rec whole e state k
+    | (Obj (Opt { kind = `Dynamic ; encoding = e ; _ })) ->
         Atom.bool resume state @@ fun (present, state) ->
         if not present then
           k (None, state)
         else
           read_rec whole e state @@ fun (v, state) ->
           k (Some v, state)
-    | (Obj (Opt { kind = `Variable ; encoding = e })) ->
+    | (Obj (Opt { kind = `Variable ; encoding = e ; _ })) ->
         let size = remaining_bytes state in
         if size = 0 then
           k (None, state)
@@ -323,20 +323,20 @@ let rec read_rec
         k ((left, right), state)
     | Tups { kind = `Variable ; left ; right } ->
         read_variable_pair left right state k
-    | Conv { inj ; encoding } ->
+    | Conv { inj ; encoding ; _ } ->
         read_rec whole encoding state @@ fun (v, state) ->
         k (inj v, state)
-    | Union { tag_size ; cases } -> begin
+    | Union { tag_size ; cases ; _ } -> begin
         Atom.tag tag_size resume state @@ fun (ctag, state) ->
         match
           List.find_opt
             (function
-              | Case { tag = Tag tag } -> tag = ctag
-              | Case { tag = Json_only } -> false)
+              | Case { tag = Tag tag ; _ } -> tag = ctag
+              | Case { tag = Json_only ; _ } -> false)
             cases
         with
         | None -> Error (Unexpected_tag ctag)
-        | Some (Case { encoding ; inj }) ->
+        | Some (Case { encoding ; inj ; _ }) ->
             read_rec whole encoding state @@ fun (v, state) ->
             k (inj v, state)
       end
@@ -375,12 +375,12 @@ let rec read_rec
               let read = limit - remaining in
               Some (old_limit - read) in
         k (v, { state with allowed_bytes })
-    | Describe { encoding = e } -> read_rec whole e state k
-    | Splitted { encoding = e } -> read_rec whole e state k
-    | Mu { fix } -> read_rec whole (fix e) state k
+    | Describe { encoding = e ; _ } -> read_rec whole e state k
+    | Splitted { encoding = e ; _ } -> read_rec whole e state k
+    | Mu { fix ; _ } -> read_rec whole (fix e) state k
     | Delayed f -> read_rec whole (f ()) state k
 
-and remaining_bytes { remaining_bytes } =
+and remaining_bytes { remaining_bytes ; _ } =
   match remaining_bytes with
   | None ->
       (* This function should only be called with a variable encoding,

@@ -77,7 +77,7 @@ let remove_all nonces nonces_to_remove =
 
 let get_block_level_opt cctxt ~chain ~block =
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>= function
-  | Ok { level } -> Lwt.return_some level
+  | Ok { level ; _ } -> Lwt.return_some level
   | Error errs ->
       lwt_warn Tag.DSL.(fun f ->
           f "@[<v 2>Cannot retrieve block %a header associated to \
@@ -91,7 +91,7 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
   begin match constants with
     | None -> Alpha_services.Constants.all cctxt (chain, `Head 0)
     | Some constants -> return constants
-  end >>=? fun { Constants.parametric = { blocks_per_cycle }} ->
+  end >>=? fun { Constants.parametric = { blocks_per_cycle ; _ } ; _ } ->
   get_block_level_opt cctxt ~chain ~block:(`Head 0) >>= function
   | None ->
       lwt_log_error Tag.DSL.(fun f ->

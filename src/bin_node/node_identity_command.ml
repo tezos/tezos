@@ -29,12 +29,12 @@ let (//) = Filename.concat
 
 let identity_file data_dir = data_dir // Node_data_version.default_identity_file_name
 
-let show { Node_config_file.data_dir } =
+let show { Node_config_file.data_dir ; _ } =
   Node_identity_file.read (identity_file data_dir) >>=? fun id ->
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return_unit
 
-let generate { Node_config_file.data_dir ; p2p } =
+let generate { Node_config_file.data_dir ; p2p ; _ } =
   let identity_file = identity_file data_dir in
   if Sys.file_exists identity_file then
     fail (Node_identity_file.Existent_identity_file identity_file)
@@ -49,7 +49,7 @@ let generate { Node_config_file.data_dir ; p2p } =
       P2p_peer.Id.pp id.peer_id identity_file ;
     return_unit
 
-let check { Node_config_file.data_dir ; p2p = { expected_pow } } =
+let check { Node_config_file.data_dir ; p2p = { expected_pow ; _ } ; _ } =
   Node_identity_file.read
     ~expected_pow (identity_file data_dir) >>=? fun id ->
   Format.printf

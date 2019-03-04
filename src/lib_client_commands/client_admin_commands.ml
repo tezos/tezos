@@ -50,7 +50,7 @@ let commands () =
        @@ stop)
       (fun () (cctxt : #Client_context.full) ->
          Shell_services.Invalid_blocks.list cctxt () >>=? fun invalid_blocks ->
-         iter_s (fun { Chain_services.hash } ->
+         iter_s (fun { Chain_services.hash ; _ } ->
              Shell_services.Invalid_blocks.delete cctxt hash >>=? fun () ->
              cctxt#message
                "Block %a no longer marked invalid."

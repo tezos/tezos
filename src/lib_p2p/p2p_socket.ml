@@ -546,14 +546,14 @@ type ('msg, 'meta) t = {
   writer : ('msg, 'meta) Writer.t ;
 }
 
-let equal { conn = { fd = fd2 } } { conn = { fd = fd1 } } =
+let equal { conn = { fd = fd2 ; _ } ; _ } { conn = { fd = fd1 ; _ } ; _ } =
   P2p_io_scheduler.id fd1 = P2p_io_scheduler.id fd2
 
-let pp ppf { conn } = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn.info
-let info { conn } = conn.info
-let local_metadata { conn } = conn.info.local_metadata
-let remote_metadata { conn } = conn.info.remote_metadata
-let private_node { conn } = conn.info.private_node
+let pp ppf { conn ; _ } = P2p_connection.Info.pp (fun _ _ -> ()) ppf conn.info
+let info { conn ; _ } = conn.info
+let local_metadata { conn ; _ } = conn.info.local_metadata
+let remote_metadata { conn ; _ } = conn.info.remote_metadata
+let private_node { conn ; _ } = conn.info.private_node
 
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
@@ -602,7 +602,7 @@ let pp_json encoding ppf msg =
   Data_encoding.Json.pp ppf
     (Data_encoding.Json.construct encoding msg)
 
-let write { writer ; conn } msg =
+let write { writer ; conn ; _ } msg =
   catch_closed_pipe begin fun () ->
     debug "Sending message to %a: %a"
       P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
@@ -610,7 +610,7 @@ let write { writer ; conn } msg =
     Lwt_pipe.push writer.messages (buf, None) >>= return
   end
 
-let write_sync { writer ; conn } msg =
+let write_sync { writer ; conn ; _ } msg =
   catch_closed_pipe begin fun () ->
     let waiter, wakener = Lwt.wait () in
     debug "Sending message to %a: %a"
@@ -620,7 +620,7 @@ let write_sync { writer ; conn } msg =
     waiter
   end
 
-let write_now { writer ; conn } msg =
+let write_now { writer ; conn ; _ } msg =
   debug "Try sending message to %a: %a"
     P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
   Writer.encode_message writer msg >>? fun buf ->
@@ -634,7 +634,7 @@ let rec split_bytes size bytes =
     MBytes.sub bytes 0 size ::
     split_bytes size (MBytes.sub bytes size (MBytes.length bytes - size))
 
-let raw_write_sync { writer } bytes =
+let raw_write_sync { writer ; _ } bytes =
   let bytes = split_bytes writer.binary_chunks_size bytes in
   catch_closed_pipe begin fun () ->
     let waiter, wakener = Lwt.wait () in
@@ -642,21 +642,21 @@ let raw_write_sync { writer } bytes =
     waiter
   end
 
-let is_readable { reader } =
+let is_readable { reader ; _ } =
   not (Lwt_pipe.is_empty reader.messages)
-let wait_readable { reader } =
+let wait_readable { reader ; _ } =
   catch_closed_pipe begin fun () ->
     Lwt_pipe.values_available reader.messages >>= return
   end
-let read { reader } =
+let read { reader ; _ } =
   catch_closed_pipe begin fun () ->
     Lwt_pipe.pop reader.messages
   end
-let read_now { reader } =
+let read_now { reader ; _ } =
   try Lwt_pipe.pop_now reader.messages
   with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
 
-let stat { conn = { fd } } = P2p_io_scheduler.stat fd
+let stat { conn = { fd ; _ } ; _ } = P2p_io_scheduler.stat fd
 
 let close ?(wait = false) st =
   begin

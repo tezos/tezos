@@ -84,7 +84,7 @@ module Types = struct
   }
 
   let view (state : state) _ : view =
-    let { bootstrapped ; last_validated_head ; last_advertised_head } = state in
+    let { bootstrapped ; last_validated_head ; last_advertised_head ; _ } = state in
     { bootstrapped ;
       last_validated_head = Block_header.hash last_validated_head ;
       last_advertised_head = Block_header.hash last_advertised_head }
@@ -302,7 +302,7 @@ let on_error w r st errs =
   | [Block_validator_errors.System_error _ ] as errs ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       return_unit
-  | [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
+  | [Block_validator_errors.Unavailable_protocol { protocol ; _ } ] -> begin
       Block_validator.fetch_and_compile_protocol
         pv.parameters.block_validator
         ~peer:pv.peer_id

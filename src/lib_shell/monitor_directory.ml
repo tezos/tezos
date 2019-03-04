@@ -166,7 +166,7 @@ let build_rpc_directory validator mainchain_validator =
           Lwt.return (Monitor_services.Active_main chain_id)
         else
           State.Chain.get_exn state chain_id >>= fun chain_state ->
-          let { State.Chain.protocol } = State.Chain.genesis chain_state in
+          let { State.Chain.protocol ; _ } = State.Chain.genesis chain_state in
           let expiration_date = Option.unopt_exn
               (Invalid_argument
                  (Format.asprintf "Monitor.active_chains: no expiration date for the chain %a"

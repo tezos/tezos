@@ -37,7 +37,7 @@ type result = {
 let update_testchain_status ctxt predecessor_header timestamp =
   Context.get_test_chain ctxt >>= function
   | Not_running -> return ctxt
-  | Running { expiration } ->
+  | Running { expiration ; _ } ->
       if Time.(expiration <= timestamp) then
         Context.set_test_chain ctxt Not_running >>= fun ctxt ->
         return ctxt
@@ -66,7 +66,7 @@ let init_test_chain
         | Some proto -> return proto
         | None -> fail (Missing_test_protocol protocol)
       end >>=? fun (module Proto_test) ->
-      Proto_test.init ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt } ->
+      Proto_test.init ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt ; _ } ->
       Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
       Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
       Context.commit_test_chain_genesis test_ctxt forked_header >>= fun genesis_header ->

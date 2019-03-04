@@ -39,7 +39,7 @@ let get_signing_slots cctxt ~chain ~block delegate level =
     ~levels:[level]
     ~delegates:[delegate]
     (chain, block) >>=? function
-  | [{ slots }] -> return_some slots
+  | [{ slots ; _ }] -> return_some slots
   | _ -> return_none
 
 let inject_endorsement
@@ -84,7 +84,7 @@ let forge_endorsement
     ~src_sk src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt
-    ~chain ~block () >>=? fun { protocol_data = { level = { level } } } ->
+    ~chain ~block () >>=? fun { protocol_data = { level = { level ; _ } ; _ } ; _ } ->
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh >>=? fun oph ->
   Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
@@ -124,7 +124,7 @@ let get_delegates cctxt state = match state.delegates with
   | (_ :: _) as delegates -> return delegates
 
 let endorse_for_delegate cctxt block delegate_pkh =
-  let { Client_baking_blocks.hash ; level ; chain_id } = block in
+  let { Client_baking_blocks.hash ; level ; chain_id ; _ } = block in
   Client_keys.get_key cctxt delegate_pkh >>=? fun (name, _pk, delegate_sk) ->
   lwt_debug Tag.DSL.(fun f ->
       f "Endorsing %a for %s (level %a)!"

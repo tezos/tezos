@@ -151,7 +151,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   (* originate a contract with bootstrap's manager as delegate *)
   Op.origination ~fee ~credit:Tez.zero ~delegate:manager.pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} -> (* 0.257tz *)
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }; _ } -> (* 0.257tz *)
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun total_fee ->
   if fee > balance then
@@ -339,7 +339,7 @@ let unregistered_delegate_key_init_origination ~fee () =
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   (* origination with delegate argument *)
   Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun _total_fee -> (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
@@ -1065,7 +1065,7 @@ let registered_self_delegate_key_init_origination () =
   Op.delegation (I i) contract (Some pkh) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) contract >>=? fun balance ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   (* origination with delegate argument *)
   Op.origination ~delegate:pkh ~credit:Tez.one (I i) contract >>=? fun (op, orig_contract) ->

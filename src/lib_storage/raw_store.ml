@@ -82,7 +82,7 @@ let init ?mapsize path =
   | Ok dir -> return { dir ; parent = Lwt.new_key () }
   | Error err -> failwith "%a" Lmdb.pp_error err
 
-let close { dir } = Lmdb.closedir dir
+let close { dir ; _ } = Lmdb.closedir dir
 
 let known { dir ; parent } key =
   begin match Lwt.get parent with

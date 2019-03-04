@@ -129,7 +129,7 @@ let monitor_heads cctxt ~next_protocols chain =
   Monitor_services.heads
     cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun (block, ({ Tezos_base.Block_header.shell } as header)) ->
+            (fun (block, ({ Tezos_base.Block_header.shell ; _ } as header)) ->
                Block_seen_event.(Event.emit (make block header `Heads))
                >>=? fun () ->
                raw_info cctxt ~chain block shell)
@@ -138,7 +138,7 @@ let monitor_heads cctxt ~next_protocols chain =
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Shell_services.Blocks.Header.shell_header
-    cctxt ~chain ~block () >>=? fun { level } ->
+    cctxt ~chain ~block () >>=? fun { level ; _ } ->
   Alpha_services.Helpers.levels_in_current_cycle
     cctxt ~offset (chain, block) >>= function
   | Error [RPC_context.Not_found _] ->

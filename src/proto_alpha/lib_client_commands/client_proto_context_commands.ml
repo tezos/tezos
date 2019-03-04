@@ -105,7 +105,7 @@ let commands version () =
       (fixed [ "get" ; "timestamp" ])
       begin fun seconds (cctxt : Proto_alpha.full) ->
         Shell_services.Blocks.Header.shell_header
-          cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v } ->
+          cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v ; _ } ->
         begin
           if seconds
           then cctxt#message "%Ld" (Time.to_seconds v)
@@ -192,7 +192,7 @@ let commands version () =
             match Script_repr.force_decode code with
             | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
             | Ok (code, _) ->
-                let { Michelson_v1_parser.source } =
+                let { Michelson_v1_parser.source ; _ } =
                   Michelson_v1_printer.unparse_toplevel code in
                 cctxt#answer "%a" Format.pp_print_text source >>= return
       end ;
@@ -392,7 +392,7 @@ let commands version () =
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
-        Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
+        Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code ; _ } ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->

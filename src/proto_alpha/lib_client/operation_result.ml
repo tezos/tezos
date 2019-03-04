@@ -56,7 +56,7 @@ let pp_manager_operation_content
         end ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;
-    | Origination { manager ; delegate ; credit ; spendable ; delegatable ; script } ->
+    | Origination { manager ; delegate ; credit ; spendable ; delegatable ; script ; preorigination = _ } ->
         Format.fprintf ppf "@[<v 2>%s:@,\
                             From: %a@,\
                             For: %a@,\
@@ -77,7 +77,7 @@ let pp_manager_operation_content
                 Option.unopt_exn
                   (Failure "ill-serialized storage")
                   (Data_encoding.force_decode storage) in
-              let { Michelson_v1_parser.source } =
+              let { Michelson_v1_parser.source ; _ } =
                 Michelson_v1_printer.unparse_toplevel code in
               Format.fprintf ppf
                 "@,@[<hv 2>Script:@ @[<h>%a@]\
@@ -163,7 +163,9 @@ let pp_manager_operation_contents_and_result ppf
       (Transaction_result { balance_updates ; consumed_gas ;
                             storage ;
                             originated_contracts ;
-                            storage_size ; paid_storage_size_diff }) =
+                            storage_size ; paid_storage_size_diff ;
+                            big_map_diff = _ ;
+                            allocated_destination_contract = _ }) =
     begin match originated_contracts with
       | [] -> ()
       | contracts ->
@@ -421,6 +423,6 @@ let pp_operation_result ppf
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
 
-let pp_internal_operation ppf (Internal_operation { source ; operation }) =
+let pp_internal_operation ppf (Internal_operation { source ; operation ; nonce = _}) =
   pp_manager_operation_content source true (fun _ppf () -> ())
     ppf (operation, ())

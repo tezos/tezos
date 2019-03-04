@@ -121,7 +121,7 @@ let c = function
   | None -> None
   | Some s -> Some (MBytes.to_string s)
 
-let test_simple { idx ; block2 } =
+let test_simple { idx ; block2 ; _ } =
   checkout idx block2 >>= function
   | None ->
       Assert.fail_msg "checkout block2"
@@ -134,7 +134,7 @@ let test_simple { idx ; block2 } =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return_unit
 
-let test_continuation { idx ; block3a } =
+let test_continuation { idx ; block3a ; _ } =
   checkout idx block3a >>= function
   | None  ->
       Assert.fail_msg "checkout block3a"
@@ -149,7 +149,7 @@ let test_continuation { idx ; block3a } =
       Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
       Lwt.return_unit
 
-let test_fork { idx ; block3b } =
+let test_fork { idx ; block3b ; _ } =
   checkout idx block3b >>= function
   | None  ->
       Assert.fail_msg "checkout block3b"
@@ -164,7 +164,7 @@ let test_fork { idx ; block3b } =
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return_unit
 
-let test_replay { idx ; genesis }  =
+let test_replay { idx ; genesis ; _ }  =
   checkout idx genesis >>= function
   | None  ->
       Assert.fail_msg "checkout genesis_block"
@@ -197,7 +197,7 @@ let fold_keys s k ~init ~f =
   loop k init
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
-let test_fold { idx ; genesis } =
+let test_fold { idx ; genesis ; _ } =
   checkout idx genesis >>= function
   | None ->
       Assert.fail_msg "checkout genesis_block"

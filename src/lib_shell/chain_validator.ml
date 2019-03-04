@@ -83,7 +83,7 @@ module Types = struct
   }
 
   let view (state : state) _ : view =
-    let { bootstrapped ; active_peers ; bootstrapped_peers } = state in
+    let { bootstrapped ; active_peers ; bootstrapped_peers ; _ } = state in
     { bootstrapped ;
       active_peers =
         P2p_peer.Table.fold (fun id _ l -> id :: l) active_peers [] ;
@@ -103,16 +103,17 @@ let shutdown w =
   Worker.shutdown w
 
 let shutdown_child nv active_chains =
-  Lwt_utils.may ~f:(fun ({ parameters = { chain_state ; global_chains_input ; } }, shutdown) ->
-      Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
-      Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
-      State.update_chain_data nv.parameters.chain_state begin fun _ chain_data ->
-        Lwt.return (Some { chain_data with test_chain = None }, ())
-      end >>= fun () ->
-      shutdown () >>= fun () ->
-      nv.child <- None ;
-      Lwt.return_unit
-    ) nv.child
+  Lwt_utils.may ~f:(fun
+                     ({ parameters = { chain_state ; global_chains_input ; _ } ; _ }, shutdown) ->
+                     Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
+                     Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
+                     State.update_chain_data nv.parameters.chain_state begin fun _ chain_data ->
+                       Lwt.return (Some { chain_data with test_chain = None }, ())
+                     end >>= fun () ->
+                     shutdown () >>= fun () ->
+                     nv.child <- None ;
+                     Lwt.return_unit
+                   ) nv.child
 
 let notify_new_block w block =
   let nv = Worker.state w in
@@ -190,8 +191,8 @@ let may_switch_test_chain w active_chains spawn_child block =
     State.Block.test_chain block >>= function
     | Not_running, _ -> shutdown_child nv active_chains >>= return
     | (Forking _ | Running _), None -> return_unit (* only for snapshots *)
-    | (Forking { protocol ; expiration }
-      | Running { protocol ; expiration }), Some forking_block ->
+    | (Forking { protocol ; expiration ; _ }
+      | Running { protocol ; expiration ; _ }), Some forking_block ->
         let genesis = Context.compute_testchain_genesis (State.Block.hash forking_block) in
         let chain_id = Context.compute_testchain_chain_id genesis in
         let activated =
@@ -404,7 +405,7 @@ let on_launch start_prevalidator w _ parameters =
   Chain.init_head parameters.chain_state >>= fun () ->
   (if start_prevalidator then
      State.read_chain_data parameters.chain_state
-       (fun _ {State.current_head} -> Lwt.return current_head) >>= fun head ->
+       (fun _ { State.current_head ; _ } -> Lwt.return current_head) >>= fun head ->
      State.Block.protocol_hash head >>= fun head_hash ->
      safe_get_protocol head_hash >>= function
      | Ok (module Proto) -> begin
@@ -544,25 +545,25 @@ let create
     global_db state limits
 
 let chain_id w =
-  let { parameters = { chain_state } } = Worker.state w in
+  let { parameters = { chain_state ; _ } ; _ } = Worker.state w in
   State.Chain.id chain_state
 
 let chain_state w =
-  let { parameters = { chain_state } } = Worker.state w in
+  let { parameters = { chain_state ; _ } ; _ } = Worker.state w in
   chain_state
 
 let prevalidator w =
-  let { prevalidator } = Worker.state w in
+  let { prevalidator ; _ } = Worker.state w in
   prevalidator
 
 let chain_db w =
-  let { parameters = { chain_db } } = Worker.state w in
+  let { parameters = { chain_db ; _ } ; _ } = Worker.state w in
   chain_db
 
 let child w =
   match (Worker.state w).child with
   | None -> None
-  | Some ({ parameters = { chain_state } }, _) ->
+  | Some ({ parameters = { chain_state ;_ } ; _ }, _) ->
       try Some (List.assoc (State.Chain.id chain_state) (Worker.list table))
       with Not_found -> None
 
@@ -597,15 +598,15 @@ let validate_block w ?force hash block operations =
     hash block operations
 
 let bootstrapped w =
-  let { bootstrapped_waiter } = Worker.state w in
+  let { bootstrapped_waiter ; _ } = Worker.state w in
   Lwt.protected bootstrapped_waiter
 
 let valid_block_watcher w =
-  let { valid_block_input } = Worker.state w in
+  let { valid_block_input ; _ } = Worker.state w in
   Lwt_watcher.create_stream valid_block_input
 
 let new_head_watcher w =
-  let { new_head_input } = Worker.state w in
+  let { new_head_input ; _ } = Worker.state w in
   Lwt_watcher.create_stream new_head_input
 
 let status = Worker.status

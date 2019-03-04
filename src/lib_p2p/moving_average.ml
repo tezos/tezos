@@ -100,5 +100,5 @@ type stat = {
   average: int ;
 }
 
-let stat ({ total ; average } : t) : stat =
+let stat ({ total ; average ; _ } : t) : stat =
   { total ; average }

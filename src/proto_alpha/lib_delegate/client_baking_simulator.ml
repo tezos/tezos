@@ -76,7 +76,7 @@ let check_context_consistency index context_hash =
       | false -> fail Invalid_context
 
 let begin_construction ~timestamp ?protocol_data index predecessor =
-  let { Client_baking_blocks.context } = predecessor in
+  let { Client_baking_blocks.context ; _ } = predecessor in
   Context.checkout index context >>= function
   | None -> fail Failed_to_checkout_context
   | Some context ->

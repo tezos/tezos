@@ -70,16 +70,16 @@ let combine_operations
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
   let { Tezos_base.Operation.branch } = (List.hd packed_operations).shell in
   assert (List.for_all
-            (fun { shell = { Tezos_base.Operation.branch = b } } -> Block_hash.(branch = b))
+            (fun { shell = { Tezos_base.Operation.branch = b ; _} ; _} -> Block_hash.(branch = b))
             packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
     List.map (function
-        | ({ Alpha_context.protocol_data = Operation_data { contents } } ) ->
+        | ({ Alpha_context.protocol_data = Operation_data { contents ; _ } ; _ } ) ->
             match Contents_list contents with
             | Contents_list (Single o) -> Contents o
             | Contents_list (Cons
-                               ((Manager_operation { operation = Reveal _ })
+                               ((Manager_operation { operation = Reveal _ ; _ })
                                , (Single o))) -> Contents o
             | _ -> (* TODO : decent error *) assert false
       ) packed_operations in

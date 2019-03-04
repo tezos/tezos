@@ -64,7 +64,7 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
           | Shell_services.Monitor.Active_test _ -> true
           | _ -> false) l in
     match testchain with
-    | Some (Active_test { protocol ; expiration_date })
+    | Some (Active_test { protocol ; expiration_date ; _ })
       when Protocol_hash.equal Proto_alpha.hash protocol -> begin
         let abort_daemon () =
           cctxt#message "Test chain's expiration date reached \

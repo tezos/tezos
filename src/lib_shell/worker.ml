@@ -401,7 +401,7 @@ module Make
   let trigger_shutdown w =
     Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
-  let canceler { canceler } = canceler
+  let canceler { canceler ; _ } = canceler
 
   let log_event w evt =
     let (module Logger) = w.logger in
@@ -625,19 +625,19 @@ module Make
       (function (t, Message (req, _)) -> t, Request.view req)
       (Lwt_pipe.peek_all message_queue)
 
-  let status { status } = status
+  let status { status ; _ } = status
 
-  let current_request { current_request } = current_request
+  let current_request { current_request ; _ } = current_request
 
   let view w =
     Types.view (state w) w.parameters
 
-  let list { instances } =
+  let list { instances ; _ } =
     Hashtbl.fold
       (fun n w acc -> (n, w) :: acc)
       instances []
 
-  let protect { canceler } ?on_error f =
+  let protect { canceler ; _ } ?on_error f =
     protect ?on_error ~canceler f
 
 end

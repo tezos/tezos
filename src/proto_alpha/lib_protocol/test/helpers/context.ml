@@ -98,7 +98,7 @@ let get_bakers ctxt =
 let get_seed_nonce_hash ctxt =
   let header =
     match ctxt with
-    | B { header } -> header
+    | B { header ; _ } -> header
     | I i -> Incremental.header i in
   match header.protocol_data.contents.seed_nonce_hash with
   | None -> failwith "No committed nonce"

@@ -70,7 +70,7 @@ let multiple_origination_and_delegation () =
   Context.init 2 >>=? fun (blk, contracts) ->
   let c1 = List.nth contracts 0 in
   let n = 10 in
-  Context.get_constants (B blk) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Context.get_constants (B blk) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
   Context.Contract.pkh c1 >>=? fun delegate_pkh ->
 
   let new_accounts = List.map (fun _ -> Account.new_account ()) (1 -- n) in
@@ -104,8 +104,8 @@ let multiple_origination_and_delegation () =
         | Contents_result
             (Manager_operation_result
                { operation_result =
-                   Applied (Origination_result { originated_contracts = [ h ] })
-               }) ->
+                   Applied (Origination_result { originated_contracts = [ h ] ; _ })
+               ; _ }) ->
             h
         | _ -> assert false
       ) tickets in
@@ -160,9 +160,9 @@ let failing_operation_in_the_middle () =
             to_list (Contents_result_list contents) @ acc
       ) [] tickets in
   begin match tickets with
-    | Contents_result (Manager_operation_result { operation_result = (Backtracked _) }) ::
-      Contents_result (Manager_operation_result { operation_result = Failed (_, [ Contract_storage.Balance_too_low _ ]) }) ::
-      Contents_result (Manager_operation_result { operation_result = Skipped _ }) ::
+    | Contents_result (Manager_operation_result { operation_result = (Backtracked _) ; _ }) ::
+      Contents_result (Manager_operation_result { operation_result = Failed (_, [ Contract_storage.Balance_too_low _ ]) ; _ }) ::
+      Contents_result (Manager_operation_result { operation_result = Skipped _ ; _ }) ::
       _ -> ()
     | _ -> assert false
   end ;
@@ -203,9 +203,9 @@ let failing_operation_in_the_middle_with_fees () =
             to_list (Contents_result_list contents) @ acc
       ) [] tickets in
   begin match tickets with
-    | Contents_result (Manager_operation_result { operation_result = (Backtracked _) }) ::
-      Contents_result (Manager_operation_result { operation_result = Failed (_, [ Contract_storage.Balance_too_low _ ]) }) ::
-      Contents_result (Manager_operation_result { operation_result = Skipped _ }) ::
+    | Contents_result (Manager_operation_result { operation_result = (Backtracked _) ; _ }) ::
+      Contents_result (Manager_operation_result { operation_result = Failed (_, [ Contract_storage.Balance_too_low _ ]) ; _ }) ::
+      Contents_result (Manager_operation_result { operation_result = Skipped _ ; _ }) ::
       _ -> ()
     | _ -> assert false
   end ;

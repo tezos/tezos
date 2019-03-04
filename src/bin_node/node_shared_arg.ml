@@ -332,6 +332,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         cors_origins ; cors_headers ;
         log_output ;
         bootstrap_threshold ;
+        config_file = _ ;
       } = args in
   let bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers

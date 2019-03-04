@@ -213,15 +213,15 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
     | List (max_length, e) ->
         let max_length = Option.unopt ~default:max_int max_length in
         read_list Array_too_long max_length e state
-    | (Obj (Req { encoding = e })) -> read_rec e state
-    | (Obj (Dft { encoding = e })) -> read_rec e state
-    | (Obj (Opt { kind = `Dynamic ; encoding = e })) ->
+    | (Obj (Req { encoding = e ; _ })) -> read_rec e state
+    | (Obj (Dft { encoding = e ; _ })) -> read_rec e state
+    | (Obj (Opt { kind = `Dynamic ; encoding = e ; _ })) ->
         let present = Atom.bool state in
         if not present then
           None
         else
           Some (read_rec e state)
-    | (Obj (Opt { kind = `Variable ; encoding = e })) ->
+    | (Obj (Opt { kind = `Variable ; encoding = e ; _ })) ->
         if state.remaining_bytes = 0 then
           None
         else
@@ -251,16 +251,16 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
         (left, right)
     | Tups { kind = `Variable ; left ; right } ->
         read_variable_pair left right state
-    | Conv { inj ; encoding } ->
+    | Conv { inj ; encoding ; _ } ->
         inj (read_rec encoding state)
-    | Union { tag_size ; cases } ->
+    | Union { tag_size ; cases ; _ } ->
         let ctag = Atom.tag tag_size state in
-        let Case { encoding ; inj } =
+        let Case { encoding ; inj ; _ } =
           try
             List.find
               (function
-                | Case { tag = Tag tag } -> tag = ctag
-                | Case { tag = Json_only } -> false)
+                | Case { tag = Tag tag ; _ } -> tag = ctag
+                | Case { tag = Json_only ; _ } -> false)
               cases
           with Not_found -> raise (Unexpected_tag ctag) in
         inj (read_rec encoding state)
@@ -293,9 +293,9 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret
               Some (old_limit - read) in
         state.allowed_bytes <- allowed_bytes ;
         v
-    | Describe { encoding = e } -> read_rec e state
-    | Splitted { encoding = e } -> read_rec e state
-    | Mu { fix } -> read_rec (fix e) state
+    | Describe { encoding = e ; _ } -> read_rec e state
+    | Splitted { encoding = e ; _ } -> read_rec e state
+    | Mu { fix ; _ } -> read_rec (fix e) state
     | Delayed f -> read_rec (f ()) state
 
 

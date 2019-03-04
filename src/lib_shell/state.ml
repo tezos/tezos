@@ -102,12 +102,12 @@ and block = {
 }
 
 
-let read_chain_data { chain_data } f =
+let read_chain_data { chain_data ; _ } f =
   Shared.use chain_data begin fun state ->
     f state.chain_data_store state.data
   end
 
-let update_chain_data { chain_id ; context_index ; chain_data } f =
+let update_chain_data { chain_id ; context_index ; chain_data ; _ } f =
   Shared.use chain_data begin fun state ->
     f state.chain_data_store state.data >>= fun (data, res) ->
     Lwt_utils.may data
@@ -381,7 +381,7 @@ module Chain = struct
   type t = chain_state
   type chain_state = t
 
-  let main { main_chain } = main_chain
+  let main { main_chain ; _ } = main_chain
   let test chain_state =
     read_chain_data chain_state begin fun _ chain_data ->
       Lwt.return chain_data.test_chain
@@ -545,19 +545,19 @@ module Chain = struct
         | exn -> Lwt.fail exn)
 
   let all state =
-    Shared.use state.global_data begin fun { chains } ->
+    Shared.use state.global_data begin fun { chains ; _ } ->
       Lwt.return @@
       Chain_id.Table.fold (fun _ chain acc -> chain :: acc) chains []
     end
 
-  let id { chain_id } = chain_id
-  let genesis { genesis } = genesis
-  let faked_genesis_hash { faked_genesis_hash } = faked_genesis_hash
-  let expiration { expiration } = expiration
-  let allow_forked_chain { allow_forked_chain } = allow_forked_chain
-  let global_state { global_state } = global_state
+  let id { chain_id ; _ } = chain_id
+  let genesis { genesis ; _ } = genesis
+  let faked_genesis_hash { faked_genesis_hash ; _ } = faked_genesis_hash
+  let expiration { expiration ; _ } = expiration
+  let allow_forked_chain { allow_forked_chain ; _ } = allow_forked_chain
+  let global_state { global_state ; _ } = global_state
   let checkpoint chain_state =
-    Shared.use chain_state.chain_data begin fun { checkpoint } ->
+    Shared.use chain_state.chain_data begin fun { checkpoint ; _ } ->
       Lwt.return checkpoint
     end
 
@@ -588,7 +588,7 @@ module Chain = struct
           else
             let outdated_valid_heads =
               List.filter
-                (fun (hash, { Block_header.shell } ) ->
+                (fun (hash, { Block_header.shell ; _ } ) ->
                    shell.level <= level &&
                    not (Block_hash.equal hash head_hash))
                 valid_heads in
@@ -616,7 +616,7 @@ module Chain = struct
         f "destroy %a"
         -% t event "destroy"
         -% a chain_id (id chain)) >>= fun () ->
-    Shared.use state.global_data begin fun { global_store ; chains } ->
+    Shared.use state.global_data begin fun { global_store ; chains ; _ } ->
       Chain_id.Table.remove chains (id chain) ;
       Store.Chain.destroy global_store (id chain)
     end
@@ -651,9 +651,9 @@ module Block = struct
     let compare b1 b2 = Block_hash.compare b1.hash b2.hash
     let equal b1 b2 = Block_hash.equal b1.hash b2.hash
 
-    let hash { hash } = hash
-    let header { header } = header
-    let shell_header { header = { Block_header.shell } } = shell
+    let hash { hash ; _} = hash
+    let header { header ; _ } = header
+    let shell_header { header = { Block_header.shell ; _ } ; _ } = shell
     let timestamp b = (shell_header b).timestamp
     let fitness b = (shell_header b).fitness
     let level b = (shell_header b).level
@@ -695,7 +695,7 @@ module Block = struct
         Lwt.return { header ; hash }
       end
 
-    let of_block ( { hash ; header } : block ) : t = { hash ; header }
+    let of_block ( { hash ; header ; _ } : block ) : t = { hash ; header }
     let to_block chain_state ( { hash ; header } : t ) : block option Lwt.t =
       Shared.use chain_state.block_store begin fun store ->
         Store.Block.Contents.read_opt (store, hash) >>= function
@@ -727,20 +727,20 @@ module Block = struct
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
   let equal b1 b2 = Block_hash.equal b1.hash b2.hash
 
-  let hash { hash } = hash
-  let header { header } = header
-  let metadata { contents = { metadata } } = metadata
-  let chain_state { chain_state } = chain_state
-  let chain_id { chain_state = { chain_id } } = chain_id
-  let shell_header { header = { shell } } = shell
+  let hash { hash ; _} = hash
+  let header { header ; _ } = header
+  let metadata { contents = { metadata ; _ } ; _ } = metadata
+  let chain_state { chain_state ; _ } = chain_state
+  let chain_id { chain_state = { chain_id ; _ } ; _ } = chain_id
+  let shell_header { header = { shell ; _ } ; _ } = shell
   let timestamp b = (shell_header b).timestamp
   let fitness b = (shell_header b).fitness
   let level b = (shell_header b).level
   let validation_passes b = (shell_header b).validation_passes
-  let message { contents = { message } } = message
-  let max_operations_ttl { contents = { max_operations_ttl } } =
+  let message { contents = { message ; _ } ; _ } = message
+  let max_operations_ttl { contents = { max_operations_ttl ; _ } ; _ } =
     max_operations_ttl
-  let last_allowed_fork_level { contents = { last_allowed_fork_level } } =
+  let last_allowed_fork_level { contents = { last_allowed_fork_level ; _ } ; _ } =
     last_allowed_fork_level
 
   let is_genesis b = Block_hash.equal b.hash b.chain_state.genesis.block
@@ -821,7 +821,7 @@ module Block = struct
       Lwt.return { chain_state ; hash ; contents ; header }
     end
 
-  let predecessor { chain_state ; header ; hash } =
+  let predecessor { chain_state ; header ; hash ; _ } =
     if Block_hash.equal hash header.shell.predecessor then
       Lwt.return_none           (* we are at genesis *)
     else
@@ -961,7 +961,7 @@ module Block = struct
   let watcher (state : chain_state) =
     Lwt_watcher.create_stream state.block_watcher
 
-  let operation_hashes { chain_state ; hash ; header } i =
+  let operation_hashes { chain_state ; hash ; header ; _ } i =
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use chain_state.block_store begin fun store ->
@@ -970,14 +970,14 @@ module Block = struct
       Lwt.return (hashes, path)
     end
 
-  let all_operation_hashes { chain_state ; hash ; header } =
+  let all_operation_hashes { chain_state ; hash ; header ; _ } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
         (fun i -> Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
         (0 -- (header.shell.validation_passes - 1))
     end
 
-  let operations { chain_state ; hash ; header } i =
+  let operations { chain_state ; hash ; header ; _ } i =
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use chain_state.block_store begin fun store ->
@@ -986,31 +986,31 @@ module Block = struct
       Lwt.return (ops, path)
     end
 
-  let operations_metadata { chain_state ; hash ; header } i =
+  let operations_metadata { chain_state ; hash ; header ; _ } i =
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations_metadata" ;
     Shared.use chain_state.block_store begin fun store ->
       Store.Block.Operations_metadata.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__
     end
 
-  let all_operations { chain_state ; hash ; header } =
+  let all_operations { chain_state ; hash ; header ; _ } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
         (fun i -> Store.Block.Operations.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
         (0 -- (header.shell.validation_passes - 1))
     end
 
-  let all_operations_metadata { chain_state ; hash ; header } =
+  let all_operations_metadata { chain_state ; hash ; header ; _ } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
         (fun i -> Store.Block.Operations_metadata.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
         (0 -- (header.shell.validation_passes - 1))
     end
 
-  let context { chain_state ; hash } =
+  let context { chain_state ; hash ; _ } =
     Shared.use chain_state.block_store begin fun block_store ->
       Store.Block.Contents.read_opt (block_store, hash)
-    end >|= Option.unopt_assert ~loc:__POS__ >>= fun { context = commit } ->
+    end >|= Option.unopt_assert ~loc:__POS__ >>= fun { context = commit ; _ } ->
     Shared.use chain_state.context_index begin fun context_index ->
       Context.checkout_exn context_index commit
     end
@@ -1100,8 +1100,8 @@ end
 let watcher (state : global_state) =
   Lwt_watcher.create_stream state.block_watcher
 
-let read_block { global_data } ?pred hash =
-  Shared.use global_data begin fun { chains } ->
+let read_block { global_data ; _ } ?pred hash =
+  Shared.use global_data begin fun { chains ; _ } ->
     Chain_id.Table.fold
       (fun _chain_id chain_state acc ->
          acc >>= function
@@ -1320,8 +1320,8 @@ let init
   may_create_chain state chain_id genesis >>= fun main_chain_state ->
   return (state, main_chain_state, context_index)
 
-let close { global_data } =
-  Shared.use global_data begin fun { global_store } ->
+let close { global_data ; _ } =
+  Shared.use global_data begin fun { global_store ; _ } ->
     Store.close global_store ;
     Lwt.return_unit
   end

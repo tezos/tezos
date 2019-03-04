@@ -97,7 +97,7 @@ let max_endorsement () =
 
   Context.get_endorsers (B b) >>=? fun endorsers ->
   Assert.equal_int ~loc:__LOC__
-    (List.length (List.concat (List.map (fun { Alpha_services.Delegate.Endorsing_rights.slots } -> slots) endorsers))) endorsers_per_block >>=? fun () ->
+    (List.length (List.concat (List.map (fun { Alpha_services.Delegate.Endorsing_rights.slots ; _ } -> slots) endorsers))) endorsers_per_block >>=? fun () ->
 
   fold_left_s (fun (delegates, ops, balances) (endorser : Alpha_services.Delegate.Endorsing_rights.t) ->
       let delegate = endorser.delegate in

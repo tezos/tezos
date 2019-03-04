@@ -177,7 +177,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
         (fun op -> View (Validate op))
         operation_encoding
 
-    let pp ppf (View (Validate { hash })) =
+    let pp ppf (View (Validate { hash ; _ })) =
       Format.fprintf ppf "Validating new operation %a" Operation_hash.pp hash
   end
 
@@ -418,7 +418,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     let { Block_header.shell =
             { fitness = predecessor_fitness ;
               timestamp = predecessor_timestamp ;
-              level = predecessor_level } } =
+              level = predecessor_level ; _ } ; _ } =
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
     let predecessor_hash = State.Block.hash predecessor in
@@ -516,11 +516,11 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     match request with
     | Request.Validate parsed_op -> on_validate w parsed_op >>= return
 
-  let on_launch (_ : t) (_ : Name.t) ( { chain_db ; validation_state } as parameters ) =
+  let on_launch (_ : t) (_ : Name.t) ( { chain_db ; validation_state ; _ } as parameters ) =
     let chain_state = Distributed_db.chain_state chain_db in
     Chain.data chain_state >>= fun {
       current_mempool = _mempool ;
-      live_blocks ; live_operations } ->
+      live_blocks ; live_operations ; _ } ->
     (* remove all operations that are already included *)
     Operation_hash.Set.iter (fun hash ->
         ParsedCache.rem parsed_cache hash
@@ -566,7 +566,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       let on_no_request _ = return_unit
       let on_request = on_request
     end in
-    Chain.data chain_state >>= fun { current_head = predecessor } ->
+    Chain.data chain_state >>= fun { current_head = predecessor ; _ } ->
     let timestamp = Time.now () in
     create ~predecessor ~timestamp () >>=? fun validation_state ->
     Worker.launch

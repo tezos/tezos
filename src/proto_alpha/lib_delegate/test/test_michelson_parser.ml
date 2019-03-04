@@ -37,7 +37,7 @@ let prn expr =
   Format.asprintf "%a" Micheline_printer.print_expr
 
 let assert_expands original expanded =
-  let { Michelson_v1_parser.expanded = expansion }, errors =
+  let { Michelson_v1_parser.expanded = expansion ; _ }, errors =
     let source = prn (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original in
   let expanded = Micheline.strip_locations expanded in
@@ -172,13 +172,13 @@ let test_expansion () =
                      Prim (zero_loc, "PAIR", [], [])]))
 
 let assert_unexpansion_consistent original =
-  let { Michelson_v1_parser.expanded }, errors =
+  let { Michelson_v1_parser.expanded ; _ }, errors =
     let source = prn (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original in
   match errors with
   | _ :: _ -> Error errors
   | [] ->
-      let { Michelson_v1_parser.unexpanded } =
+      let { Michelson_v1_parser.unexpanded ; _ } =
         Michelson_v1_printer.unparse_expression expanded in
       Assert.equal ~prn unexpanded (Micheline.strip_locations original) ;
       ok ()

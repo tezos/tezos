@@ -151,9 +151,9 @@ let cancel_istep
   : ('i, 'o) istep -> unit
   = function
     | ISync _ -> ()
-    | IAsync_s { vout = { contents = None } } -> ()
-    | IAsync_s { vout = { contents = Some p } } -> Lwt.cancel p
-    | IAsync_p { qout } -> Queue.iter Lwt.cancel qout
+    | IAsync_s { vout = { contents = None } ; _ } -> ()
+    | IAsync_s { vout = { contents = Some p } ; _ } -> Lwt.cancel p
+    | IAsync_p { qout ; _ } -> Queue.iter Lwt.cancel qout
 
 let rec cancel_ipipe
   : type i o . (i, o) ipipe -> unit
@@ -259,10 +259,10 @@ let rec get_result
   = function
     | ICons { step = ISync _ ; pipe } ->
         get_result pipe
-    | ICons { step = IAsync_s { vout } ; pipe } ->
+    | ICons { step = IAsync_s { vout ; _ } ; pipe } ->
         assert (!vout = None) ;
         get_result pipe
-    | ICons { step = IAsync_p { qout } ; pipe } ->
+    | ICons { step = IAsync_p { qout ; _ } ; pipe } ->
         assert (Queue.is_empty qout) ;
         get_result pipe
     | IEnd { q } ->

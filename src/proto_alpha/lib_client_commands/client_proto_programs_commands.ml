@@ -73,8 +73,8 @@ let commands () =
     | None ->
         Alpha_services.Constants.all cctxt
           (cctxt#chain, block) >>=? fun { parametric = {
-            hard_gas_limit_per_operation
-          } } ->
+            hard_gas_limit_per_operation ; _
+          } ; _ } ->
         return hard_gas_limit_per_operation
     | Some gas -> return gas in
   let data_parameter =

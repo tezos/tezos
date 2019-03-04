@@ -204,31 +204,31 @@ and classify_desc : type a. a desc -> Kind.t = fun e ->
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
-  | Padded ({ encoding }, n) -> begin
+  | Padded ({ encoding ; _ }, n) -> begin
       match classify_desc encoding with
       | `Fixed m -> `Fixed (n+m)
       | _ -> assert false (* by construction (see [Fixed.padded]) *)
     end
   | String_enum (_, cases) ->
       `Fixed Binary_size.(integer_to_size @@ enum_size cases)
-  | Obj (Opt { kind }) -> (kind :> Kind.t)
-  | Objs { kind } -> kind
-  | Tups { kind } -> kind
-  | Union { kind } -> (kind :> Kind.t)
-  | Mu { kind } -> (kind :> Kind.t)
+  | Obj (Opt { kind ; _ }) -> (kind :> Kind.t)
+  | Objs { kind ; _ } -> kind
+  | Tups { kind ; _ } -> kind
+  | Union { kind ; _ } -> (kind :> Kind.t)
+  | Mu { kind ; _ } -> (kind :> Kind.t)
   (* Variable *)
   | Ignore -> `Fixed 0
   | Array _ -> `Variable
   | List _ -> `Variable
   (* Recursive *)
-  | Obj (Req { encoding }) -> classify encoding
-  | Obj (Dft { encoding }) -> classify encoding
+  | Obj (Req { encoding ; _ }) -> classify encoding
+  | Obj (Dft { encoding ; _ }) -> classify encoding
   | Tup encoding -> classify encoding
-  | Conv { encoding } -> classify encoding
-  | Describe { encoding } -> classify encoding
-  | Splitted { encoding } -> classify encoding
+  | Conv { encoding ; _ } -> classify encoding
+  | Describe { encoding ; _ } -> classify encoding
+  | Splitted { encoding ; _ } -> classify encoding
   | Dynamic_size _ -> `Dynamic
-  | Check_size { encoding } -> classify encoding
+  | Check_size { encoding ; _ } -> classify encoding
   | Delayed f -> classify (f ())
 
 let make ?json_encoding encoding = { encoding ; json_encoding }
@@ -283,21 +283,21 @@ let rec is_zeroable: type t. t encoding -> bool = fun e ->
   | Array _ -> true (* 0-element array *)
   | List _ -> true (* 0-element list *)
   (* represented as whatever is inside: truth mostly propagates *)
-  | Obj (Req { encoding = e }) -> is_zeroable e (* represented as-is *)
-  | Obj (Opt { kind = `Variable }) -> true (* optional field ommited *)
-  | Obj (Dft { encoding = e }) -> is_zeroable e (* represented as-is *)
+  | Obj (Req { encoding = e ; _ }) -> is_zeroable e (* represented as-is *)
+  | Obj (Opt { kind = `Variable ; _ }) -> true (* optional field ommited *)
+  | Obj (Dft { encoding = e ; _ }) -> is_zeroable e (* represented as-is *)
   | Obj _ -> false
-  | Objs { left ; right } -> is_zeroable left && is_zeroable right
+  | Objs { left ; right ; _ } -> is_zeroable left && is_zeroable right
   | Tup e -> is_zeroable e
-  | Tups { left ; right } -> is_zeroable left && is_zeroable right
+  | Tups { left ; right ; _ } -> is_zeroable left && is_zeroable right
   | Union _ -> false (* includes a tag *)
   (* other recursive cases: truth propagates *)
-  | Mu { kind = `Dynamic } -> false (* size prefix *)
-  | Mu { kind = `Variable ; fix } -> is_zeroable (fix e)
-  | Conv { encoding } -> is_zeroable encoding
-  | Describe { encoding } -> is_zeroable encoding
-  | Splitted { encoding } -> is_zeroable encoding
-  | Check_size { encoding } -> is_zeroable encoding
+  | Mu { kind = `Dynamic ; _ } -> false (* size prefix *)
+  | Mu { kind = `Variable ; fix ; _ } -> is_zeroable (fix e)
+  | Conv { encoding ; _ } -> is_zeroable encoding
+  | Describe { encoding ; _ } -> is_zeroable encoding
+  | Splitted { encoding ; _ } -> is_zeroable encoding
+  | Check_size { encoding ; _ } -> is_zeroable encoding
   (* Unscrutable: true by default *)
   | Delayed f -> is_zeroable (f ())
   (* Protected against zeroable *)
@@ -417,30 +417,30 @@ let rec is_obj : type a. a t -> bool = fun e ->
   match e.encoding with
   | Obj _ -> true
   | Objs _ (* by construction *) -> true
-  | Conv { encoding = e } -> is_obj e
-  | Dynamic_size { encoding = e } -> is_obj e
-  | Union { cases } ->
-      List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
+  | Conv { encoding = e ; _ } -> is_obj e
+  | Dynamic_size { encoding = e ; _ } -> is_obj e
+  | Union { cases ; _ } ->
+      List.for_all (fun (Case { encoding = e ; _ }) -> is_obj e) cases
   | Empty -> true
   | Ignore -> true
-  | Mu { fix } -> is_obj (fix e)
-  | Splitted { is_obj } -> is_obj
+  | Mu { fix ; _ } -> is_obj (fix e)
+  | Splitted { is_obj ; _ } -> is_obj
   | Delayed f -> is_obj (f ())
-  | Describe { encoding } -> is_obj encoding
+  | Describe { encoding ; _ } -> is_obj encoding
   | _ -> false
 
 let rec is_tup : type a. a t -> bool = fun e ->
   match e.encoding with
   | Tup _ -> true
   | Tups _ (* by construction *) -> true
-  | Conv { encoding = e } -> is_tup e
-  | Dynamic_size { encoding = e } -> is_tup e
-  | Union { cases } ->
-      List.for_all (function Case { encoding = e} -> is_tup e) cases
-  | Mu { fix } -> is_tup (fix e)
-  | Splitted { is_tup } -> is_tup
+  | Conv { encoding = e ; _ } -> is_tup e
+  | Dynamic_size { encoding = e ; _ } -> is_tup e
+  | Union { cases ; _ } ->
+      List.for_all (function Case { encoding = e; _ } -> is_tup e) cases
+  | Mu { fix ; _ } -> is_tup (fix e)
+  | Splitted { is_tup ; _ } -> is_tup
   | Delayed f -> is_tup (f ())
-  | Describe { encoding } -> is_tup encoding
+  | Describe { encoding ; _ } -> is_tup encoding
   | _ -> false
 
 let raw_merge_objs left right =
@@ -578,7 +578,7 @@ let check_cases tag_size cases =
     | `Uint16 -> 256 * 256 in
   ignore @@
   List.fold_left
-    (fun others (Case { tag }) ->
+    (fun others (Case { tag ; _ }) ->
        match tag with
        | Json_only -> others
        | Tag tag ->
@@ -595,7 +595,7 @@ let check_cases tag_size cases =
 let union ?(tag_size = `Uint8) cases =
   check_cases tag_size cases ;
   let kinds =
-    List.map (fun (Case { encoding }) -> classify encoding) cases in
+    List.map (fun (Case { encoding ; _ }) -> classify encoding) cases in
   let kind = Kind.merge_list tag_size kinds in
   make @@ Union { kind ; tag_size ; cases }
 let case ~title ?description tag encoding proj inj =
@@ -630,14 +630,14 @@ let rec is_nullable: type t. t encoding -> bool = fun e ->
   | Objs _ -> false
   | Tup _ -> false
   | Tups _ -> false
-  | Union { cases } ->
-      List.exists (fun (Case { encoding = e }) -> is_nullable e) cases
-  | Mu { fix } -> is_nullable (fix e)
-  | Conv { encoding = e } -> is_nullable e
-  | Describe { encoding = e } -> is_nullable e
-  | Splitted { json_encoding } -> Json_encoding.is_nullable json_encoding
-  | Dynamic_size { encoding = e } -> is_nullable e
-  | Check_size { encoding = e } -> is_nullable e
+  | Union { cases ; _ } ->
+      List.exists (fun (Case { encoding = e ; _ }) -> is_nullable e) cases
+  | Mu { fix ; _ } -> is_nullable (fix e)
+  | Conv { encoding = e ; _ } -> is_nullable e
+  | Describe { encoding = e ; _ } -> is_nullable e
+  | Splitted { json_encoding ; _ } -> Json_encoding.is_nullable json_encoding
+  | Dynamic_size { encoding = e ; _ } -> is_nullable e
+  | Check_size { encoding = e ; _ } -> is_nullable e
   | Delayed _ -> true
 
 let option ty =

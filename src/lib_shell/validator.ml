@@ -88,15 +88,15 @@ let activate v ?max_child_ttl
         v.db chain_state
         v.chain_validator_limits
 
-let get_exn { active_chains } chain_id =
+let get_exn { active_chains ; _ } chain_id =
   Chain_id.Table.find active_chains chain_id
 
-let get { active_chains } chain_id =
+let get { active_chains ; _ } chain_id =
   match Chain_id.Table.find_opt active_chains chain_id with
   |Some nv -> Ok nv
   |None -> error (Validation_errors.Inactive_chain chain_id)
 
-let get_active_chains { active_chains } =
+let get_active_chains { active_chains ; _ } =
   let l = Chain_id.Table.fold (fun c _ acc -> c :: acc) active_chains [] in
   List.rev l
 
@@ -133,7 +133,7 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
         Chain_validator.validate_block nv ~force hash block operations in
       return (hash, validation)
 
-let shutdown { active_chains ; block_validator } =
+let shutdown { active_chains ; block_validator ; _ } =
   let jobs =
     Block_validator.shutdown block_validator ::
     Chain_id.Table.fold
@@ -142,10 +142,10 @@ let shutdown { active_chains ; block_validator } =
   Lwt.join jobs >>= fun () ->
   Lwt.return_unit
 
-let watcher { valid_block_input } =
+let watcher { valid_block_input ; _ } =
   Lwt_watcher.create_stream valid_block_input
 
-let chains_watcher { chains_input } =
+let chains_watcher { chains_input ; _ } =
   Lwt_watcher.create_stream chains_input
 
 let inject_operation v ?chain_id op =
@@ -175,4 +175,4 @@ let inject_operation v ?chain_id op =
   | Some pv -> Prevalidator.inject_operation pv op
   | None -> failwith "Prevalidator is not running, cannot inject the operation."
 
-let distributed_db { db } = db
+let distributed_db { db ; _ } = db

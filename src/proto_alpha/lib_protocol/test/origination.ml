@@ -45,7 +45,7 @@ let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegata
   (* fee + credit + block security deposit were debited from source *)
   Context.get_constants (B b) >>=? fun {parametric = { origination_size ;
                                                        cost_per_byte ;
-                                                       block_security_deposit }} ->
+                                                       block_security_deposit ; _ }; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?
@@ -83,8 +83,8 @@ let test_origination_balances ~loc ?(fee=Tez.zero) ?(credit=Tez.zero)
         { origination_size ;
           cost_per_byte ;
           block_security_deposit
-        }
-    } ->
+        ; _ }
+    ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?

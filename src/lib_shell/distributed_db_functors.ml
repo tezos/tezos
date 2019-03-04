@@ -261,7 +261,7 @@ end = struct
             Scheduler.notify_unrequested s.scheduler p k ;
             Lwt.return_unit
       end
-    | Some (Pending { wakener = w ; param }) -> begin
+    | Some (Pending { wakener = w ; param ; _ }) -> begin
         match Precheck.precheck k param v with
         | None ->
             Scheduler.notify_invalid s.scheduler p k ;
@@ -425,7 +425,7 @@ end = struct
   let compute_timeout state =
     let next =
       Table.fold
-        (fun _ { next_request } acc ->
+        (fun _ { next_request ; _ } acc ->
            match acc with
            | None -> Some next_request
            | Some x -> Some (min x next_request))

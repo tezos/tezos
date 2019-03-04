@@ -36,7 +36,7 @@ let print expr: string =
 let assert_expands
     (original:(Micheline_parser.location, string) Micheline.node)
     (expanded:(Micheline_parser.location, string) Micheline.node) =
-  let { Michelson_v1_parser.expanded = expansion}, errors =
+  let { Michelson_v1_parser.expanded = expansion; _ }, errors =
     let source = print (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
@@ -456,7 +456,7 @@ let test_map_cdadr () =
 (* unpexpanded : original expression with macros *)
 
 let assert_unexpansion original ex =
-  let { Michelson_v1_parser.expanded }, errors =
+  let { Michelson_v1_parser.expanded ; _ }, errors =
     let source = print (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
@@ -472,13 +472,13 @@ let assert_unexpansion original ex =
   | _ :: _ -> Error errors
 
 let assert_unexpansion_consistent original =
-  let { Michelson_v1_parser.expanded }, errors =
+  let { Michelson_v1_parser.expanded ; _ }, errors =
     let source = print (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original in
   match errors with
   | _ :: _ -> Error errors
   | [] ->
-      let { Michelson_v1_parser.unexpanded } =
+      let { Michelson_v1_parser.unexpanded ; _ } =
         Michelson_v1_printer.unparse_expression expanded in
       Assert.equal ~print unexpanded (Micheline.strip_locations original) ;
       ok ()

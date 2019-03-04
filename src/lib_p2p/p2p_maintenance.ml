@@ -241,7 +241,7 @@ let activate st =
       ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
   Option.iter st.discovery ~f:P2p_discovery.activate
 
-let maintain { just_maintained ; please_maintain } =
+let maintain { just_maintained ; please_maintain ; _ } =
   let wait = Lwt_condition.wait just_maintained in
   Lwt_condition.broadcast please_maintain () ;
   wait
@@ -251,6 +251,7 @@ let shutdown {
     discovery ;
     maintain_worker ;
     just_maintained ;
+    _ ;
   } =
   Lwt_canceler.cancel canceler >>= fun () ->
   Lwt_utils.may ~f:P2p_discovery.shutdown discovery >>= fun () ->

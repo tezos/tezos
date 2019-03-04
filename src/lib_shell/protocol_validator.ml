@@ -112,11 +112,11 @@ let create db =
       ~cancel:(fun () -> Lwt_canceler.cancel bv.canceler) ;
   bv
 
-let shutdown { canceler ; worker } =
+let shutdown { canceler ; worker ; _ } =
   Lwt_canceler.cancel canceler >>= fun () ->
   worker
 
-let validate { messages } hash protocol =
+let validate { messages ; _ } hash protocol =
   match Registered_protocol.get hash with
   | Some protocol ->
       lwt_debug Tag.DSL.(fun f ->
@@ -162,8 +162,8 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
   and test_protocol =
     Context.get_test_chain context >>= function
     | Not_running -> return_unit
-    | Forking { protocol }
-    | Running { protocol } ->
+    | Forking { protocol ; _ }
+    | Running { protocol ; _ } ->
         fetch_and_compile_protocol pv ?peer ?timeout protocol  >>=? fun _ ->
         return_unit in
   protocol >>=? fun () ->

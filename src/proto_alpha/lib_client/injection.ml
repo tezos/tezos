@@ -247,12 +247,12 @@ let simulate (type t)
 let estimated_gas_single
     (type kind)
     (Manager_operation_result { operation_result ;
-                                internal_operation_results }
+                                internal_operation_results ; _ }
      : kind Kind.manager contents_result) =
   let consumed_gas (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied (Transaction_result { consumed_gas }) -> Ok consumed_gas
-    | Applied (Origination_result { consumed_gas }) -> Ok consumed_gas
+    | Applied (Transaction_result { consumed_gas ; _ }) -> Ok consumed_gas
+    | Applied (Origination_result { consumed_gas ; _ }) -> Ok consumed_gas
     | Applied (Reveal_result { consumed_gas }) -> Ok consumed_gas
     | Applied (Delegation_result { consumed_gas }) -> Ok consumed_gas
     | Skipped _ -> assert false
@@ -270,16 +270,17 @@ let estimated_storage_single
     (type kind)
     origination_size
     (Manager_operation_result { operation_result ;
-                                internal_operation_results }
+                                internal_operation_results ;
+                                _ }
      : kind Kind.manager contents_result) =
   let storage_size_diff (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied (Transaction_result { paid_storage_size_diff ; allocated_destination_contract }) ->
+    | Applied (Transaction_result { paid_storage_size_diff ; allocated_destination_contract ; _ }) ->
         if allocated_destination_contract then
           Ok (Z.add paid_storage_size_diff origination_size)
         else
           Ok paid_storage_size_diff
-    | Applied (Origination_result { paid_storage_size_diff }) ->
+    | Applied (Origination_result { paid_storage_size_diff ; _ }) ->
         Ok (Z.add paid_storage_size_diff origination_size)
     | Applied (Reveal_result _)-> Ok Z.zero
     | Applied (Delegation_result _) -> Ok Z.zero
@@ -310,12 +311,13 @@ let estimated_storage origination_size res =
 let originated_contracts_single
     (type kind)
     (Manager_operation_result { operation_result ;
-                                internal_operation_results }
+                                internal_operation_results ;
+                                _ }
      : kind Kind.manager contents_result) =
   let originated_contracts (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied (Transaction_result { originated_contracts }) -> Ok originated_contracts
-    | Applied (Origination_result { originated_contracts }) -> Ok originated_contracts
+    | Applied (Transaction_result { originated_contracts ; _ }) -> Ok originated_contracts
+    | Applied (Origination_result { originated_contracts ; _ }) -> Ok originated_contracts
     | Applied (Reveal_result _) -> Ok []
     | Applied (Delegation_result _) -> Ok []
     | Skipped _ -> assert false
@@ -348,7 +350,7 @@ let detect_script_failure :
     let detect_script_failure_single
         (type kind)
         (Manager_operation_result { operation_result ;
-                                    internal_operation_results }
+                                    internal_operation_results ; _ }
          : kind Kind.manager contents_result) =
       let detect_script_failure (type kind) (result : kind manager_operation_result) =
         match result with
@@ -386,12 +388,15 @@ let may_patch_limits
     ~chain ~block ?branch ?(compute_fee = false)
     (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt
-    (chain, block) >>=? fun { parametric = {
+    (chain, block) >>=? fun {
+    parametric = {
       hard_gas_limit_per_operation = gas_limit ;
       hard_storage_limit_per_operation = storage_limit ;
       origination_size ;
       cost_per_byte ;
-    } } ->
+      _ ;
+    } ;
+    _ ; } ->
   let may_need_patching_single
     : type kind. kind contents -> kind contents option = function
     | Manager_operation c

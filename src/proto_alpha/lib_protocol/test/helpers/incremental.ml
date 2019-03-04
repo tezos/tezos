@@ -107,7 +107,7 @@ let detect_script_failure :
     let detect_script_failure_single
         (type kind)
         (Manager_operation_result { operation_result ;
-                                    internal_operation_results }
+                                    internal_operation_results ; _ }
          : kind Kind.manager Apply_results.contents_result) =
       let detect_script_failure (type kind) (result : kind manager_operation_result) =
         match result with

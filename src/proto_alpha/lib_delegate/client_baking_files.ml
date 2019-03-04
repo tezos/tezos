@@ -47,5 +47,5 @@ let resolve_location (cctxt : #Client_context.full) ~chain (kind : 'a) : 'a loca
           test_filename chain_id
   end >>=? fun filename -> return { filename ; chain }
 
-let filename { filename } = filename
-let chain { chain } = chain
+let filename { filename ; _ } = filename
+let chain { chain ; _ } = chain

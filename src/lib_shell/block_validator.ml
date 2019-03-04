@@ -68,7 +68,7 @@ module Request = struct
       } -> State.Block.t option tzresult t
   let view
     : type a. a t -> view
-    = fun (Request_validation { chain_db ; peer ; hash }) ->
+    = fun (Request_validation { chain_db ; peer ; hash ; _ }) ->
       let chain_id = chain_db |> Distributed_db.chain_state |> State.Chain.id in
       { chain_id ; block = hash ; peer = peer }
 end
@@ -109,7 +109,7 @@ let on_request
         return (Ok None)
     | None ->
         State.Block.read_invalid chain_state hash >>= function
-        | Some { errors } ->
+        | Some { errors ; _ } ->
             return (Error errors)
         | None ->
             begin
