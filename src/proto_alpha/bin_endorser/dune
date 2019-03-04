@@ -4,9 +4,7 @@
  (libraries tezos-client-base-unix
             tezos-client-commands
             tezos-baking-alpha-commands)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
                    -open Tezos_baking_alpha_commands

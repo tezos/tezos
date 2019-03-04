@@ -42,6 +42,8 @@ end
 
 module Scheduler(IO : IO) = struct
 
+  [@@@ocaml.warning "-30"]
+
   type t = {
     canceler: Lwt_canceler.t ;
     mutable worker: unit Lwt.t ;

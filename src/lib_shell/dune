@@ -8,9 +8,7 @@
             tezos-shell-services
             tezos-protocol-updater
 	    tezos-validation)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
                    -open Tezos_rpc_http
                    -open Tezos_p2p

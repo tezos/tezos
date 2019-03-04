@@ -10,9 +10,7 @@
             tezos-protocol-compiler.native
             tezos-storage
             dynlink)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_micheline
                    -open Tezos_shell_services

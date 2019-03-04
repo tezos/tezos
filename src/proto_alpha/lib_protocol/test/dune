@@ -8,9 +8,11 @@
             michelson_parser
             tezos-stdlib-unix
             bip39
-            )
- (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_base__TzPervasives
+            zarith
+            lwt
+            alcotest
+            bigstring)
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_alpha_test_helpers
                    )))

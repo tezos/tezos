@@ -12,9 +12,7 @@
  (public_name tezos-protocol-compiler.registerer)
  (libraries tezos-base
             tezos-protocol-environment-sigs)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -opaque
+ (flags (:standard -opaque
                    -open Tezos_base__TzPervasives))
  (modules Registerer))
 
@@ -29,9 +27,7 @@
             ocplib-endian
             ocplib-ocamlres
             unix)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix))
  (modules Embedded_cmis Packer Compiler))
 
@@ -41,9 +37,7 @@
  (libraries tezos-base
             tezos-protocol-compiler
             compiler-libs.bytecomp)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_compiler))
  (modules Byte))
 
@@ -53,9 +47,7 @@
  (libraries tezos-base
             tezos-protocol-compiler
             compiler-libs.optcomp)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_compiler))
  (modules Native))
 
@@ -81,9 +73,7 @@
  (libraries tezos-base
             tezos-protocol-compiler
             tezos-stdlib-unix)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_protocol_compiler))
  (modules Main_packer))

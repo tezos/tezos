@@ -6,9 +6,7 @@
             ocplib-json-typed-bson
             zarith
             ezjsonm)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_stdlib)))
+ (flags (:standard -open Tezos_stdlib)))
 
 (alias
  (name runtest_indent)

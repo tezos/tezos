@@ -11,9 +11,7 @@
             tezos-shell-services
             tezos-p2p
             alcotest-lwt)
- (flags (:standard -w -9-32
-                   -linkall
-                   -safe-string
+ (flags (:standard -linkall
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services

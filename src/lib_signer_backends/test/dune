@@ -2,9 +2,7 @@
  (names test_encrypted test_crouching)
  (libraries tezos-signer-backends
             alcotest-lwt)
- (flags (:standard -w -9-32
-                   -safe-string
-                   -open Tezos_error_monad
+ (flags (:standard -open Tezos_error_monad
                    -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_client_base

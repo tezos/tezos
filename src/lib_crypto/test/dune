@@ -9,9 +9,7 @@
             tezos-crypto
             tezos-data-encoding
             alcotest)
- (flags (:standard -w -9-32
-                   -safe-string
-                   -open Tezos_stdlib
+ (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_data_encoding)))
 

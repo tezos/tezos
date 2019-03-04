@@ -902,6 +902,8 @@ let exec
   parse_args ~command options_spec args_dict ctx >>=? fun parsed_options ->
   exec 1 ctx spec (handler (converter parsed_options)) params
 
+[@@@ocaml.warning "-30"]
+
 (* Command dispatch tree *)
 type 'arg level =
   { stop : ('arg) command option ;

@@ -1,3 +1,4 @@
+;; -*- mode: dune; -*-
 
 (include dune.inc)
 

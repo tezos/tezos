@@ -8,9 +8,7 @@
             tezos-rpc-http
             tezos-signer-backends
             tezos-shell-services)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http
                    -open Tezos_shell_services
                    -open Tezos_stdlib_unix

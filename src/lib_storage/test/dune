@@ -4,9 +4,7 @@
             tezos-storage
             tezos-stdlib-unix
             alcotest-lwt)
- (flags (:standard -w -9-32
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
                    -open Tezos_stdlib_unix)))
 

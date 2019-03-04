@@ -7,8 +7,7 @@
             tezos_data_encoding
             alcotest
             crowbar)
- (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_stdlib
+ (flags (:standard -open Tezos_stdlib
                    -open Tezos_data_encoding)))
 
 (alias

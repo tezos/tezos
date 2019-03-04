@@ -2,8 +2,7 @@
  (names test_parser)
  (libraries tezos-micheline
             alcotest-lwt)
- (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_micheline)))
+ (flags (:standard -open Tezos_micheline)))
 
 (alias
   (name buildtest)

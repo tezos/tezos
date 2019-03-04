@@ -38,7 +38,7 @@
  (libraries tezos-protocol-environment-sigs)
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
         -warn-error "-a+8"
-        -safe-string -nopervasives)
+        -nopervasives)
  (modules Functor))
 
 (library
@@ -53,7 +53,7 @@
  (public_name tezos-embedded-protocol-alpha.raw)
  (libraries tezos_embedded_protocol_environment_alpha)
  (library_flags (:standard -linkall))
- (flags (:standard -nopervasives -nostdlib -safe-string
+ (flags (:standard -nopervasives -nostdlib
                    -w +a-4-6-7-9-29-32-40..42-44-45-48
                    -warn-error -a+8
                    -open Tezos_embedded_protocol_environment_alpha__Environment

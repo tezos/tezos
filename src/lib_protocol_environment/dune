@@ -4,9 +4,7 @@
  (libraries tezos-base
             tezos-protocol-environment-sigs
             tezos-micheline)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline))
  (wrapped false)
  (modules Tezos_protocol_environment
@@ -19,8 +17,6 @@
  (libraries tezos-base
             tezos-protocol-environment
             tezos-storage)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string))
  (modules Tezos_protocol_environment_shell))
 
 (alias

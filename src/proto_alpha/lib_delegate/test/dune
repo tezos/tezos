@@ -12,8 +12,7 @@
             tezos-client-base-unix
             tezos-signer-backends
             alcotest-lwt)
- (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http
                    -open Tezos_shell_services
                    -open Tezos_client_base
