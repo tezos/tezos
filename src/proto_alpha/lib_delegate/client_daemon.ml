@@ -23,11 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let rec retry (cctxt: #Proto_alpha.full) ~delay ~tries f x =
+  f x >>= function
+  | Ok _ as r -> Lwt.return r
+  | Error (RPC_client.Request_failed
+             { error = Connection_failed _ ; _ } :: _) as err
+    when tries > 0 -> begin
+      cctxt#message
+        "Connection refused, retrying in %.2f seconds..."
+        delay >>= fun () ->
+      Lwt.pick
+        [ (Lwt_unix.sleep delay >|= fun () -> `Continue) ;
+          (Lwt_exit.termination_thread >|= fun _ -> `Killed) ;
+        ] >>= function
+      | `Killed ->
+          Lwt.return err
+      | `Continue ->
+          retry cctxt ~delay:(delay *. 1.5) ~tries:(tries - 1) f x
+    end
+  | Error _ as err ->
+      Lwt.return err
+
 let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the node to be synchronized with its \
                  peers..." >>= fun () ->
-  Shell_services.Monitor.bootstrapped cctxt >>=? fun _ ->
+  retry cctxt ~tries:5 ~delay:1.
+    Shell_services.Monitor.bootstrapped cctxt >>=? fun _ ->
   cctxt#message "Node synchronized." >>= fun () ->
   return_unit
 
