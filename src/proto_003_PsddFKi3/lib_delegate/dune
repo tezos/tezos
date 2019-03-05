@@ -10,6 +10,7 @@
             tezos-client-003-PsddFKi3
             tezos-client-commands
             tezos-storage
+            tezos-rpc-http
             tezos-rpc)
  (library_flags (:standard -linkall))
  (modules (:standard \
@@ -23,7 +24,8 @@
                    -open Tezos_client_003_PsddFKi3
                    -open Tezos_client_commands
                    -open Tezos_storage
-                   -open Tezos_rpc)))
+                   -open Tezos_rpc
+                   -open Tezos_rpc_http)))
 
 (library
  (name tezos_baking_003_PsddFKi3_commands)
