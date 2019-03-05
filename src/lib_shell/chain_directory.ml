@@ -37,6 +37,11 @@ let get_chain_id state = function
   | `Hash chain_id ->
       Lwt.return chain_id
 
+let get_chain_id_opt state chain =
+  Lwt.catch
+    (fun () -> get_chain_id state chain >>= Lwt.return_some)
+    (fun _exn -> Lwt.return_none)
+
 let get_chain state chain =
   get_chain_id state chain >>= fun chain_id ->
   State.Chain.get_exn state chain_id
