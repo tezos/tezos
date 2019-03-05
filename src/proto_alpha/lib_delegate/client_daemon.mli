@@ -50,7 +50,7 @@ end
 module Accuser : sig
   val run:
     #Proto_alpha.full ->
-    chains: Chain_services.chain list ->
+    chain: Chain_services.chain ->
     preserved_levels: int ->
     unit tzresult Lwt.t
 end

@@ -155,11 +155,15 @@ end
 
 module Accuser = struct
 
-  let run (cctxt : #Proto_alpha.full) ~chains ~preserved_levels =
+  let run (cctxt : #Proto_alpha.full) ~chain ~preserved_levels =
     await_bootstrapped_node cctxt >>=? fun _ ->
+    begin if chain = `Test then
+        monitor_fork_testchain cctxt ~cleanup_nonces:true
+      else
+        return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_valid_blocks
       ~next_protocols:(Some [Proto_alpha.hash])
-      cctxt ~chains () >>=? fun valid_blocks_stream ->
+      cctxt ~chains:[ chain ] () >>=? fun valid_blocks_stream ->
     cctxt#message "Accuser started." >>= fun () ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
     return_unit

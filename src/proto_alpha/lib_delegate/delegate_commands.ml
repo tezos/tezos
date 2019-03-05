@@ -238,5 +238,5 @@ let accuser_commands () =
       (fun (pidfile, preserved_levels) cctxt ->
          init_signal () ;
          may_lock_pidfile pidfile >>=? fun () ->
-         Client_daemon.Accuser.run ~chains:[ cctxt#chain ] ~preserved_levels cctxt) ;
+         Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt) ;
   ]

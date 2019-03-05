@@ -151,3 +151,12 @@ launch_accuser() {
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
 	 run "$@"
 }
+
+launch_accuser_test() {
+    configure_client
+    wait_for_the_node_to_be_bootstraped
+    exec "$accuser" --chain test \
+	 --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run "$@"
+}
