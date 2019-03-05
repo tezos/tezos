@@ -114,7 +114,7 @@ launch_baker() {
     wait_for_the_node_to_be_bootstraped
     exec "$baker" --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 run with local node "$node_data_dir"
+	 run with local node "$node_data_dir" "$@"
 }
 
 launch_endorser() {
@@ -122,7 +122,7 @@ launch_endorser() {
     wait_for_the_node_to_be_bootstraped
     exec "$endorser" --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 run --endorsement-delay 10
+	 run "$@"
 }
 
 launch_accuser() {
@@ -130,5 +130,5 @@ launch_accuser() {
     wait_for_the_node_to_be_bootstraped
     exec "$accuser" --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 run
+	 run "$@"
 }
