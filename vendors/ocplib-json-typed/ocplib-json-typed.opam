@@ -13,6 +13,6 @@ build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
   "ocaml" {>= "4.3.0"}
-  "dune" {build & >= "1.0.1"}
+  "dune" {build & >= "1.7"}
   "uri" {>= "1.9.0" }
 ]
