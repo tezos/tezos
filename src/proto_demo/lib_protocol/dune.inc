@@ -26,7 +26,7 @@
 
 (rule
  (targets functor.ml)
- (deps error.ml services.ml main.mli main.ml
+ (deps error.ml services.mli services.ml main.mli main.ml
        (:src_dir TEZOS_PROTOCOL))
  (action (with-stdout-to %{targets}
                          (chdir %{workspace_root}
