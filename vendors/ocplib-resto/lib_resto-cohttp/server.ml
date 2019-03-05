@@ -348,7 +348,10 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
             exit 1
         | Unix.Unix_error (ECONNRESET, _, _)
         | Unix.Unix_error (EPIPE, _, _)  -> ()
-        | exn -> !Lwt.async_exception_hook exn
+        | exn ->
+            Format.eprintf "@[<v 2>Uncaught (asynchronous) exception:@ %s@ %s@]%!"
+              (Printexc.to_string exn)
+              (Printexc.get_backtrace ())
       and callback (io, con) req body =
         Lwt.catch
           begin fun () -> callback server (io, con) req body end
