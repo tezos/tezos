@@ -79,22 +79,22 @@ let check_network ctxt =
   | Ok [] ->
       Lwt.return_none
   | Ok (version :: _) ->
-      match String.split_on_char '_' (version.chain_name :> string) with
-      | "SANDBOXED" :: _ ->
-          sandbox () ;
-          Lwt.return_some `Sandbox
-      | "TEZOS" :: "ZERONET" :: _date :: [] ->
-          zeronet () ;
-          Lwt.return_some `Zeronet
-      | "TEZOS" :: "ALPHANET" :: _date :: [] ->
-          alphanet () ;
-          Lwt.return_some `Alphanet
-      | "TEZOS" :: "BETANET" :: _ :: []
-      | "TEZOS" :: "MAINNET" :: [] ->
-          mainnet () ;
-          Lwt.return_some `Mainnet
-      | _ ->
-          Lwt.return_none
+      let has_prefix prefix =
+        String.has_prefix ~prefix (version.chain_name :> string) in
+      if has_prefix "SANDBOXED" then begin
+        sandbox () ;
+        Lwt.return_some `Sandbox
+      end else if has_prefix "TEZOS_ZERONET" then begin
+        zeronet () ;
+        Lwt.return_some `Zeronet
+      end else if has_prefix "TEZOS_ALPHANET" then begin
+        alphanet () ;
+        Lwt.return_some `Alphanet
+      end else if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then begin
+        mainnet () ;
+        Lwt.return_some `Mainnet
+      end else
+        Lwt.return_none
 
 let get_commands_for_version ctxt network chain block protocol =
   Shell_services.Blocks.protocols ctxt ~chain ~block () >>= function
