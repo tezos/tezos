@@ -73,7 +73,9 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
       end
     | None -> loop ()
     | Some _ -> loop () (* Got a testchain for a different protocol, skipping *) in
-  loop () >>=? fun () ->
+  Lwt.pick
+    [ (Lwt_exit.termination_thread >>= fun _ -> failwith "Interrupted..." ) ;
+      loop () ] >>=? fun () ->
   cctxt#message "Test chain forked." >>= fun () ->
   return_unit
 
