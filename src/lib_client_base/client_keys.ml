@@ -78,6 +78,10 @@ let make_pk_uri x = x
 type sk_uri = Uri.t
 let make_sk_uri x = x
 
+let pk_uri_parameter () = Clic.parameter (fun _ s ->
+    try return (make_pk_uri @@ Uri.of_string s)
+    with Failure s -> failwith "Error while parsing URI: %s" s)
+
 let pk_uri_param ?name ?desc params =
   let name = Option.unopt ~default:"uri" name in
   let desc = Option.unopt
@@ -85,11 +89,11 @@ let pk_uri_param ?name ?desc params =
                 Varies from one scheme to the other.\n\
                 Use command `list signing schemes` for more \
                 information." desc in
-  let open Clic in
-  param ~name ~desc (parameter (fun _ s ->
-      try return (make_pk_uri @@ Uri.of_string s)
-      with Failure s -> failwith "Error while parsing uri: %s" s))
-    params
+  Clic.param ~name ~desc (pk_uri_parameter ()) params
+
+let sk_uri_parameter () = Clic.parameter (fun _ s ->
+    try return (make_sk_uri @@ Uri.of_string s)
+    with Failure s -> failwith "Error while parsing URI: %s" s)
 
 let sk_uri_param ?name ?desc params =
   let name = Option.unopt ~default:"uri" name in
@@ -98,12 +102,7 @@ let sk_uri_param ?name ?desc params =
                 Varies from one scheme to the other.\n\
                 Use command `list signing schemes` for more \
                 information." desc in
-  let open Clic in
-  param ~name ~desc
-    (parameter (fun _ s ->
-         try return (make_sk_uri @@ Uri.of_string s)
-         with Failure s -> failwith "Error while parsing uri: %s" s))
-    params
+  Clic.param ~name ~desc (sk_uri_parameter ()) params
 
 module Secret_key =
   Client_aliases.Alias (struct

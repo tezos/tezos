@@ -32,6 +32,26 @@ type ('p, 'ctx) parameter =
 let parameter ?autocomplete converter =
   { converter ; autocomplete }
 
+let compose_parameters { converter = c1; autocomplete = a1' } { converter = c2; autocomplete = a2' } =
+  { converter = (fun ctx s ->
+        c1 ctx s >>= function
+        | Ok r -> return r
+        | Error _ -> c2 ctx s);
+    autocomplete = match a1' with
+      | None -> a2'
+      | Some a1 -> match a2' with
+        | None -> a1'
+        | Some a2 -> Some (fun ctx ->
+            a1 ctx >>=? fun r1 ->
+            a2 ctx >>=? fun r2 ->
+            return (List.concat [r1; r2]))
+  }
+
+let map_parameter ~f { converter; autocomplete } =
+  { converter = (fun ctx s -> converter ctx s >>|? f);
+    autocomplete
+  }
+
 type label =
   { long : string ;
     short : char option }

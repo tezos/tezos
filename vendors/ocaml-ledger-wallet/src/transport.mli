@@ -20,6 +20,7 @@ module Status : sig
     | Incorrect_class
     | Ins_not_supported
     | Memory_error
+    | Referenced_data_not_found
     | Technical_problem of int
     | Ok
 

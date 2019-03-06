@@ -48,6 +48,14 @@ val get_authorized_key :
 (** [get_authorized_key ?pp ?buf ledger] is the BIP32 path of the key
     authorized to bake on the Ledger app running at [ledger]. *)
 
+val get_authorized_path_and_curve :
+  ?pp:Format.formatter -> ?buf:Cstruct.t ->
+  Hidapi.t -> (int32 list * curve, Transport.error) result
+(** [get_authorized_path_and_curve ?pp ?buf ledger] is the BIP32 path
+    and the curve code of the key authorized to bake on the Ledger app
+    running at [ledger]. *)
+
+
 val get_public_key :
   ?prompt:bool ->
   ?pp:Format.formatter ->
@@ -80,6 +88,11 @@ val setup_baking :
     indicates that the key at the given [curve/path] is authorized for
     baking. *)
 
+val deauthorize_baking :
+  ?pp:Format.formatter -> ?buf:Cstruct.t -> Hidapi.t -> (unit, Transport.error) result
+(** [deauthorize_baking ?pp ?buf ledger]
+    deauthorizes the Ledger's Baking application from baking for any address. *)
+
 val get_high_watermark :
   ?pp:Format.formatter -> ?buf:Cstruct.t ->
   Hidapi.t -> (int32, Transport.error) result
@@ -102,7 +115,7 @@ val set_high_watermark :
   Hidapi.t -> int32 -> (unit, Transport.error) result
 (** [set_high_watermark ?pp ?buf ledger hwm] reset the high water
     mark on [ledger] to [hwm] for the main-chain.
-    This works with the baking app only. Use {!setup_baking} to be able to also 
+    This works with the baking app only. Use {!setup_baking} to be able to also
     reset all the test-chain water mark. *)
 
 val sign :

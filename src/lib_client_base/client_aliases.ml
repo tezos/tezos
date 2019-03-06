@@ -73,6 +73,7 @@ module type Alias = sig
     string -> t -> unit tzresult Lwt.t
   val of_source : string -> t tzresult Lwt.t
   val to_source : t -> string tzresult Lwt.t
+  val alias_parameter : unit -> (string * t, #Client_context.wallet) Clic.parameter
   val alias_param :
     ?name:string ->
     ?desc:string ->
@@ -200,15 +201,15 @@ module Alias = functor (Entity : Entity) -> struct
 
   include Entity
 
+  let alias_parameter () = parameter
+      ~autocomplete
+      (fun cctxt s ->
+         find cctxt s >>=? fun v ->
+         return (s, v))
+
   let alias_param
       ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
-    param ~name ~desc
-      (parameter
-         ~autocomplete
-         (fun (cctxt : #Client_context.wallet) s ->
-            find cctxt s >>=? fun v ->
-            return (s, v)))
-      next
+    param ~name ~desc (alias_parameter ()) next
 
   type fresh_param = Fresh of string
 

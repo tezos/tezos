@@ -67,8 +67,9 @@ module type Alias = sig
   val update :
     #Client_context.wallet ->
     string -> t -> unit tzresult Lwt.t
-  val of_source  : string -> t tzresult Lwt.t
-  val to_source  : t -> string tzresult Lwt.t
+  val of_source : string -> t tzresult Lwt.t
+  val to_source : t -> string tzresult Lwt.t
+  val alias_parameter : unit -> (string * t, #Client_context.wallet) Clic.parameter
   val alias_param :
     ?name:string ->
     ?desc:string ->
