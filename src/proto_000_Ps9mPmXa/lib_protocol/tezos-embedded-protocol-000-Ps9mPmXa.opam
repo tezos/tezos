@@ -14,7 +14,7 @@ depends: [
 build: [
   [ "%{tezos-protocol-compiler:lib}%/replace"
       "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
-      "src/dune" "000_Ps9mPmXa" ]
+      "dune" "000_Ps9mPmXa" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
