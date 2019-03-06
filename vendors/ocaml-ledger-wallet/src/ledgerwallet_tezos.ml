@@ -66,6 +66,8 @@ type ins =
   | Get_authorized_key
   | Setup
   | Query_all_high_watermarks
+  | Deauthorize_baking
+  | Get_authorized_path_and_curve
 
 let int_of_ins = function
   | Version -> 0x00
@@ -80,6 +82,8 @@ let int_of_ins = function
   | Get_authorized_key -> 0x07
   | Setup -> 0x0A
   | Query_all_high_watermarks -> 0x0B
+  | Deauthorize_baking -> 0x0C
+  | Get_authorized_path_and_curve -> 0x0D
 
 type curve =
   | Ed25519
@@ -108,6 +112,21 @@ let int_of_curve = function
   | Secp256k1 -> 0x01
   | Secp256r1 -> 0x02
 
+let curve_of_int = function
+  | 0x00 -> Some Ed25519
+  | 0x01 -> Some Secp256k1
+  | 0x02 -> Some Secp256r1
+  | _ -> None
+
+type Transport.Status.t +=
+    Tezos_invalid_curve_code of int
+
+let () = Transport.Status.register_string_f begin function
+    | Tezos_invalid_curve_code curve_code ->
+        Some ("Unrecognized curve code: " ^ string_of_int curve_code)
+    | _ -> None
+  end
+
 let wrap_ins cmd =
   Apdu.create_cmd ~cmd ~cla_of_cmd:(fun _ -> 0x80) ~ins_of_cmd:int_of_ins
 
@@ -121,15 +140,30 @@ let get_git_commit ?pp ?buf h =
   Transport.apdu ~msg:"get_git_commit" ?pp ?buf h apdu >>|
   Cstruct.to_string
 
+let read_path_with_length buf =
+  let length = Cstruct.get_uint8 buf 0 in
+  let rec go acc path =
+    if Cstruct.len path = 0 || List.length acc = length then List.rev acc
+    else
+      go (Cstruct.BE.get_uint32 path 0 :: acc)
+        (Cstruct.shift path 4) in
+  go [] (Cstruct.shift buf 1)
+
 let get_authorized_key ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Get_authorized_key) in
   Transport.apdu ~msg:"get_authorized_key" ?pp ?buf h apdu >>| fun path ->
-  let rec read_numbers acc path =
-    if Cstruct.len path = 0 then List.rev acc
-    else
-      read_numbers (Cstruct.BE.get_uint32 path 0 :: acc)
-        (Cstruct.shift path 4) in
-  read_numbers [] (Cstruct.shift path 1)
+  read_path_with_length path
+
+let get_authorized_path_and_curve ?pp ?buf h =
+  let apdu = Apdu.create (wrap_ins Get_authorized_path_and_curve) in
+  Transport.apdu ~msg:"get_authorized_path_and_curve" ?pp ?buf h apdu >>= fun payload ->
+  let curve_code = Cstruct.get_uint8 payload 0 in
+  match curve_of_int curve_code with
+  | None ->
+      Transport.app_error ~msg:"get_authorized_path_and_curve" (R.error (Tezos_invalid_curve_code curve_code))
+  | Some curve ->
+      let path_components = read_path_with_length (Cstruct.shift payload 1) in
+      R.ok (path_components, curve)
 
 let write_path cs path =
   ListLabels.fold_left path ~init:cs ~f:begin fun cs i ->
@@ -168,7 +202,7 @@ let setup_baking ?pp ?buf h ~main_chain_id ~main_hwm ~test_hwm curve path =
     (3 * 4) + 1 + (4 * nb_derivations) in
   let data_init = Cstruct.create lc in
   (* If the size of chain-ids changes, then all assumptions of this
-     binary format are broken (the ledger expects an int32). *)
+     binary format are broken (the ledger expects a uint32). *)
   assert (String.length main_chain_id = 4) ;
   for ith = 0 to 3 do
     Cstruct.set_uint8 data_init ith (int_of_char main_chain_id.[ith]) ;
@@ -186,6 +220,11 @@ let setup_baking ?pp ?buf h ~main_chain_id ~main_hwm ~test_hwm curve path =
   Transport.apdu ~msg ?pp ?buf h apdu >>| fun addr ->
   let keylen = Cstruct.get_uint8 addr 0 in
   Cstruct.sub addr 1 keylen
+
+let deauthorize_baking ?pp ?buf h =
+  let apdu = Apdu.create (wrap_ins Deauthorize_baking) in
+  Transport.apdu ~msg:"deauthorize_baking" ?pp ?buf h apdu >>| fun _ ->
+  ()
 
 let get_high_watermark ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Query_high_watermark) in

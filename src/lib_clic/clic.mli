@@ -58,6 +58,15 @@ val parameter :
   ('ctx -> string -> 'a tzresult Lwt.t) ->
   ('a, 'ctx) parameter
 
+(** Build an argument parser by composing two other parsers. The
+    resulting parser will try the first parser and if it fails will
+    try the second. The auto-complete contents of the two will be
+    concatenated. *)
+val compose_parameters : ('a, 'ctx) parameter -> ('a, 'ctx) parameter -> ('a, 'ctx) parameter
+
+(** Map a pure function over the result of a parameter parser. *)
+val map_parameter : f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
+
 (** {2 Flags and Options } *)
 
 (** The type for optional arguments (and switches).
