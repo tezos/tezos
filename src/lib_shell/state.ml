@@ -114,8 +114,7 @@ let update_chain_data { chain_id ; context_index ; chain_data } f =
         Shared.use context_index begin fun context_index ->
           Context.set_head context_index chain_id
             data.current_head.contents.context
-        end >>= fun () ->
-        Lwt.return_unit
+        end
       end >>= fun () ->
     Lwt.return res
   end
@@ -617,8 +616,7 @@ module Chain = struct
         -% a chain_id (id chain)) >>= fun () ->
     Shared.use state.global_data begin fun { global_store ; chains } ->
       Chain_id.Table.remove chains (id chain) ;
-      Store.Chain.destroy global_store (id chain) >>= fun () ->
-      Lwt.return_unit
+      Store.Chain.destroy global_store (id chain)
     end
 
 end
@@ -706,7 +704,7 @@ module Block = struct
     let all_operation_hashes chain_state { hash ; header } =
       Shared.use chain_state.block_store begin fun store ->
         Lwt_list.map_p
-          (fun i -> (Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__ >>= fun h ->  Lwt.return h))
+          (fun i -> Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.Block_header.shell.validation_passes - 1))
 
       end
@@ -767,9 +765,10 @@ module Block = struct
   let unmark_invalid chain_state block =
     Shared.use chain_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store block >>= fun mem ->
-      if mem
-      then Store.Block.Invalid_block.remove store block >>= return
-      else fail (Block_not_invalid block)
+      if mem then
+        Store.Block.Invalid_block.remove store block >>= return
+      else
+        fail (Block_not_invalid block)
     end
 
   let is_valid_for_checkpoint block checkpoint =
@@ -985,7 +984,7 @@ module Block = struct
   let all_operation_hashes { chain_state ; hash ; header } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
-        (fun i -> (Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__ >>= fun h -> Lwt.return h))
+        (fun i -> Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
         (0 -- (header.shell.validation_passes - 1))
     end
 
@@ -1002,21 +1001,20 @@ module Block = struct
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations_metadata" ;
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Operations_metadata.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__ >>= fun ops ->
-      Lwt.return ops
+      Store.Block.Operations_metadata.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__
     end
 
   let all_operations { chain_state ; hash ; header } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
-        (fun i -> Store.Block.Operations.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__ >>= fun o -> Lwt.return o)
+        (fun i -> Store.Block.Operations.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
         (0 -- (header.shell.validation_passes - 1))
     end
 
   let all_operations_metadata { chain_state ; hash ; header } =
     Shared.use chain_state.block_store begin fun store ->
       Lwt_list.map_p
-        (fun i -> Store.Block.Operations_metadata.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__ >>= fun om -> Lwt.return om)
+        (fun i -> Store.Block.Operations_metadata.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
         (0 -- (header.shell.validation_passes - 1))
     end
 
