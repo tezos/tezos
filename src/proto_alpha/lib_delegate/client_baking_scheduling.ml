@@ -23,8 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic
-    (struct let name = "client.scheduling" end)
+include Internal_event.Legacy_logging.Make_semantic (struct
+    let name =  Proto_alpha.Name.name ^ ".client.scheduling"
+  end)
 
 open Logging
 
