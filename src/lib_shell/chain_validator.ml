@@ -148,12 +148,16 @@ let with_activated_peer_validator w peer_id f =
             peer_id in
         P2p_peer.Table.add nv.active_peers peer_id pv ;
         pv
-  end >>=? fun pv ->
-  match Peer_validator.status pv with
-  | Worker_types.Running _ -> f pv
-  | Worker_types.Closing (_, _)
-  | Worker_types.Closed (_, _, _)
-  | Worker_types.Launching _ -> return_unit
+  end >>= function
+  | Error _ as e ->
+      P2p_peer.Table.remove nv.active_peers peer_id ;
+      Lwt.return e
+  | Ok pv ->
+      match Peer_validator.status pv with
+      | Worker_types.Running _ -> f pv
+      | Worker_types.Closing (_, _)
+      | Worker_types.Closed (_, _, _)
+      | Worker_types.Launching _ -> return_unit
 
 let may_update_checkpoint chain_state new_head =
   State.Chain.checkpoint chain_state >>= fun (old_level, _old_block) ->
@@ -348,11 +352,13 @@ let on_close w =
   Distributed_db.deactivate nv.parameters.chain_db >>= fun () ->
   begin
     P2p_peer.Table.fold
-      (fun _ pv acc ->
+      (fun peer_id pv acc ->
          acc >>= fun acc ->
          pv >|= function
          | Ok pv -> Peer_validator.shutdown pv :: acc
-         | Error _ -> acc)
+         | Error _ ->
+             P2p_peer.Table.remove nv.active_peers peer_id ;
+             acc)
       nv.active_peers (Lwt.return [])
   end >>= fun pvs ->
   Lwt.join
@@ -408,9 +414,9 @@ let on_launch start_prevalidator w _ parameters =
   Distributed_db.set_callback parameters.chain_db {
     notify_branch = begin fun peer_id locator ->
       Lwt.async begin fun () ->
-        with_activated_peer_validator w peer_id (fun pv ->
-            Peer_validator.notify_branch pv locator ;
-            return_unit)
+        with_activated_peer_validator w peer_id @@ fun pv ->
+        Peer_validator.notify_branch pv locator ;
+        return_unit
       end
     end ;
     notify_head = begin fun peer_id block ops ->
@@ -430,12 +436,15 @@ let on_launch start_prevalidator w _ parameters =
       Lwt.async begin fun () ->
         let nv = Worker.state w in
         match P2p_peer.Table.find_opt nv.active_peers peer_id with
+        | None -> return_unit
         | Some pv ->
-            pv >>=? fun pv ->
-            Peer_validator.shutdown pv >>= fun () ->
-            return_unit
-        | None ->
-            return_unit
+            pv >>= function
+            | Error _ as e ->
+                P2p_peer.Table.remove nv.active_peers peer_id ;
+                Lwt.return e
+            | Ok pv ->
+                Peer_validator.shutdown pv >>= fun () ->
+                return_unit
       end
     end ;
   } ;
