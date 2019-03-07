@@ -502,7 +502,11 @@ let import data_dir filename block =
   (* FIXME: use config value ?*)
 
   State.init
-    ~context_root ~store_root ~history_mode:Rolling genesis
+    ~context_root
+    ~store_root
+    ~history_mode:Rolling
+    genesis
+    ~patch_context:(Patch_context.patch_context None)
   >>=? fun (_state, chain_state, context_index, _history_mode) ->
 
   Store.init ~mapsize:40_960_000_000L store_root >>=? fun store ->
