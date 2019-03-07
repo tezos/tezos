@@ -477,7 +477,7 @@ module Writer = struct
                 lwt_debug "connection closed to %a"
                   P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
                 Lwt.return_unit
-            | [ P2p_errors.Connection_closed ] ->
+            | P2p_errors.Connection_closed :: _ ->
                 lwt_debug "connection closed to %a"
                   P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
                 Lwt_canceler.cancel st.canceler >>= fun () ->
