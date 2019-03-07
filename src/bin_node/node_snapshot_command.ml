@@ -410,14 +410,16 @@ let check_context_hash_consistency
        block_header.shell.context)
     (Snapshot_import_failure "Resulting context hash does not match")
 
+let is_full_snapshot history =
+  (snd history.(0)).Context.Pruned_block.block_header.shell.level = 1l
+
 let set_history_mode store history =
-  begin if (snd history.(0)).Context.Pruned_block.block_header.shell.level = 1l then
-      lwt_log_notice "Setting history-mode to %a" History_mode.pp Full >>= fun () ->
-      Store.Configuration.History_mode.store store Full
-    else
-      lwt_log_notice "Setting history-mode to %a" History_mode.pp Rolling >>= fun () ->
-      Lwt.return ()
-  end
+  if is_full_snapshot history then
+    lwt_log_notice "Setting history-mode to %a" History_mode.pp Full >>= fun () ->
+    Store.Configuration.History_mode.store store Full
+  else
+    lwt_log_notice "Setting history-mode to %a" History_mode.pp Rolling >>= fun () ->
+    Lwt.return ()
 
 let store_new_head
     chain_state
@@ -486,7 +488,59 @@ let clean_directory data_dir =
   Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
   Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
-let import data_dir filename block =
+let reconstruct_contexts
+    store context_index chain_id block_store
+    (history: (Block_hash.t * Context.Pruned_block.t) array) =
+  lwt_log_notice "Reconstructing all the contexts from the genesis." >>= fun () ->
+  let limit = Array.length history in
+
+  let rec reconstruct_chunks level =
+    Store.with_atomic_rw store begin fun () ->
+      let rec reconstruct_chunks level =
+        Tezos_stdlib.Utils.display_progress
+          "Reconstructing contexts: %i/%i"
+          level
+          limit ;
+        if level = limit then
+          return level
+        else
+          begin
+            let block_hash, pb = history.(level) in
+            Store.Block.Header.read
+              (block_store, block_hash) >>=? fun block_header ->
+            let max_operations_ttl = (max_int - 1) in
+            let operations = List.rev (List.map snd pb.operations) in
+            let predecessor_block_hash = pb.block_header.shell.predecessor in
+            Store.Block.Header.read
+              (block_store, predecessor_block_hash) >>=? fun pred_block_header ->
+            let context_hash = pred_block_header.shell.context in
+            Context.checkout_exn context_index context_hash >>= fun pred_context ->
+
+            Tezos_validation.Block_validation.apply
+              chain_id
+              ~max_operations_ttl
+              ~predecessor_block_header:pred_block_header
+              ~predecessor_context:pred_context
+              ~block_header
+              operations >>=? fun block_validation_result ->
+
+            check_context_hash_consistency
+              block_validation_result
+              block_header >>=? fun () ->
+
+            reconstruct_chunks (level + 1)
+          end
+      in
+      if level + 1 mod 1000 = 0 then return level
+      else reconstruct_chunks level end >>=? fun level ->
+    if level = limit then return_unit
+    else reconstruct_chunks limit in
+  reconstruct_chunks 0 >>=? fun _cpt ->
+  Tezos_stdlib.Utils.display_progress_end ();
+  return_unit
+
+
+let import ?(reconstruct = false) data_dir filename block =
   let data_dir =
     match data_dir with
     | None -> Node_config_file.default_data_dir
@@ -597,7 +651,16 @@ let import data_dir filename block =
              let oldest_header = (snd history.(0)).block_header in
              update_caboose chain_data block_header oldest_header
                block_validation_result.validation_result.max_operations_ttl >>= fun () ->
-             return_unit
+
+             (* Reconstruct all the contexts if requested *)
+             match reconstruct with
+             | true ->
+                 if is_full_snapshot history then
+                   reconstruct_contexts store context_index chain_id block_store history
+                 else
+                   fail Wrong_reconstrcut_mode
+             | false ->
+                 return_unit
            end
        end
          restored_data >>=? fun () ->
@@ -623,11 +686,11 @@ module Term = struct
 
   type subcommand = Export | Import
 
-  let process subcommand config_file file block export_rolling =
+  let process subcommand config_file file block export_rolling reconstruct =
     let res =
       match subcommand with
       | Export -> export ~export_rolling config_file file block
-      | Import -> import config_file file block
+      | Import -> import ~reconstruct config_file file block
     in
     match Lwt_main.run res with
     | Ok () -> `Ok ()
@@ -664,13 +727,22 @@ module Term = struct
     Arg.(value & flag &
          info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["rolling"])
 
+  let reconstruct =
+    let open Cmdliner in
+    let doc =
+      "Forces the reconstruction of all the contexts from the genesis during the \
+       import phase. This operation can take a while." in
+    Arg.(value & flag &
+         info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["reconstruct"])
+
   let term =
     let open Cmdliner.Term in
     ret (const process $ subcommand_arg
          $ Node_shared_arg.Term.data_dir
          $ file_arg
          $ blocks
-         $ export_rolling)
+         $ export_rolling
+         $ reconstruct)
 
 end
 
