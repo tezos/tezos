@@ -49,11 +49,11 @@ Node
 ----
 
 The node is effectively the Tezos blockchain and it has two main
-functions: running the gossip network and the updating the context.
+functions: running the gossip network and updating the context.
 The gossip network is where all Tezos nodes exchange blocks and
 operations with each other (see :ref:`tezos-admin-client` to monitor
 p2p connections).
-Using this peer-to-peer network an operation originated by a user, can
+Using this peer-to-peer network, an operation originated by a user can
 hop several times through other nodes until it finds its way in a
 block baked by a baker.
 Using the blocks it receives on the gossip network the shell also
