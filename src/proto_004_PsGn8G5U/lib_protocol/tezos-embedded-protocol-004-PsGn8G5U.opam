@@ -9,21 +9,13 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.0.1" }
   "tezos-base"
-  "tezos-rpc-http"
-  "tezos-p2p"
-  "tezos-shell"
+  "tezos-protocol-compiler"
   "tezos-protocol-updater"
-  "tezos-embedded-protocol-genesis"
-  "tezos-embedded-protocol-demo"
-  "tezos-embedded-protocol-alpha"
-  "tezos-embedded-protocol-004-PshR5rQT"
-  "tezos-embedded-protocol-004-PsGn8G5U"
-  "cmdliner"
-  "tls"
-  "cstruct" { < "3.4.0" } ## Because "tls" depends on a version of "nocrypto"
-                          ## that is not compatible with recent "cstruct"
 ]
 build: [
+  [ "rm" "dune" "src/dune" ]
+  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_embedded_protocol_template" "src/dune" ]
+  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"004_PsGn8G5U\"/" "src/dune" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [

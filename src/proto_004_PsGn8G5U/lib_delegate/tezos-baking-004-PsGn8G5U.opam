@@ -9,25 +9,17 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.0.1" }
   "tezos-base"
+  "tezos-protocol-environment"
+  "tezos-protocol-004-PsGn8G5U"
+  "tezos-shell-services"
   "tezos-client-base"
-  "tezos-client-genesis"
-  "tezos-client-demo"
+  "tezos-client-commands"
   "tezos-client-alpha"
-  "tezos-client-004-PshR5rQT"
   "tezos-client-004-PsGn8G5U"
-  "tezos-client-alpha-commands"
-  "tezos-client-004-PshR5rQT-commands"
-  "tezos-client-004-PsGn8G5U-commands"
-  "tezos-baking-alpha"
-  "tezos-baking-004-PshR5rQT"
-  "tezos-baking-004-PsGn8G5U"
-  "tezos-baking-alpha-commands"
-  "tezos-baking-004-PshR5rQT-commands"
-  "tezos-baking-004-PsGn8G5U-commands"
-  "tezos-client-base-unix"
-  "tezos-signer-backends"
   "tezos-node" { with-test }
-  "tezos-protocol-compiler" { with-test }
+  "tezos-client-genesis" { with-test }
+  "tezos-client-base-unix" { with-test }
+  "alcotest-lwt" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
