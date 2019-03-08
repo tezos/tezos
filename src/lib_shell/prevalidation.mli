@@ -71,6 +71,8 @@ module type T = sig
   val status: t -> status tzresult Lwt.t
 
   val validation_state: t -> Proto.validation_state
+
+  val pp_result: Format.formatter -> result -> unit
 end
 
 module Make(Proto : Registered_protocol.T) : T with module Proto = Proto
