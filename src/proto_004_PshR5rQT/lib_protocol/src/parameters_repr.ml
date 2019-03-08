@@ -328,15 +328,15 @@ module Proto_003 = struct
 
   let default = {
     preserved_cycles = 5 ;
-    blocks_per_cycle = 4096l ;
+    blocks_per_cycle = 128l ;
     blocks_per_commitment = 32l ;
-    blocks_per_roll_snapshot = 256l ;
-    blocks_per_voting_period = 32768l ;
+    blocks_per_roll_snapshot = 8l ;
+    blocks_per_voting_period = 9216l ;
     time_between_blocks =
-      List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
+      List.map Period_repr.of_seconds_exn [ 20L ] ;
     endorsers_per_block = 32 ;
-    hard_gas_limit_per_operation = Z.of_int 400_000 ;
-    hard_gas_limit_per_block = Z.of_int 4_000_000 ;
+    hard_gas_limit_per_operation = Z.of_int 4_000_000 ;
+    hard_gas_limit_per_block = Z.of_int 40_000_000 ;
     proof_of_work_threshold =
       Int64.(sub (shift_left 1L 46) 1L) ;
     tokens_per_roll =
@@ -352,7 +352,7 @@ module Proto_003 = struct
     endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
     block_reward = Tez_repr.(mul_exn one 16) ;
     endorsement_reward = Tez_repr.(mul_exn one 2) ;
-    hard_storage_limit_per_operation = Z.of_int 60_000 ;
+    hard_storage_limit_per_operation = Z.of_int 600_000 ;
     cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
   }
 
