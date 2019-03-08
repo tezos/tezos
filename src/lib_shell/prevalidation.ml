@@ -67,6 +67,7 @@ module type T = sig
 
   val status: t -> status tzresult Lwt.t
 
+  val pp_result: Format.formatter -> result -> unit
 end
 
 module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struct
@@ -195,6 +196,16 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       block_result ;
       applied_operations = pv.applied ;
     }
+
+  let pp_result ppf =
+    let open Format in
+    function
+    | Applied _ -> pp_print_string ppf "applied"
+    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
+    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
+    | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
+    | Duplicate -> pp_print_string ppf "duplicate"
+    | Outdated -> pp_print_string ppf "outdated"
 
 end
 
