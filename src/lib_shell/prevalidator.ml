@@ -570,8 +570,10 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
             Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
             pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
             return_unit
-        | _ ->
-            failwith "Error while applying operation %a" Operation_hash.pp oph
+        | res ->
+            failwith "Error while applying operation %a:@ %a"
+              Operation_hash.pp oph
+              Prevalidation.pp_result res
 
     let on_notify w pv peer mempool =
       let all_ophs =
