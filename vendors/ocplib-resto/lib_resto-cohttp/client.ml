@@ -201,7 +201,7 @@ module Make (Encoding : Resto.ENCODING) = struct
       call_and_retry_on_502 1 0. >>= fun (response, ansbody) ->
       let headers = Response.headers response in
       let media_name =
-        match Header.get headers "content-type" with
+        match Header.get_media_type headers with
         | None -> None
         | Some s ->
             match Utils.split_path s with
