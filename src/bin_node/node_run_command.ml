@@ -63,18 +63,6 @@ let () =
 
 let (//) = Filename.concat
 
-let find_log_rules default =
-  match Option.try_with (fun () -> Sys.getenv "TEZOS_LOG"),
-        Option.try_with (fun () -> Sys.getenv "LWT_LOG")
-  with
-  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
-  | None, Some rules -> "environment variable LWT_LOG", Some rules
-  | None, None -> "configuration file", default
-  | Some rules, Some _ ->
-      warn "Both environment variables TEZOS_LOG and LWT_LOG \
-            defined, using TEZOS_LOG." ;
-      "environment variable TEZOS_LOG", Some rules
-
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   begin
     match sandbox with

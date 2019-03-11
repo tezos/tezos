@@ -165,7 +165,8 @@ let export ?(export_rolling=false) data_dir filename block =
   let chain_store = Store.Chain.get store chain_id in
   let chain_data_store = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
-  Store.Configuration.History_mode.read_exn store >>= fun history_mode ->
+  Store.Configuration.History_mode.read_opt store >|=
+  Option.unopt_assert ~loc:__POS__ >>= fun history_mode ->
   begin match history_mode with
     | Archive | Full -> return_unit
     | Rolling ->
@@ -177,8 +178,10 @@ let export ?(export_rolling=false) data_dir filename block =
     | Some block_hash ->
         Lwt.return (Block_hash.of_b58check_exn block_hash)
     | None ->
-        Store.Chain_data.Current_head.read_exn chain_data_store >>= fun head ->
-        Store.Block.Predecessors.read_exn (block_store, head) 6 >>= fun sixteenth_pred ->
+        Store.Chain_data.Current_head.read_opt chain_data_store >|=
+        Option.unopt_assert ~loc:__POS__ >>= fun head ->
+        Store.Block.Predecessors.read_opt (block_store, head) 6  >|=
+        Option.unopt_assert ~loc:__POS__ >>= fun sixteenth_pred ->
         lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (64th predecessor from the current head)"
           Block_hash.pp sixteenth_pred >>= fun () ->
         Lwt.return sixteenth_pred
