@@ -98,7 +98,7 @@ let build_raw_rpc_directory
     (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
 
-  let dir : State.Block.t RPC_directory.t ref =
+  let dir : State.Block.block RPC_directory.t ref =
     ref RPC_directory.empty in
 
   let merge d = dir := RPC_directory.merge d !dir in
@@ -119,24 +119,27 @@ let build_raw_rpc_directory
   let module S = Block_services.S in
 
   register0 S.live_blocks begin fun block () () ->
+    State.Block.max_operations_ttl block >>=? fun max_op_ttl ->
     Chain_traversal.live_blocks
       block
-      (State.Block.max_operations_ttl block) >>=? fun (live_blocks, _) ->
+      max_op_ttl >>=? fun (live_blocks, _) ->
     return live_blocks
   end ;
 
   (* block metadata *)
 
   let metadata block =
+    State.Block.metadata block >>=? fun metadata ->
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_metadata_encoding
-        (State.Block.metadata block) in
+        metadata in
+    State.Block.max_operations_ttl block >>=? fun max_operations_ttl ->
     State.Block.test_chain block >>= fun (test_chain_status, _) ->
     return {
       Block_services.protocol_data ;
       test_chain_status ;
-      max_operations_ttl = State.Block.max_operations_ttl block ;
+      max_operations_ttl ;
       max_operation_data_length = Next_proto.max_operation_data_length ;
       max_block_header_length = Next_proto.max_block_length ;
       operation_list_quota =
@@ -360,7 +363,7 @@ let get_directory block =
 let get_block chain_state = function
   | `Genesis ->
       Chain.genesis chain_state >>= begin function
-        | Some b -> Lwt.return (State.Block.Complete b)
+        | Some b -> Lwt.return_some b
         | None -> Lwt.fail Not_found
       end
   | `Head n ->
@@ -368,7 +371,7 @@ let get_block chain_state = function
       if n < 0 then
         Lwt.fail Not_found
       else if n = 0 then
-        Lwt.return (State.Block.Complete head)
+        Lwt.return_some head
       else
         State.Block.read_predecessor
           chain_state ~pred:n ~below_save_point:true
@@ -418,12 +421,7 @@ let fake_rpc_directory =
 
 let build_rpc_directory chain_state block =
   get_block chain_state block >>= function
-  | Unknown -> Lwt.fail Not_found
-  | Pruned { chain_id ; hash ; header } ->
-      Lwt.return
-        (RPC_directory.map
-           (fun _ -> Lwt.return (chain_id, hash, header))
-           fake_rpc_directory)
-  | Complete block ->
+  | Some block ->
       get_directory block >>= fun dir ->
       Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)
+  | None -> Lwt.fail Not_found

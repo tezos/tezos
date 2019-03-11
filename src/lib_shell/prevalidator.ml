@@ -584,10 +584,11 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     let on_flush w pv predecessor =
       Lwt_watcher.shutdown_input pv.operation_stream;
+      (State.Block.max_operations_ttl predecessor) >>=? fun max_op_ttl ->
       Chain_traversal.live_blocks
         predecessor
-        (State.Block.max_operations_ttl predecessor) >>=? fun (new_live_blocks,
-                                                               new_live_operations) ->
+        max_op_ttl >>=? fun (new_live_blocks,
+                             new_live_operations) ->
       list_pendings
         pv.chain_db
         ~from_block:pv.predecessor ~to_block:predecessor

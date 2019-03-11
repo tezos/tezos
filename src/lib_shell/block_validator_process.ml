@@ -85,7 +85,7 @@ let apply_block bvp ~predecessor block_header operations =
   let chain_state = State.Block.chain_state predecessor in
   let chain_id = State.Block.chain_id predecessor in
   let predecessor_block_header = State.Block.header predecessor in
-  let max_operations_ttl = State.Block.max_operations_ttl predecessor in
+  State.Block.max_operations_ttl predecessor >>=? fun max_operations_ttl ->
   let block_hash = Block_header.hash block_header in
   begin
     Chain.data chain_state >>= fun chain_data ->
@@ -93,7 +93,7 @@ let apply_block bvp ~predecessor block_header operations =
       return (chain_data.live_blocks, chain_data.live_operations)
     else
       Chain_traversal.live_blocks
-        predecessor (State.Block.max_operations_ttl predecessor)
+        predecessor max_operations_ttl
   end >>=? fun (live_blocks, live_operations) ->
   Block_validation.check_liveness
     ~live_operations ~live_blocks block_hash operations >>=? fun () ->
