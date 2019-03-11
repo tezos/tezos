@@ -29,21 +29,6 @@ include Internal_event.Legacy_logging.Make(struct
     let name = "client.signer.ledger"
   end)
 
-let scheme = "ledger"
-
-let title =
-  "Built-in signer using Ledger Nano S."
-
-let description =
-  "Valid URIs are of the form\n\
-  \ - ledger://<root_pkh>[/<path>]\n\
-   where <root_pkh> is the Base58-encoded public key hash of the key \
-   at m/44'/1729' and <path> is a BIP32 path anchored at \
-   m/44'/1729'. Ledger does not yet support non-hardened path so each \
-   node of the path must be hardened.\n\
-   Use `tezos-client list connected ledgers` to get the <root_pkh> of \
-   all connected devices."
-
 module Bip32_path = struct
   let hard = Int32.logor 0x8000_0000l
   let unhard = Int32.logand 0x7fff_ffffl
@@ -419,8 +404,6 @@ let int32_of_path_element_exn x =
   | None -> invalid_arg "int32_of_path_element_exn"
   | Some p -> p
 
-let neuterize (sk : sk_uri) = return (make_pk_uri (sk :> Uri.t))
-
 let path_of_sk_uri (uri : sk_uri) =
   match TzString.split_path (Uri.path (uri :> Uri.t)) with
   | [] -> []
@@ -441,47 +424,6 @@ let unopt_curve annimal = function
       failwith "A curve specification is required for this operation,@ e.g.@ \
                 \"ledger://%a/{ed25519,...}\"" Ledger_names.pp annimal
 
-let public_key
-    ?(interactive : Client_context.io_wallet option) (pk_uri : pk_uri) =
-  let find_curve of_pkh = function
-    | Pkh pkh ->
-        protect (fun () -> return (snd (List.assoc pkh of_pkh)))
-    | Animals (a, curve_opt) -> unopt_curve a curve_opt
-  in
-  match Hashtbl.find_opt pks pk_uri with
-  | Some pk -> return pk
-  | None ->
-      id_of_pk_uri pk_uri >>=? fun id ->
-      with_ledger id begin fun ledger _version _of_curve of_pkh  ->
-        find_curve of_pkh id >>=? fun curve  ->
-        let path = path_of_pk_uri pk_uri in
-        begin
-          match interactive with
-          | Some cctxt ->
-              get_public_key ~prompt:false ledger curve path >>=? fun pk ->
-              let pkh = Signature.Public_key.hash pk in
-              cctxt#message
-                "Please validate@ (and write down)@ the public key hash\
-                 @ displayed@ on the Ledger,@ it should be equal@ to `%a`:"
-                Signature.Public_key_hash.pp pkh >>= fun () ->
-              get_public_key ~prompt:true ledger curve path
-          | None ->
-              get_public_key ~prompt:false ledger curve path
-        end >>=? fun pk ->
-        let pkh = Signature.Public_key.hash pk in
-        Hashtbl.replace pks pk_uri pk ;
-        Hashtbl.replace pkhs pk_uri pkh ;
-        return pk
-      end >>= function
-      | Error err -> failwith "%a" pp_print_error err
-      | Ok v -> return v
-
-let public_key_hash ?interactive pk_uri =
-  match Hashtbl.find_opt pkhs pk_uri with
-  | Some pkh -> return (pkh, None)
-  | None ->
-      public_key ?interactive pk_uri >>=? fun pk ->
-      return (Hashtbl.find pkhs pk_uri, Some pk)
 
 let curve_of_id = function
   | Pkh pkh -> return (curve_of_pkh pkh)
@@ -493,56 +435,120 @@ let pp_ledger_chain_id fmt s =
   | "\x00\x00\x00\x00" -> Format.fprintf fmt "'Unspecified'"
   | other -> Format.fprintf fmt "%a" Chain_id.pp (Chain_id.of_string_exn other)
 
-let sign ?watermark sk_uri msg =
-  id_of_sk_uri sk_uri >>=? fun id ->
-  with_ledger id begin fun ledger { major; minor; patch; _ } _of_curve _of_pkh ->
-    let msg = Option.unopt_map watermark
-        ~default:msg ~f:begin fun watermark ->
-        MBytes.concat "" [Signature.bytes_of_watermark watermark ;
-                          msg]
-      end in
-    curve_of_id id >>=? fun curve ->
-    let path = Bip32_path.tezos_root @ path_of_sk_uri sk_uri in
-    let msg_len = MBytes.length msg in
-    wrap_ledger_cmd begin fun pp ->
-      if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
-        Ledgerwallet_tezos.sign ~hash_on_ledger:false
-          ~pp ledger curve path
-          (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
-      else
-        Ledgerwallet_tezos.sign
-          ~pp ledger curve path (Cstruct.of_bigarray msg)
-    end >>=? fun signature ->
-    match curve with
-    | Ed25519 ->
-        let signature = Cstruct.to_bigarray signature in
-        let signature = Ed25519.of_bytes_exn signature in
-        return (Signature.of_ed25519 signature)
-    | Secp256k1 ->
-        (* Remove parity info *)
-        Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
-        let signature = Cstruct.to_bigarray signature in
-        let open Libsecp256k1.External in
-        let signature = Sign.read_der_exn secp256k1_ctx signature in
-        let bytes = Sign.to_bytes secp256k1_ctx signature in
-        let signature = Secp256k1.of_bytes_exn bytes in
-        return (Signature.of_secp256k1 signature)
-    | Secp256r1 ->
-        (* Remove parity info *)
-        Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
-        let signature = Cstruct.to_bigarray signature in
-        let open Libsecp256k1.External in
-        (* We use secp256r1 library to extract P256 DER signature. *)
-        let signature = Sign.read_der_exn secp256k1_ctx signature in
-        let buf = Sign.to_bytes secp256k1_ctx signature in
-        let signature = P256.of_bytes_exn buf in
-        return (Signature.of_p256 signature)
-  end
+module Signer_implementation : Client_keys.SIGNER = struct
+  let scheme = "ledger"
+
+  let title =
+    "Built-in signer using Ledger Nano S."
+
+  let description =
+    "Valid URIs are of the form\n\
+    \ - ledger://<root_pkh>[/<path>]\n\
+     where <root_pkh> is the Base58-encoded public key hash of the key \
+     at m/44'/1729' and <path> is a BIP32 path anchored at \
+     m/44'/1729'. Ledger does not yet support non-hardened path so each \
+     node of the path must be hardened.\n\
+     Use `tezos-client list connected ledgers` to get the <root_pkh> of \
+     all connected devices."
 
 
-let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
-let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
-let supports_deterministic_nonces _ = return_false
+  let neuterize (sk : sk_uri) = return (make_pk_uri (sk :> Uri.t))
+
+  let public_key
+      ?(interactive : Client_context.io_wallet option) (pk_uri : pk_uri) =
+    let find_curve of_pkh = function
+      | Pkh pkh ->
+          protect (fun () -> return (snd (List.assoc pkh of_pkh)))
+      | Animals (a, curve_opt) -> unopt_curve a curve_opt
+    in
+    match Hashtbl.find_opt pks pk_uri with
+    | Some pk -> return pk
+    | None ->
+        id_of_pk_uri pk_uri >>=? fun id ->
+        with_ledger id begin fun ledger _version _of_curve of_pkh  ->
+          find_curve of_pkh id >>=? fun curve  ->
+          let path = path_of_pk_uri pk_uri in
+          begin
+            match interactive with
+            | Some cctxt ->
+                get_public_key ~prompt:false ledger curve path >>=? fun pk ->
+                let pkh = Signature.Public_key.hash pk in
+                cctxt#message
+                  "Please validate@ (and write down)@ the public key hash\
+                   @ displayed@ on the Ledger,@ it should be equal@ to `%a`:"
+                  Signature.Public_key_hash.pp pkh >>= fun () ->
+                get_public_key ~prompt:true ledger curve path
+            | None ->
+                get_public_key ~prompt:false ledger curve path
+          end >>=? fun pk ->
+          let pkh = Signature.Public_key.hash pk in
+          Hashtbl.replace pks pk_uri pk ;
+          Hashtbl.replace pkhs pk_uri pkh ;
+          return pk
+        end >>= function
+        | Error err -> failwith "%a" pp_print_error err
+        | Ok v -> return v
+
+  let public_key_hash ?interactive pk_uri =
+    match Hashtbl.find_opt pkhs pk_uri with
+    | Some pkh -> return (pkh, None)
+    | None ->
+        public_key ?interactive pk_uri >>=? fun pk ->
+        return (Hashtbl.find pkhs pk_uri, Some pk)
+
+
+  let sign ?watermark sk_uri msg =
+    id_of_sk_uri sk_uri >>=? fun id ->
+    with_ledger id begin fun ledger { major; minor; patch; _ } _of_curve _of_pkh ->
+      let msg = Option.unopt_map watermark
+          ~default:msg ~f:begin fun watermark ->
+          MBytes.concat "" [Signature.bytes_of_watermark watermark ;
+                            msg]
+        end in
+      curve_of_id id >>=? fun curve ->
+      let path = Bip32_path.tezos_root @ path_of_sk_uri sk_uri in
+      let msg_len = MBytes.length msg in
+      wrap_ledger_cmd begin fun pp ->
+        if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
+          Ledgerwallet_tezos.sign ~hash_on_ledger:false
+            ~pp ledger curve path
+            (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
+        else
+          Ledgerwallet_tezos.sign
+            ~pp ledger curve path (Cstruct.of_bigarray msg)
+      end >>=? fun signature ->
+      match curve with
+      | Ed25519 ->
+          let signature = Cstruct.to_bigarray signature in
+          let signature = Ed25519.of_bytes_exn signature in
+          return (Signature.of_ed25519 signature)
+      | Secp256k1 ->
+          (* Remove parity info *)
+          Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
+          let signature = Cstruct.to_bigarray signature in
+          let open Libsecp256k1.External in
+          let signature = Sign.read_der_exn secp256k1_ctx signature in
+          let bytes = Sign.to_bytes secp256k1_ctx signature in
+          let signature = Secp256k1.of_bytes_exn bytes in
+          return (Signature.of_secp256k1 signature)
+      | Secp256r1 ->
+          (* Remove parity info *)
+          Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
+          let signature = Cstruct.to_bigarray signature in
+          let open Libsecp256k1.External in
+          (* We use secp256r1 library to extract P256 DER signature. *)
+          let signature = Sign.read_der_exn secp256k1_ctx signature in
+          let buf = Sign.to_bytes secp256k1_ctx signature in
+          let signature = P256.of_bytes_exn buf in
+          return (Signature.of_p256 signature)
+    end
+
+
+  let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
+  let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
+  let supports_deterministic_nonces _ = return_false
+end
+open Signer_implementation
 
 let commands =
   let open Clic in

@@ -35,8 +35,6 @@ module Bip32_path : sig
   val string_of_path : int32 list -> string
 end
 
-include Client_keys.SIGNER
-
-
+module Signer_implementation : Client_keys.SIGNER
 
 val commands : unit -> Client_context.full Clic.command list
