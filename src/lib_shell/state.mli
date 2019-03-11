@@ -142,33 +142,17 @@ module Block : sig
   val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
   val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
-  val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
+  val read: Chain.t -> Block_hash.t -> t tzresult Lwt.t
+  val read_opt: Chain.t -> Block_hash.t -> t option Lwt.t
+  val read_exn: Chain.t -> Block_hash.t -> t Lwt.t
 
-  (** A type for predecessor reads in the context of partial chain history. **)
-  type predecessor_lookup =
-    | Complete of block
-    | Pruned of {
-        chain_id: Chain_id.t ;
-        hash: Block_hash.t ;
-        header: Block_header.t
-      }
-    | Unknown
-
-  (** [read_predecessor chain ~pred ~below_save_point hash] returns either:
-      - [Complete b], where [b] is the block at distance [pred] of the
-        one referenced by [hash] in the [chain];
-      - [Pruned h] with the header of the block at distance [pred] of the
-        one referenced by [hash] block.
-        This occurs when the node is running in full mode or rolling mode,
-        and if [below_save_point] is [true]) and if the block has been pruned
-        but not deleted (i.e it is between the caboose and the savepoint);
-      - [Unknown] if the block does not exist in the [chain].
-        This occurs when the block has been deleted of if the distance [pred] is
-        too big.
-  *)
-  val read_predecessor: Chain.t -> pred:int -> ?below_save_point:bool -> Block_hash.t -> predecessor_lookup Lwt.t
+  (** Will return the full block if the block has never been cleaned
+      (all blocks for nodes whose history-mode is set to archive), only
+      the header for nodes below the save point (nodes in full or
+      rolling history-mode) or even `Pruned` for blocks below the rock
+      bottom, only for nodes in rolling history-mode. Will fail with
+      `Not_found` if the given hash is unknown. *)
+  val read_predecessor: Chain.t -> pred:int -> ?below_save_point:bool -> Block_hash.t -> t option Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -177,49 +161,13 @@ module Block : sig
     Operation.t list list -> MBytes.t list list ->
     validation_store ->
     forking_testchain: bool ->
-    block option tzresult Lwt.t
+    t option tzresult Lwt.t
 
   val store_invalid:
     Chain.t ->
     Block_header.t ->
     error list ->
     bool tzresult Lwt.t
-
-  module Header : sig
-    type t = private {
-      chain_state: Chain.t ;
-      hash: Block_hash.t ;
-      header: Block_header.t ;
-    }
-    type block_header = t
-
-    val known: Chain.t -> Block_hash.t -> bool Lwt.t
-
-    val read: Chain.t -> Block_hash.t -> block_header tzresult Lwt.t
-    val read_opt: Chain.t -> Block_hash.t -> block_header option Lwt.t
-    val read_exn: Chain.t -> Block_hash.t -> block_header Lwt.t
-
-    val of_block: block -> block_header
-    val to_block: block_header -> block option Lwt.t
-
-    val compare: t -> t -> int
-    val equal: t -> t -> bool
-
-    val hash: t -> Block_hash.t
-    val header: t -> Block_header.t
-    val shell_header: t -> Block_header.shell_header
-    val timestamp: t -> Time.t
-    val fitness: t -> Fitness.t
-    val validation_passes: t -> int
-    val level: t -> Int32.t
-
-    val all_operation_hashes: block_header -> Operation_hash.t list list Lwt.t
-
-    val predecessor : block_header -> block_header option Lwt.t
-    val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
-
-  end
-
 
   val compare: t -> t -> int
   val equal: t -> t -> bool
@@ -233,13 +181,13 @@ module Block : sig
   val chain_id: t -> Chain_id.t
   val chain_state: t -> Chain.t
   val level: t -> Int32.t
-  val message: t -> string option
-  val max_operations_ttl: t -> int
-  val metadata: t -> MBytes.t
-  val last_allowed_fork_level: t -> Int32.t
+  val message: t -> string option tzresult Lwt.t
+  val max_operations_ttl: t -> int tzresult Lwt.t
+  val metadata: t -> MBytes.t tzresult Lwt.t
+  val last_allowed_fork_level: t -> Int32.t tzresult Lwt.t
 
   val is_genesis: t -> bool
-  val predecessor: t -> block option Lwt.t
+  val predecessor: t -> t option Lwt.t
   val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
   val is_valid_for_checkpoint: t -> Block_header.t -> bool Lwt.t
@@ -261,7 +209,7 @@ module Block : sig
     t -> int -> MBytes.t list Lwt.t
   val all_operations_metadata: t -> MBytes.t list list Lwt.t
 
-  val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
+  val watcher: Chain.t -> t Lwt_stream.t * Lwt_watcher.stopper
 
   (** [known_ancestor chain_state locator] computes the unknown prefix in
       the [locator] according to [chain_state].
@@ -279,8 +227,8 @@ module Block : sig
     Chain.t -> Block_locator.t ->
     Block_locator.t option Lwt.t
 
-  val get_rpc_directory: block -> block RPC_directory.t option Lwt.t
-  val set_rpc_directory: block -> block RPC_directory.t -> unit Lwt.t
+  val get_rpc_directory: t -> t RPC_directory.t option Lwt.t
+  val set_rpc_directory: t -> t RPC_directory.t -> unit Lwt.t
 
 end
 

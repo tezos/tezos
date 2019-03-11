@@ -114,9 +114,10 @@ let locked_set_head chain_store data block live_blocks live_operations =
              }
 
 let set_head chain_state block =
+  State.Block.max_operations_ttl block >>=? fun max_op_ttl ->
   Chain_traversal.live_blocks
-    block (State.Block.max_operations_ttl block) >>=? fun (live_blocks,
-                                                           live_operations) ->
+    block max_op_ttl >>=? fun (live_blocks,
+                               live_operations) ->
   State.update_chain_data chain_state begin fun chain_store data ->
     locked_set_head
       chain_store data block live_blocks live_operations >>= fun new_chain_data ->
@@ -125,8 +126,9 @@ let set_head chain_state block =
   return chain_state
 
 let test_and_set_head chain_state ~old block =
+  State.Block.max_operations_ttl block >>=? fun max_op_ttl ->
   Chain_traversal.live_blocks
-    block (State.Block.max_operations_ttl block) >>=? fun (live_blocks, live_operations) ->
+    block max_op_ttl >>=? fun (live_blocks, live_operations) ->
   State.update_chain_data chain_state begin fun chain_store data ->
     if not (State.Block.equal data.current_head old) then
       Lwt.return (None, false)
