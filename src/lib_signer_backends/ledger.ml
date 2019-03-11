@@ -44,12 +44,12 @@ let description =
    Use `tezos-client list connected ledgers` to get the <root_pkh> of \
    all connected devices."
 
-let hard = Int32.logor 0x8000_0000l
-let unhard = Int32.logand 0x7fff_ffffl
-let is_hard n = Int32.logand 0x8000_0000l n <> 0l
-let tezos_root = [hard 44l ; hard 1729l]
-
 module Bip32_path = struct
+  let hard = Int32.logor 0x8000_0000l
+  let unhard = Int32.logand 0x7fff_ffffl
+  let is_hard n = Int32.logand 0x8000_0000l n <> 0l
+  let tezos_root = [hard 44l ; hard 1729l]
+
   let node_of_string str =
     match Int32.of_string_opt str with
     | Some node -> Some node
@@ -156,9 +156,13 @@ let pp_id ppf = function
         curve
 
 let pp_animals_uri ppf (names, curve, path) =
-  let (root, path_without_root) = List.split_n (List.length tezos_root) path in
-  if root <> tezos_root then
-    Format.kasprintf Pervasives.failwith "BIP32 path is missing Tezos BIP32 prefix of %a: %a" Bip32_path.pp_path tezos_root Bip32_path.pp_path path
+  let (root, path_without_root) =
+    List.split_n (List.length Bip32_path.tezos_root) path in
+  if root <> Bip32_path.tezos_root then
+    Format.kasprintf
+      Pervasives.failwith
+      "BIP32 path is missing Tezos BIP32 prefix of %a: %a"
+      Bip32_path.pp_path Bip32_path.tezos_root Bip32_path.pp_path path
   else
     Format.fprintf ppf "ledger://%a%a" pp_id (Animals (names, Some curve))
       (fun fmt -> function
@@ -225,7 +229,7 @@ let wrap_ledger_cmd f =
 let public_key_returning_instruction which
     ?(prompt=false)
     ledger curve path =
-  let path = tezos_root @ path in
+  let path = Bip32_path.tezos_root @ path in
   begin match which with
     | `Get_public_key -> wrap_ledger_cmd begin fun pp ->
         Ledgerwallet_tezos.get_public_key ~prompt ~pp ledger curve path
@@ -408,7 +412,7 @@ let int32_of_path_element x =
       let len = String.length x in
       if len < 2 then None else
         Option.map
-          ~f:hard (Int32.of_string_opt (String.sub x 0 (len - 1)))
+          ~f:Bip32_path.hard (Int32.of_string_opt (String.sub x 0 (len - 1)))
 
 let int32_of_path_element_exn x =
   match int32_of_path_element x with
@@ -498,7 +502,7 @@ let sign ?watermark sk_uri msg =
                           msg]
       end in
     curve_of_id id >>=? fun curve ->
-    let path = tezos_root @ path_of_sk_uri sk_uri in
+    let path = Bip32_path.tezos_root @ path_of_sk_uri sk_uri in
     let msg_len = MBytes.length msg in
     wrap_ledger_cmd begin fun pp ->
       if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
