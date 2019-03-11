@@ -71,24 +71,6 @@ module Bip32_path = struct
   let string_of_path = Fmt.to_to_string pp_path
 end
 
-(* Those are always valid on Ledger Nano S with latest firmware. *)
-let vendor_id = 0x2c97
-let product_id = 0x0001
-
-let pks : (pk_uri, Signature.Public_key.t) Hashtbl.t =
-  Hashtbl.create 13
-
-let pkhs : (pk_uri, Signature.Public_key_hash.t) Hashtbl.t =
-  Hashtbl.create 13
-
-let curve_of_pkh :
-  Signature.public_key_hash -> Ledgerwallet_tezos.curve = function
-  | Ed25519 _ -> Ledgerwallet_tezos.Ed25519
-  | Secp256k1 _ -> Secp256k1
-  | P256 _ -> Secp256r1
-
-let secp256k1_ctx =
-  Libsecp256k1.External.Context.create ~sign:false ~verify:false ()
 
 type error +=
   | LedgerError of Ledgerwallet.Transport.error
@@ -127,230 +109,367 @@ let () =
     (function Ledger_deterministic_nonce_not_implemented -> Some () | _ -> None)
     (fun () -> Ledger_deterministic_nonce_not_implemented)
 
-type id =
-  | Animals of Ledger_names.t * Ledgerwallet_tezos.curve option
-  | Pkh of Signature.Public_key_hash.t
+(** Wrappers around Ledger APDUs. *)
+module Ledger_commands = struct
 
-let pp_id ppf = function
-  | Pkh pkh -> Signature.Public_key_hash.pp ppf pkh
-  | Animals (cthd, curve) ->
-      Format.fprintf ppf "%a%a" Ledger_names.pp cthd
-        (fun fmt -> function
-           | None -> Format.fprintf fmt ""
-           | Some a -> Format.fprintf fmt "/%a" Ledgerwallet_tezos.pp_curve a)
-        curve
+  let wrap_ledger_cmd f =
+    let buf = Buffer.create 100 in
+    let pp =
+      Format.make_formatter
+        (fun s ofs lgth -> Buffer.add_substring buf s ofs lgth)
+        (fun () -> debug "%s%!" (Buffer.contents buf) ; Buffer.clear buf) in
+    let res = f pp in
+    lwt_debug "%!" >>= fun () ->
+    match res with
+    | Error err ->
+        fail (LedgerError err)
+    | Ok v ->
+        return v
 
-let pp_animals_uri ppf (names, curve, path) =
-  let (root, path_without_root) =
-    List.split_n (List.length Bip32_path.tezos_root) path in
-  if root <> Bip32_path.tezos_root then
-    Format.kasprintf
-      Pervasives.failwith
-      "BIP32 path is missing Tezos BIP32 prefix of %a: %a"
-      Bip32_path.pp_path Bip32_path.tezos_root Bip32_path.pp_path path
-  else
-    Format.fprintf ppf "ledger://%a%a" pp_id (Animals (names, Some curve))
-      (fun fmt -> function
-         | [] -> Format.fprintf fmt ""
-         | xs -> Format.fprintf fmt "/%a" Bip32_path.pp_path xs)
-      path_without_root
-
-let parse_animals animals =
-  match String.split '-' animals with
-  | [c; t; h; d] -> Some { Ledger_names.c ; t ; h ; d }
-  | _ -> None
-
-let id_of_uri uri =
-  let host = Uri.host uri in
-  match Option.apply host
-          ~f:Signature.Public_key_hash.of_b58check_opt with
-  | Some pkh -> return (Pkh pkh)
-  | None ->
-      match Option.apply host ~f:parse_animals,
-            Option.apply (List.hd_opt (String.split '/' (Uri.path uri)))
-              ~f:Ledgerwallet_tezos.curve_of_string with
-      | Some animals, curve ->
-          return (Animals (animals, curve))
-      | (ann, curr) ->
-          failwith "No public key hash or animal names in %a (%a, %a)"
-            Uri.pp_hum uri
-            (fun fmt -> function
-               | None -> Format.fprintf fmt "NONE"
-               | Some a -> Format.fprintf fmt "%a" Ledger_names.pp a)
-            ann
-            (fun fmt -> function
-               | None -> Format.fprintf fmt "NONE"
-               | Some a -> Format.fprintf fmt "%a" Ledgerwallet_tezos.pp_curve a)
-            curr
-
-let id_of_pk_uri (uri : pk_uri) = id_of_uri (uri :> Uri.t)
-let id_of_sk_uri (uri : sk_uri) = id_of_uri (uri :> Uri.t)
-
-let sk_or_alias_param next =
-  let name = "account-alias-or-ledger-uri" in
-  let desc = "An imported ledger alias or a ledger URI (e.g. 'ledger://animal/curve/path')." in
-  let open Clic in
-  (* Order of parsers is important: The secret key parser accepts far more inputs so must come last. *)
-  param ~name ~desc (compose_parameters
-                       (map_parameter ~f:(fun (_, (x, _)) -> `Pk_uri x) (Public_key.alias_parameter ()))
-                       (map_parameter ~f:(fun x -> `Sk_uri x) (Client_keys.sk_uri_parameter ())))
-    next
-
-let id_of_sk_or_pk = function
-  | `Sk_uri sk -> id_of_sk_uri sk
-  | `Pk_uri pk -> id_of_pk_uri pk
-
-let wrap_ledger_cmd f =
-  let buf = Buffer.create 100 in
-  let pp = Format.formatter_of_buffer buf in
-  let res = f pp in
-  debug "%s" (Buffer.contents buf) ;
-  match res with
-  | Error err ->
-      fail (LedgerError err)
-  | Ok v ->
-      return v
-
-let public_key_returning_instruction which
-    ?(prompt=false)
-    ledger curve path =
-  let path = Bip32_path.tezos_root @ path in
-  begin match which with
-    | `Get_public_key -> wrap_ledger_cmd begin fun pp ->
-        Ledgerwallet_tezos.get_public_key ~prompt ~pp ledger curve path
-      end
-    | `Authorize_baking ->
-        wrap_ledger_cmd begin fun pp ->
-          Ledgerwallet_tezos.authorize_baking ~pp ledger curve path
-        end
-    | `Setup (main_chain_id, main_hwm, test_hwm) ->
-        wrap_ledger_cmd begin fun pp ->
-          Ledgerwallet_tezos.setup_baking ~pp ledger curve path
-            ~main_chain_id ~main_hwm ~test_hwm
-        end
-  end >>|? fun pk ->
-  let pk = Cstruct.to_bigarray pk in
-  match curve with
-  | Ledgerwallet_tezos.Ed25519 ->
-      MBytes.set_int8 pk 0 0 ; (* hackish, but works. *)
-      Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding pk
-  | Secp256k1 ->
-      let open Libsecp256k1.External in
-      let buf = MBytes.create (Key.compressed_pk_bytes + 1) in
-      let pk = Key.read_pk_exn secp256k1_ctx pk in
-      MBytes.set_int8 buf 0 1 ;
-      let _nb_written = Key.write secp256k1_ctx ~pos:1 buf pk in
-      Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
-  | Secp256r1 ->
-      let open Uecc in
-      let pklen = compressed_size secp256r1 in
-      let buf = MBytes.create (pklen + 1) in
-      match pk_of_bytes secp256r1 pk with
-      | None ->
-          Pervasives.failwith "Impossible to read P256 public key from Ledger"
-      | Some pk ->
-          MBytes.set_int8 buf 0 2 ;
-          let _nb_written = write_key ~compress:true (MBytes.sub buf 1 pklen) pk in
-          Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
-
-let get_public_key = public_key_returning_instruction `Get_public_key
-
-module Ledger = struct
-  type t = {
-    device_info : Hidapi.device_info ;
-    version : Ledgerwallet_tezos.Version.t ;
-    git_commit : string option ;
-    of_curve : (Ledgerwallet_tezos.curve *
-                (Signature.Public_key.t *
-                 Signature.Public_key_hash.t)) list ;
-    of_pkh : (Signature.Public_key_hash.t *
-              (Signature.Public_key.t *
-               Ledgerwallet_tezos.curve)) list ;
-  }
-
-  let create ?git_commit ~device_info ~version ~of_curve ~of_pkh () =
-    { device_info ; version ; git_commit ; of_curve ; of_pkh }
-
-  let curves { Ledgerwallet_tezos.Version.major ; minor ; patch ; _ } =
-    let open Ledgerwallet_tezos in
-    if (major, minor, patch) <= (0, 1, 0) then
-      [ Ed25519 ; Secp256k1 ]
-    else
-      [ Ed25519 ; Secp256k1 ; Secp256r1 ]
-
-  let animals_of_pkh pkh =
-    pkh |> Signature.Public_key_hash.to_string |>
-    Ledger_names.crouching_tiger
-
-  let find_ledgers ?id ?git_commit h device_info version =
-    fold_left_s begin fun (ledger_found, of_curve, of_pkh) curve ->
-      get_public_key h curve [] >>|? fun pk ->
-      let cur_pkh = Signature.Public_key.hash pk in
-      let cur_animals = animals_of_pkh cur_pkh in
-      log_info "Found PK: %a" Signature.Public_key.pp pk ;
-      log_info "Found PKH: %a" Signature.Public_key_hash.pp cur_pkh ;
-      log_info "Found Animals: %a" Ledger_names.pp cur_animals ;
-      ledger_found ||
-      (match id with
-       | Some (Pkh pkh) when pkh = cur_pkh -> true
-       | Some (Animals (animals, _)) when animals = cur_animals -> true
-       | _ -> false),
-      (curve, (pk, cur_pkh)) :: of_curve,
-      (cur_pkh, (pk, curve)) :: of_pkh
-    end (false, [], []) (curves version)
-    >>=? fun (ledger_found, of_curve, of_pkh) ->
-    match id with
-    | None ->
-        return_some
-          (create ?git_commit ~device_info ~version
-             ~of_curve ~of_pkh ())
-    | Some _ when ledger_found ->
-        return_some
-          (create ?git_commit ~device_info ~version
-             ~of_curve ~of_pkh ())
-    | _ -> return_none
-
-  let of_hidapi ?id device_info h =
+  let get_version ~device_info h =
     let buf = Buffer.create 100 in
     let pp = Format.formatter_of_buffer buf in
     let version = Ledgerwallet_tezos.get_version ~pp h in
     debug "%s" (Buffer.contents buf) ;
     match version with
-    | Error (AppError { status = Ledgerwallet.Transport.Status.Ins_not_supported ; _ })
-    | Error (AppError { status = Ledgerwallet_tezos.Version.Tezos_impossible_to_read_version ; _ }) ->
-        (* version is < 0.1.1. Assume it is 0.0.1, Tezos app. *)
-        let version =
-          { Ledgerwallet_tezos.Version.app_class = Tezos ;
-            major = 0 ;
-            minor = 0 ;
-            patch = 1 ;
-          } in
-        warn "Impossible to read Tezos version, assuming %a"
-          Ledgerwallet_tezos.Version.pp version ;
-        find_ledgers ?id h device_info version
     | Error e ->
         warn "WARNING:@ The device at [%s] is not a Tezos application@ \
               %a"
           device_info.Hidapi.path
           Ledgerwallet.Transport.pp_error e ;
         return_none
-    | Ok ({ major; minor; patch; _ } as version) ->
-        log_info "Found a %a application at [%s]"
-          Ledgerwallet_tezos.Version.pp version device_info.path ;
-        begin
-          if (major, minor, patch) >= (1, 4, 0) then
-            wrap_ledger_cmd (fun pp ->
-                Ledgerwallet_tezos.get_git_commit ~pp h) >>=? fun c ->
-            return_some c
-          else return_none
-        end >>=? fun git_commit ->
-        find_ledgers ?id ?git_commit h device_info version
+    | Ok version ->
+        wrap_ledger_cmd (fun pp ->
+            Ledgerwallet_tezos.get_git_commit ~pp h) >>=? fun git_commit ->
+        log_info "Found a %a application at [%s] (git-description: %S)"
+          Ledgerwallet_tezos.Version.pp version device_info.path git_commit ;
+        let cleaned_up =
+          (* The ledger sends a NUL-terminated C-String: *)
+          if git_commit.[String.length git_commit - 1] = '\x00'
+          then String.sub git_commit 0 (String.length git_commit - 1)
+          else git_commit in
+        return_some (version, cleaned_up)
+
+  let secp256k1_ctx =
+    Libsecp256k1.External.Context.create ~sign:false ~verify:false ()
+
+  let public_key_returning_instruction which
+      ?(prompt=false)
+      hidapi curve path =
+    let path = Bip32_path.tezos_root @ path in
+    begin match which with
+      | `Get_public_key -> wrap_ledger_cmd begin fun pp ->
+          Ledgerwallet_tezos.get_public_key ~prompt ~pp hidapi curve path
+        end
+      | `Authorize_baking ->
+          wrap_ledger_cmd begin fun pp ->
+            Ledgerwallet_tezos.authorize_baking ~pp hidapi curve path
+          end
+      | `Setup (main_chain_id, main_hwm, test_hwm) ->
+          wrap_ledger_cmd begin fun pp ->
+            Ledgerwallet_tezos.setup_baking ~pp hidapi curve path
+              ~main_chain_id ~main_hwm ~test_hwm
+          end
+    end >>|? fun pk ->
+    let pk = Cstruct.to_bigarray pk in
+    match curve with
+    | Ledgerwallet_tezos.Ed25519 ->
+        MBytes.set_int8 pk 0 0 ; (* hackish, but works. *)
+        Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding pk
+    | Secp256k1 ->
+        let open Libsecp256k1.External in
+        let buf = MBytes.create (Key.compressed_pk_bytes + 1) in
+        let pk = Key.read_pk_exn secp256k1_ctx pk in
+        MBytes.set_int8 buf 0 1 ;
+        let _nb_written = Key.write secp256k1_ctx ~pos:1 buf pk in
+        Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
+    | Secp256r1 ->
+        let open Uecc in
+        let pklen = compressed_size secp256r1 in
+        let buf = MBytes.create (pklen + 1) in
+        match pk_of_bytes secp256r1 pk with
+        | None ->
+            Pervasives.failwith "Impossible to read P256 public key from Ledger"
+        | Some pk ->
+            MBytes.set_int8 buf 0 2 ;
+            let _nb_written = write_key ~compress:true (MBytes.sub buf 1 pklen) pk in
+            Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
+
+  let get_public_key = public_key_returning_instruction `Get_public_key
+
+  let pkh_of_pk = Signature.Public_key.hash
+
+  let public_key
+      ?(interactive : Client_context.io_wallet option) hid curve path =
+    begin match interactive with
+      | Some cctxt ->
+          get_public_key ~prompt:false hid curve path >>=? fun pk ->
+          let pkh = pkh_of_pk pk in
+          cctxt#message
+            "Please validate@ (and write down)@ the public key hash\
+             @ displayed@ on the Ledger,@ it should be equal@ to `%a`:"
+            Signature.Public_key_hash.pp pkh >>= fun () ->
+          get_public_key ~prompt:true hid curve path
+      | None ->
+          get_public_key ~prompt:false hid curve path
+    end
+
+  let public_key_hash ?interactive hid curve path =
+    public_key ?interactive hid curve path >>=? fun pk ->
+    return (pkh_of_pk pk, pk)
+
+  let get_authorized_path  hid version =
+    let open Ledgerwallet_tezos.Version in
+    if version.major < 2 then
+      wrap_ledger_cmd (fun pp -> Ledgerwallet_tezos.get_authorized_key ~pp hid)
+      >>|? fun path -> `Legacy_path path
+    else
+      wrap_ledger_cmd
+        (fun pp -> Ledgerwallet_tezos.get_authorized_path_and_curve ~pp hid)
+      >>= function
+      | Error (LedgerError
+                 (AppError
+                    {status = Ledgerwallet.Transport.Status.Referenced_data_not_found; _}) :: _) ->
+          return `No_baking_authorized
+      | Error _ as e -> Lwt.return e
+      | Ok (path, curve) -> return (`Path_curve (path, curve))
+
+  let sign ?watermark hid curve path base_msg =
+    let msg =
+      Option.unopt_map watermark
+        ~default:base_msg ~f:(fun watermark ->
+            MBytes.concat ""
+              [Signature.bytes_of_watermark watermark ; base_msg]) in
+    let path = Bip32_path.tezos_root @ path in
+    wrap_ledger_cmd begin fun pp ->
+      (* if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
+       *   Ledgerwallet_tezos.sign ~hash_on_ledger:false
+       *     ~pp ledger curve path
+       *     (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
+       * else *)
+      Ledgerwallet_tezos.sign
+        ~pp hid curve path (Cstruct.of_bigarray msg)
+    end >>=? fun signature ->
+    match curve with
+    | Ed25519 ->
+        let signature = Cstruct.to_bigarray signature in
+        let signature = Ed25519.of_bytes_exn signature in
+        return (Signature.of_ed25519 signature)
+    | Secp256k1 ->
+        (* Remove parity info *)
+        Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
+        let signature = Cstruct.to_bigarray signature in
+        let open Libsecp256k1.External in
+        let signature = Sign.read_der_exn secp256k1_ctx signature in
+        let bytes = Sign.to_bytes secp256k1_ctx signature in
+        let signature = Secp256k1.of_bytes_exn bytes in
+        return (Signature.of_secp256k1 signature)
+    | Secp256r1 ->
+        (* Remove parity info *)
+        Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
+        let signature = Cstruct.to_bigarray signature in
+        let open Libsecp256k1.External in
+        (* We use secp256r1 library to extract P256 DER signature. *)
+        let signature = Sign.read_der_exn secp256k1_ctx signature in
+        let buf = Sign.to_bytes secp256k1_ctx signature in
+        let signature = P256.of_bytes_exn buf in
+        return (Signature.of_p256 signature)
 end
 
-let find_ledgers ?id () =
+(** Identification of a ledger's root key through crouching-tigers
+    (not the keys used for an account). *)
+module Ledger_id = struct
+  (**
+     The “ID” of the ledger is the animals (or pkh) corresponding to
+     ["/ed25519/"] (first curve, no path).
+  *)
+  type t = Animals of Ledger_names.t | Pkh of Signature.public_key_hash
+
+  let animals_of_pkh pkh =
+    pkh |> Signature.Public_key_hash.to_string |>
+    Ledger_names.crouching_tiger
+
+  let curve = Ledgerwallet_tezos.Ed25519
+
+  let get hidapi =
+    Ledger_commands.get_public_key hidapi curve [] >>=? fun pk ->
+    let pkh = Signature.Public_key.hash pk in
+    let animals = animals_of_pkh pkh in
+    return (Animals animals)
+
+  let pp ppf = function
+    | Animals a -> Ledger_names.pp ppf a
+    | Pkh pkh -> Signature.Public_key_hash.pp ppf pkh
+
+  let to_animals =
+    function
+    | Animals a -> a
+    | Pkh pkh -> animals_of_pkh pkh
+
+  let equal a b = to_animals a = to_animals b
+end
+
+(** An account is a given key-pair corresponding to a
+    [ledger + curve + derivation-path]. *)
+module Ledger_account = struct
+  type t = {
+    ledger : Ledger_id.t ;
+    curve : Ledgerwallet_tezos.curve ;
+    path: int32 list
+  }
+end
+
+(** {!Leder_uri.t} represents a parsed ["ledger://..."] URI which may
+    refer to a {!Ledger_id.t} or a full blown {!Ledger_account.t}. *)
+module Ledger_uri = struct
+
+  type t = [ `Ledger of Ledger_id.t | `Ledger_account of Ledger_account.t ]
+
+  let int32_of_path_element_exn ?(allow_weak = false) x =
+    let failf ppf = Printf.ksprintf Pervasives.failwith ppf in
+    let len = String.length x in
+    match String.get x (len - 1) with
+    | exception _ -> failf "Empty path element"
+    | '\'' ->
+        let intpart = String.sub x 0 (len - 1) in
+        begin match Int32.of_string_opt intpart with
+          | Some i -> Bip32_path.hard i
+          | None -> failf "Path is not an integer: %S" intpart
+        end
+    | _ when allow_weak ->
+        begin match Int32.of_string_opt x with
+          | Some i -> i
+          | None -> failf "Path is not a non-hardened integer: %S" x
+        end
+    | _ ->
+        (* Future derivation schemes will support weak paths, not for now. *)
+        failf "Non-hardened paths are not allowed (%S)" x
+
+  let parse_animals animals =
+    match String.split '-' animals with
+    | [c; t; h; d] -> Some { Ledger_names.c ; t ; h ; d }
+    | _ -> None
+
+  let parse ?allow_weak uri : t tzresult Lwt.t =
+    let host = Uri.host uri in
+    begin match Option.apply host
+                  ~f:Signature.Public_key_hash.of_b58check_opt with
+    | Some pkh -> return (Ledger_id.Pkh pkh)
+    | None ->
+        (match Option.apply host ~f:parse_animals with
+         | Some animals -> return (Ledger_id.Animals animals)
+         | None ->
+             failwith "Cannot parse host of URI: %s" (Uri.to_string uri))
+    end >>=? fun ledger ->
+    let components = String.split '/' (Uri.path uri) in
+    begin match components with
+      | s :: tl ->
+          let curve, more_path =
+            match Ledgerwallet_tezos.curve_of_string s with
+            | Some curve -> curve, tl
+            | None -> Ledger_id.curve, s :: tl in
+          begin
+            try return (List.map
+                          (int32_of_path_element_exn ?allow_weak)
+                          more_path)
+            with Failure s ->
+              failwith "Failed to parse Curve/BIP32 path from %s (%s): %s"
+                (Uri.path uri) (Uri.to_string uri) s
+          end
+          >>=? fun bip32 ->
+          return (`Ledger_account Ledger_account.{ledger; curve; path = bip32})
+      | [] ->
+          return (`Ledger ledger)
+    end
+
+  let ledger_uri_or_alias_param next =
+    let name = "account-alias-or-ledger-uri" in
+    let desc =
+      "An imported ledger alias or a ledger URI \
+       (e.g. \"ledger://animal/curve/path\")." in
+    let open Clic in
+    param ~name ~desc
+      (parameter
+         (fun cctxt str ->
+            Public_key.find_opt cctxt str >>=? begin function
+              | Some ((x : pk_uri), _) -> return (x :> Uri.t)
+              | None ->
+                  try return (Uri.of_string str)
+                  with e ->
+                    failwith "Error while parsing URI: %s"
+                      (Printexc.to_string e)
+            end
+            >>=? fun uri ->
+            parse uri))
+      next
+
+  let pp: _ -> t -> unit = fun ppf -> Format.(function
+      | `Ledger lid -> fprintf ppf "ledger://%a" Ledger_id.pp lid
+      | `Ledger_account {Ledger_account.ledger ; curve ; path } ->
+          fprintf ppf "ledger://%a/%a/%a"
+            Ledger_id.pp ledger
+            Ledgerwallet_tezos.pp_curve curve
+            Bip32_path.pp_path path)
+
+  let if_matches (meta_uri : t) ledger_id cont =
+    match meta_uri with
+    | `Ledger l ->
+        if Ledger_id.equal l ledger_id then cont () else return_none
+    | `Ledger_account { Ledger_account. ledger ; _ } ->
+        if Ledger_id.equal ledger ledger_id then cont () else return_none
+
+
+  let full_account (ledger_uri : t) =
+    begin match ledger_uri with
+      | `Ledger_account acc -> return acc
+      | `Ledger ledger_id ->
+          failwith
+            "Insufficient information: \
+             you need to provide a curve & BIP32 path (%a)."
+            Ledger_id.pp ledger_id
+    end
+
+end
+
+(** Filters allow early dismissal of HID devices/ledgers which
+    searching for a ledger. *)
+module Filter = struct
+  type version_filter =
+    Ledgerwallet_tezos.Version.t * string -> bool
+  type t = [
+    | `None
+    | `Hid_path of string
+    | `Version of string * version_filter
+  ]
+
+  let version_matches (t : t) version_commit =
+    match t with
+    | `Version (_, f) -> f version_commit
+    | _ -> true
+
+  let is_app : _ -> _ -> t =
+    fun msg app ->
+      `Version (msg, fun ({Ledgerwallet_tezos.Version.app_class ; _} ,_) ->
+          app = app_class)
+
+  let is_baking = is_app "App = Baking" Ledgerwallet_tezos.Version.TezBake
+
+  let pp ppf (f : t) =
+    let open Format in
+    match f with
+    | `None -> fprintf ppf "None"
+    | `Hid_path s -> fprintf ppf "HID-path: %s" s
+    | `Version (s, _) -> fprintf ppf "%s" s
+end
+
+(* Those are always valid on Ledger Nano S with latest firmware. *)
+let vendor_id = 0x2c97
+let product_id = 0x0001
+
+let use_ledger ?(filter : Filter.t = `None) f =
   let ledgers = Hidapi.enumerate ~vendor_id ~product_id () in
   log_info "Found %d Ledger(s)" (List.length ledgers) ;
-  filter_map_s begin fun device_info ->
+  let process_device device_info f =
     log_info "Processing Ledger at path [%s]" device_info.Hidapi.path ;
     (* HID interfaces get the number 0
        (cf. https://github.com/LedgerHQ/ledger-nano-s/issues/48)
@@ -365,69 +484,139 @@ let find_ledgers ?id () =
       (device_info.Hidapi.interface_number = -1
        && device_info.Hidapi.usage_page = 0xffa0)
     then
-      begin match Hidapi.(open_path device_info.path) with
-        | None -> return_none
-        | Some h ->
-            Lwt.finalize
-              (fun () -> Ledger.of_hidapi ?id device_info h)
-              (fun () -> Hidapi.close h ; Lwt.return_unit)
+      begin match filter with
+        | `Hid_path hp when device_info.path <> hp -> return_none
+        | _ ->
+            begin match Hidapi.(open_path device_info.path) with
+              | None -> return_none
+              | Some h ->
+                  Lwt.finalize
+                    (fun () ->
+                       Ledger_commands.get_version ~device_info h
+                       >>=? function
+                       | Some version_git when
+                           (Filter.version_matches filter version_git) ->
+                           Ledger_id.get h >>=? fun ledger_id ->
+                           f h version_git device_info ledger_id
+                       | None | Some _ -> return_none)
+                    (fun () -> Hidapi.close h ; Lwt.return_unit)
+            end
       end
     else
       return_none
-  end ledgers
+  in
+  let rec go =
+    function
+    | [] -> return_none
+    | h :: t ->
+        process_device h f
+        >>=? function
+        | Some x -> return_some x
+        | None -> go t
+  in
+  go ledgers
 
-let with_ledger id f =
-  find_ledgers ~id () >>=? function
-  | [] ->
-      failwith "No Ledger found for %a" pp_id id
-  | { device_info ; version ; of_curve ; of_pkh ; _ } :: _ ->
-      match Hidapi.open_path device_info.path with
-      | None ->
-          failwith "Cannot open Ledger %a at path %s"
-            pp_id id device_info.path
-      | Some h ->
-          Lwt.finalize
-            (fun () -> f h version of_curve of_pkh)
-            (fun () -> Hidapi.close h; Lwt.return_unit)
-
-let int32_of_path_element x =
-  match Int32.of_string_opt x with
-  | Some i -> Some i
+let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
+  use_ledger ?filter
+    (fun hidapi (version, git_commit) device_info ledger_id ->
+       Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
+           f hidapi (version, git_commit) device_info ledger_id))
+  >>=? function
+  | Some o -> return o
   | None ->
-      let len = String.length x in
-      if len < 2 then None else
-        Option.map
-          ~f:Bip32_path.hard (Int32.of_string_opt (String.sub x 0 (len - 1)))
-
-let int32_of_path_element_exn x =
-  match int32_of_path_element x with
-  | None -> invalid_arg "int32_of_path_element_exn"
-  | Some p -> p
-
-let path_of_sk_uri (uri : sk_uri) =
-  match TzString.split_path (Uri.path (uri :> Uri.t)) with
-  | [] -> []
-  | curve :: path when Ledgerwallet_tezos.curve_of_string curve <> None ->
-      List.map int32_of_path_element_exn path
-  | path -> List.map int32_of_path_element_exn path
-
-let path_of_pk_uri (uri : pk_uri) =
-  match TzString.split_path (Uri.path (uri :> Uri.t)) with
-  | [] -> []
-  | curve :: path when Ledgerwallet_tezos.curve_of_string curve <> None ->
-      List.map int32_of_path_element_exn path
-  | path -> List.map int32_of_path_element_exn path
-
-let unopt_curve annimal = function
-  | Some curve -> return curve
-  | None ->
-      failwith "A curve specification is required for this operation,@ e.g.@ \
-                \"ledger://%a/{ed25519,...}\"" Ledger_names.pp annimal
+      failwith "%sFound no ledger corresponding to %a%t."
+        (Option.unopt_map ~default:"" ~f:(Printf.sprintf "%s: ") msg)
+        Ledger_uri.pp ledger_uri
+        (fun ppf ->
+           match filter with
+           | Some f -> Format.fprintf ppf " with filter \"%a\"" Filter.pp f
+           | None -> ())
 
 
-let curve_of_id = function
-  | Pkh pkh -> return (curve_of_pkh pkh)
-  | Animals (a, curve_opt) -> unopt_curve a curve_opt
+(** A global {!Hashtbl.t} which allows us to avoid calling
+    {!Signer_implementation.get_public_key} too often. *)
+module Global_cache : sig
+  val record :
+    pk_uri ->
+    pk:Signature.public_key -> pkh:Signature.public_key_hash -> unit
+  val get :
+    pk_uri -> (Signature.public_key_hash * Signature.public_key) option
+end = struct
+  let _cache :
+    (pk_uri, Signature.Public_key_hash.t * Signature.Public_key.t) Hashtbl.t =
+    Hashtbl.create 13
+
+  let record pk_uri ~pk ~pkh =
+    Hashtbl.replace _cache pk_uri (pkh, pk)
+
+  let get pk_uri =
+    Hashtbl.find_opt _cache pk_uri
+end
+
+(** The implementation of the “signer-plugin.” *)
+module Signer_implementation : Client_keys.SIGNER = struct
+  let scheme = "ledger"
+
+  let title =
+    "Built-in signer using a Ledger Nano S."
+
+  let description =
+    Printf.sprintf
+      "Valid URIs are of the form\n\
+      \ - ledger://<animals>/<curve>[/<path>]\n\
+       where:\n\
+      \ - <animals> is the identifier of the ledger of the form \
+       'crouching-tiger-hidden-dragon' and can be obtained with the command \
+       `tezos-client list connected ledgers` (which also provides full examples).\n\
+       - <curve> is the signing curve, e.g. `ed1551`\n\
+       - <path> is a BIP32 path anchored at \
+       m/%s. The ledger does not yet support non-hardened paths, so each \
+       node of the path must be hardened."
+      Bip32_path.(string_of_path tezos_root)
+
+  let neuterize (sk : sk_uri) = return (make_pk_uri (sk :> Uri.t))
+
+  let pkh_of_pk = Signature.Public_key.hash
+
+  let public_key
+      ?(interactive : Client_context.io_wallet option) (pk_uri : pk_uri) =
+    match Global_cache.get pk_uri with
+    | Some (_, pk) -> return pk
+    | None ->
+        begin
+          Ledger_uri.parse (pk_uri :> Uri.t) >>=? fun ledger_uri ->
+          Ledger_uri.full_account ledger_uri >>=? fun { curve ; path ; _ } ->
+          use_ledger_or_fail ~ledger_uri
+            (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+               Ledger_commands.public_key ?interactive hidapi curve path
+               >>=? fun pk ->
+               let pkh = pkh_of_pk pk in
+               Global_cache.record pk_uri ~pkh ~pk ;
+               return_some pk)
+        end >>= function
+        | Error err -> failwith "%a" pp_print_error err
+        | Ok v -> return v
+
+  let public_key_hash ?interactive pk_uri =
+    match Global_cache.get pk_uri with
+    | Some (pkh, pk) -> return (pkh, Some pk)
+    | None ->
+        public_key ?interactive pk_uri >>=? fun pk ->
+        return (pkh_of_pk pk, Some pk)
+
+  let sign ?watermark (sk_uri : sk_uri) msg =
+    Ledger_uri.parse (sk_uri :> Uri.t) >>=? fun ledger_uri ->
+    Ledger_uri.full_account ledger_uri >>=? fun { curve ; path ; _ } ->
+    use_ledger_or_fail ~ledger_uri
+      (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+         Ledger_commands.sign ?watermark hidapi curve path msg
+         >>=? fun bytes ->
+         return_some bytes)
+
+  let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
+  let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
+  let supports_deterministic_nonces _ = return_false
+end
 
 (* The Ledger uses a special value 0x00000000 for the “any” chain-id: *)
 let pp_ledger_chain_id fmt s =
@@ -435,525 +624,428 @@ let pp_ledger_chain_id fmt s =
   | "\x00\x00\x00\x00" -> Format.fprintf fmt "'Unspecified'"
   | other -> Format.fprintf fmt "%a" Chain_id.pp (Chain_id.of_string_exn other)
 
-module Signer_implementation : Client_keys.SIGNER = struct
-  let scheme = "ledger"
+(** Commands for both ledger applications. *)
+let generic_commands group = Clic.[
+    command ~group
+      ~desc: "List supported Ledger Nano S devices connected."
+      no_options
+      (fixed [ "list" ; "connected" ; "ledgers" ])
+      (fun () (cctxt : Client_context.full) ->
+         use_ledger
+           (fun _hidapi (version, git_commit) device_info ledger_id ->
+              let open Hidapi in
+              cctxt#message "%t"
+                Format.(fun ppf ->
+                    let intro =
+                      asprintf
+                        "Found a %a (git-description: %S) application \
+                         running on %s %s at [%s]."
+                        Ledgerwallet_tezos.Version.pp version
+                        git_commit
+                        (device_info.manufacturer_string
+                         |> Option.unopt ~default:"NO-MANUFACTURER")
+                        (device_info.product_string
+                         |> Option.unopt ~default:"NO-PRODUCT")
+                        device_info.path
+                    in
+                    pp_open_vbox ppf 0 ;
+                    fprintf ppf "## Ledger `%a`@," Ledger_id.pp ledger_id ;
+                    pp_open_hovbox ppf 0 ;
+                    pp_print_text ppf intro ;
+                    pp_close_box ppf () ;
+                    pp_print_cut ppf () ;
+                    pp_print_cut ppf () ;
+                    pp_open_hovbox ppf 0 ;
+                    pp_print_text ppf
+                      "To use keys at BIP32 path m/44'/1729'/0'/0' \
+                       (default Tezos key path), use one of:" ;
+                    pp_close_box ppf () ;
+                    pp_print_cut ppf () ;
+                    List.iter (fun curve ->
+                        fprintf ppf
+                          "  tezos-client import secret key \
+                           ledger_%s \"ledger://%a/%a/0'/0'\""
+                          (Sys.getenv_opt "USER" |> Option.unopt ~default:"user")
+                          Ledger_id.pp ledger_id
+                          Ledgerwallet_tezos.pp_curve curve ;
+                        pp_print_cut ppf ())
+                      [ Ed25519 ; Secp256k1 ; Secp256r1 ] ;
+                    pp_close_box ppf () ;
+                    pp_print_newline ppf () )
+              >>= fun () ->
+              return_none)
+         >>=? fun _ ->
+         return_unit) ;
+    Clic.command ~group
+      ~desc: "Display version/public-key/address information for a Ledger URI"
+      (args1 (switch ~doc:"Test signing operation" ~long:"test-sign" ()))
+      (prefixes [ "show" ; "ledger" ]
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ stop)
+      (fun test_sign ledger_uri (cctxt : Client_context.full) ->
+         use_ledger_or_fail
+           ~ledger_uri
+           (fun hidapi (version, git_commit) device_info _ledger_id ->
+              cctxt#message "Found ledger corresponding to %a:"
+                Ledger_uri.pp ledger_uri
+              >>= fun () ->
+              cctxt#message "* Manufacturer: %s"
+                (Option.unopt device_info.manufacturer_string ~default:"NONE")
+              >>= fun () ->
+              cctxt#message "* Product: %s"
+                (Option.unopt device_info.product_string ~default:"NONE")
+              >>= fun () ->
+              cctxt#message "* Application: %a (git-description: %S)"
+                Ledgerwallet_tezos.Version.pp version git_commit
+              >>= fun () ->
+              begin match ledger_uri with
+                | `Ledger_account { curve ;  path ; _ } ->
+                    cctxt#message "* Curve: `%a`"
+                      Ledgerwallet_tezos.pp_curve curve
+                    >>= fun () ->
+                    let full_path = Bip32_path.tezos_root @ path in
+                    cctxt#message "* Path: `%s` [%s]"
+                      (Bip32_path.string_of_path full_path)
+                      (String.concat "; "
+                         (List.map (Printf.sprintf "0x%lX") full_path))
+                    >>= fun () ->
+                    Ledger_commands.public_key_hash hidapi curve path
+                    >>=? fun (pkh, pk) ->
+                    cctxt#message "* Public Key: %a"
+                      Signature.Public_key.pp pk >>= fun () ->
+                    cctxt#message "* Public Key Hash: %a@\n"
+                      Signature.Public_key_hash.pp pkh >>= fun () ->
+                    begin match test_sign, version.app_class with
+                      | true, Tezos ->
+                          let pkh_bytes =
+                            Signature.Public_key_hash.to_bytes pkh in
+                          (* Signing requires validation on the device.  *)
+                          cctxt#message "Attempting a signature, please \
+                                         validate on the ledger."
+                          >>= fun () ->
+                          Ledger_commands.sign
+                            ~watermark:Generic_operation
+                            hidapi curve path pkh_bytes >>=? fun signature ->
+                          begin match
+                              Signature.check ~watermark:Generic_operation
+                                pk signature pkh_bytes
+                            with
+                            | false ->
+                                failwith "Fatal: Ledger cannot sign with %a"
+                                  Signature.Public_key_hash.pp pkh
+                            | true ->
+                                cctxt#message "Tezos Wallet successfully signed."
+                                >>= fun () ->
+                                return_unit
+                          end
+                      | true, TezBake ->
+                          failwith "Option --test-sign only works \
+                                    for the Tezos Wallet app."
+                      | false, _ ->
+                          return_unit
+                    end
+                | `Ledger _ when test_sign ->
+                    failwith "Option --test-sign only works with a full \
+                              ledger URI/account (with curve/path)."
+                | `Ledger _ ->
+                    cctxt#message "* This is just a ledger URI."
+                    >>= fun () -> return_unit
+              end
+              >>=? fun () ->
+              return_some ())) ;
+  ]
 
-  let title =
-    "Built-in signer using Ledger Nano S."
+(** Commands specific to the Baking app minus the high-water-mark ones
+    which get a specific treatment in {!high_water_mark_commands}. *)
+let baking_commands group = Clic.[
+    Clic.command ~group
+      ~desc: "Query the path of the authorized key"
+      no_options
+      (prefixes [ "get" ; "ledger" ; "authorized" ; "path" ; "for" ]
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ stop)
+      (fun () ledger_uri (cctxt : Client_context.full) ->
+         use_ledger_or_fail ~ledger_uri ~filter:Filter.is_baking
+           (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+              Ledger_commands.get_authorized_path hidapi version
+              >>=? fun authorized ->
+              begin match authorized with
+                | `Legacy_path p ->
+                    cctxt#message
+                      "@[<v 0>Authorized baking path (Legacy < 2.x.y): %a@]"
+                      Bip32_path.pp_path p >>= fun () ->
+                    return_some ()
+                | `No_baking_authorized ->
+                    cctxt#message "No baking key authorized at all."
+                    >>= fun () ->
+                    return_some ()
+                | `Path_curve (ledger_path, ledger_curve) ->
+                    cctxt#message
+                      "@[<v 0>Authorized baking path: %a@]"
+                      Bip32_path.pp_path ledger_path >>= fun () ->
+                    cctxt#message
+                      "@[<v 0>Authorized baking curve: %a@]"
+                      Ledgerwallet_tezos.pp_curve ledger_curve >>= fun () ->
+                    begin match ledger_uri with
+                      | `Ledger _ -> return_some ()
+                      | `Ledger_account { curve; path ; _ }
+                        when curve = ledger_curve
+                          && Bip32_path.tezos_root @ path = ledger_path ->
+                          return_some ()
+                      | `Ledger_account { curve; path ; _ } ->
+                          failwith
+                            "Path and curve do not match the ones \
+                             specified in the command line: %a & %a"
+                            Ledgerwallet_tezos.pp_curve curve
+                            Bip32_path.pp_path (Bip32_path.tezos_root @ path)
+                    end
+              end)) ;
+    Clic.command ~group
+      ~desc: "Authorize a Ledger to bake for a key (deprecated, \
+              use `setup ledger ...` with recent versions of the Baking app)"
+      no_options
+      (prefixes [ "authorize" ; "ledger" ; "to" ; "bake" ; "for" ]
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ stop)
+      (fun () ledger_uri (cctxt : Client_context.full) ->
+         use_ledger_or_fail ~ledger_uri ~filter:Filter.is_baking
+           (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+              begin match version with
+                | { Ledgerwallet_tezos.Version.app_class = Tezos ; _ } ->
+                    failwith "This command (`authorize ledger ...`) only \
+                              works with the Tezos Baking app"
+                | { Ledgerwallet_tezos.Version.app_class = TezBake ;
+                    major ; _ } when major >= 2 ->
+                    failwith
+                      "This command (`authorize ledger ...`) is@ \
+                       not compatible with@ this version of the Ledger@ \
+                       Baking app (%a >= 2.0.0),@ please use the command@ \
+                       `setup ledger to bake for ...`@ from now on."
+                      Ledgerwallet_tezos.Version.pp version
+                | _ ->
+                    cctxt#message
+                      "This Ledger Baking app is outdated (%a)@ running@ \
+                       in backwards@ compatibility mode."
+                      Ledgerwallet_tezos.Version.pp version
+                    >>= fun () ->
+                    return_unit
+              end
+              >>=? fun () ->
+              Ledger_uri.full_account ledger_uri
+              >>=? fun { Ledger_account. curve ;  path ; _ } ->
+              Ledger_commands.public_key_returning_instruction
+                `Authorize_baking hidapi curve path
+              >>=? fun pk ->
+              let pkh = Signature.Public_key.hash pk in
+              cctxt#message
+                "@[<v 0>Authorized baking for address: %a@,\
+                 Corresponding full public key: %a@]"
+                Signature.Public_key_hash.pp pkh
+                Signature.Public_key.pp pk >>= fun () ->
+              return_some ())) ;
+    Clic.command ~group
+      ~desc: "Setup a Ledger to bake for a key"
+      (let hwm_arg kind =
+         let doc =
+           Printf.sprintf
+             "Use <HWM> as %s chain high watermark instead of asking the ledger."
+             kind in
+         let long = kind ^ "-hwm" in
+         default_arg ~doc ~long ~placeholder:"HWM"
+           ~default:"ASK-LEDGER"
+           (parameter
+              (fun _ -> function
+                 | "ASK-LEDGER" -> return None
+                 | s ->
+                     try return (Some (Int32.of_string s)) with _ ->
+                       failwith "Parameter %S should be a 32-bits integer" s))
+       in
+       args3
+         (default_arg
+            ~doc:"Use <ID> as main chain-id instead of asking the node."
+            ~long:"main-chain-id" ~placeholder:"ID"
+            ~default:"ASK-NODE"
+            (parameter
+               (fun _ -> function
+                  | "ASK-NODE" -> return `Ask_node
+                  | s ->
+                      try return (`Int32 (Int32.of_string s))
+                      with _ ->
+                        (try return (`Chain_id (Chain_id.of_b58check_exn s))
+                         with _ ->
+                           failwith "Parameter %S should be a 32-bits integer \
+                                     or a Base58 chain-id" s))))
+         (hwm_arg "main") (hwm_arg "test"))
+      (prefixes [ "setup" ; "ledger" ; "to" ; "bake" ; "for" ]
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ stop)
+      (fun (chain_id_opt, main_hwm_opt, test_hwm_opt) ledger_uri (cctxt : Client_context.full) ->
+         use_ledger_or_fail ~ledger_uri ~filter:Filter.is_baking
+           (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+              begin
+                let open Ledgerwallet_tezos.Version in
+                match version with
+                | { app_class = Tezos ; _ } ->
+                    failwith "This command (`setup ledger ...`) only \
+                              works with the Tezos Baking app"
+                | { app_class = TezBake ;
+                    major ; _ } when major < 2 ->
+                    failwith
+                      "This command (`setup ledger ...`)@ is not@ compatible@ with \
+                       this version@ of the Ledger Baking app@ (%a < 2.0.0),@ \
+                       please upgrade@ your ledger@ or use the command@ \
+                       `authorize ledger to bake for ...`"
+                      pp version
+                | _ -> return_unit
+              end
+              >>=? fun () ->
+              Ledger_uri.full_account ledger_uri
+              >>=? fun { Ledger_account. curve ;  path ; _ } ->
+              let chain_id_of_int32 i32 =
+                let open Int32 in
+                let byte n =
+                  logand 0xFFl (shift_right i32 (n * 8))
+                  |> Int32.to_int |> char_of_int in
+                Chain_id.of_string_exn
+                  (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i)))) in
+              begin match chain_id_opt with
+                | `Ask_node ->
+                    Chain_services.chain_id cctxt ()
+                | `Int32 s -> return (chain_id_of_int32 s)
+                | `Chain_id chid -> return chid
+              end
+              >>=? fun main_chain_id ->
+              Ledger_commands.wrap_ledger_cmd begin fun pp ->
+                Ledgerwallet_tezos.get_all_high_watermarks ~pp hidapi
+              end
+              >>=? fun (`Main_hwm current_mh, `Test_hwm current_th, `Chain_id current_ci) ->
+              let main_hwm = Option.unopt main_hwm_opt ~default:current_mh in
+              let test_hwm = Option.unopt test_hwm_opt ~default:current_th in
+              cctxt#message "Setting up the ledger:@.\
+                             * Main chain ID: %a -> %a@.\
+                             * Main chain High Watermark: %ld -> %ld@.\
+                             * Test chain High Watermark: %ld -> %ld"
+                pp_ledger_chain_id current_ci
+                Chain_id.pp main_chain_id
+                current_mh main_hwm
+                current_th test_hwm
+              >>= fun () ->
+              Ledger_commands.public_key_returning_instruction
+                (`Setup (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
+                hidapi curve path
+              >>=? fun pk ->
+              let pkh = Signature.Public_key.hash pk in
+              cctxt#message
+                "@[<v 0>Authorized baking for address: %a@,\
+                 Corresponding full public key: %a@]"
+                Signature.Public_key_hash.pp pkh
+                Signature.Public_key.pp pk >>= fun () ->
+              return_some ()
+           )) ;
+    Clic.command ~group
+      ~desc: "Deauthorize Ledger from baking"
+      no_options
+      (prefixes [ "deauthorize" ; "ledger" ; "baking" ; "for" ]
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ stop)
+      (fun () ledger_uri (_cctxt : Client_context.full) ->
+         use_ledger_or_fail ~ledger_uri ~filter:Filter.is_baking
+           (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+              Ledger_commands.wrap_ledger_cmd begin fun pp ->
+                Ledgerwallet_tezos.deauthorize_baking ~pp hidapi
+              end >>=? fun () ->
+              return_some ()
+           )) ;
+  ]
 
-  let description =
-    "Valid URIs are of the form\n\
-    \ - ledger://<root_pkh>[/<path>]\n\
-     where <root_pkh> is the Base58-encoded public key hash of the key \
-     at m/44'/1729' and <path> is a BIP32 path anchored at \
-     m/44'/1729'. Ledger does not yet support non-hardened path so each \
-     node of the path must be hardened.\n\
-     Use `tezos-client list connected ledgers` to get the <root_pkh> of \
-     all connected devices."
-
-
-  let neuterize (sk : sk_uri) = return (make_pk_uri (sk :> Uri.t))
-
-  let public_key
-      ?(interactive : Client_context.io_wallet option) (pk_uri : pk_uri) =
-    let find_curve of_pkh = function
-      | Pkh pkh ->
-          protect (fun () -> return (snd (List.assoc pkh of_pkh)))
-      | Animals (a, curve_opt) -> unopt_curve a curve_opt
-    in
-    match Hashtbl.find_opt pks pk_uri with
-    | Some pk -> return pk
-    | None ->
-        id_of_pk_uri pk_uri >>=? fun id ->
-        with_ledger id begin fun ledger _version _of_curve of_pkh  ->
-          find_curve of_pkh id >>=? fun curve  ->
-          let path = path_of_pk_uri pk_uri in
-          begin
-            match interactive with
-            | Some cctxt ->
-                get_public_key ~prompt:false ledger curve path >>=? fun pk ->
-                let pkh = Signature.Public_key.hash pk in
-                cctxt#message
-                  "Please validate@ (and write down)@ the public key hash\
-                   @ displayed@ on the Ledger,@ it should be equal@ to `%a`:"
-                  Signature.Public_key_hash.pp pkh >>= fun () ->
-                get_public_key ~prompt:true ledger curve path
-            | None ->
-                get_public_key ~prompt:false ledger curve path
-          end >>=? fun pk ->
-          let pkh = Signature.Public_key.hash pk in
-          Hashtbl.replace pks pk_uri pk ;
-          Hashtbl.replace pkhs pk_uri pkh ;
-          return pk
-        end >>= function
-        | Error err -> failwith "%a" pp_print_error err
-        | Ok v -> return v
-
-  let public_key_hash ?interactive pk_uri =
-    match Hashtbl.find_opt pkhs pk_uri with
-    | Some pkh -> return (pkh, None)
-    | None ->
-        public_key ?interactive pk_uri >>=? fun pk ->
-        return (Hashtbl.find pkhs pk_uri, Some pk)
-
-
-  let sign ?watermark sk_uri msg =
-    id_of_sk_uri sk_uri >>=? fun id ->
-    with_ledger id begin fun ledger { major; minor; patch; _ } _of_curve _of_pkh ->
-      let msg = Option.unopt_map watermark
-          ~default:msg ~f:begin fun watermark ->
-          MBytes.concat "" [Signature.bytes_of_watermark watermark ;
-                            msg]
-        end in
-      curve_of_id id >>=? fun curve ->
-      let path = Bip32_path.tezos_root @ path_of_sk_uri sk_uri in
-      let msg_len = MBytes.length msg in
-      wrap_ledger_cmd begin fun pp ->
-        if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
-          Ledgerwallet_tezos.sign ~hash_on_ledger:false
-            ~pp ledger curve path
-            (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
-        else
-          Ledgerwallet_tezos.sign
-            ~pp ledger curve path (Cstruct.of_bigarray msg)
-      end >>=? fun signature ->
-      match curve with
-      | Ed25519 ->
-          let signature = Cstruct.to_bigarray signature in
-          let signature = Ed25519.of_bytes_exn signature in
-          return (Signature.of_ed25519 signature)
-      | Secp256k1 ->
-          (* Remove parity info *)
-          Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
-          let signature = Cstruct.to_bigarray signature in
-          let open Libsecp256k1.External in
-          let signature = Sign.read_der_exn secp256k1_ctx signature in
-          let bytes = Sign.to_bytes secp256k1_ctx signature in
-          let signature = Secp256k1.of_bytes_exn bytes in
-          return (Signature.of_secp256k1 signature)
-      | Secp256r1 ->
-          (* Remove parity info *)
-          Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
-          let signature = Cstruct.to_bigarray signature in
-          let open Libsecp256k1.External in
-          (* We use secp256r1 library to extract P256 DER signature. *)
-          let signature = Sign.read_der_exn secp256k1_ctx signature in
-          let buf = Sign.to_bytes secp256k1_ctx signature in
-          let signature = P256.of_bytes_exn buf in
-          return (Signature.of_p256 signature)
-    end
-
-
-  let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
-  let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
-  let supports_deterministic_nonces _ = return_false
-end
-open Signer_implementation
+(** Commands for high water mark of the Baking app. The
+    [watermark_spelling] argument is used to make 2 sets of commands: with
+    the old/wrong spelling “watermark” for backwards compatibility and
+    with the correct one “high water mark” (it's a mark of the highest
+    water level). *)
+let high_water_mark_commands group watermark_spelling =
+  let make_desc desc =
+    if List.length watermark_spelling = 1
+    then desc ^ " (legacy/deprecated spelling)"
+    else desc in
+  Clic.[
+    Clic.command ~group
+      ~desc:(make_desc "Get high water mark of a Ledger")
+      (args1 (switch ~doc:"Prevent the fallback to the (deprecated) Ledger \
+                           instructions (for 1.x.y versions of the Baking app)"
+                ~long:"no-legacy-instructions" ()))
+      (prefixes ([ "get" ; "ledger" ; "high" ] @ watermark_spelling @ [ "for" ])
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ stop)
+      (fun no_legacy_apdu ledger_uri (cctxt : Client_context.full) ->
+         use_ledger_or_fail ~ledger_uri ~filter:Filter.is_baking
+           (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+              match version.app_class with
+              | Tezos ->
+                  failwith "Fatal: this operation is only valid with the \
+                            Tezos Baking application"
+              | TezBake when not no_legacy_apdu && version.major < 2 ->
+                  Ledger_commands.wrap_ledger_cmd begin fun pp ->
+                    Ledgerwallet_tezos.get_high_watermark ~pp hidapi
+                  end >>=? fun hwm ->
+                  cctxt#message "The high water mark for@ %a@ is %ld."
+                    Ledger_uri.pp ledger_uri hwm >>= fun () ->
+                  return_some ()
+              | TezBake when no_legacy_apdu && version.major < 2 ->
+                  failwith
+                    "Cannot get the high water mark with@ \
+                     `--no-legacy-instructions` and version %a"
+                    Ledgerwallet_tezos.Version.pp version
+              | TezBake ->
+                  Ledger_commands.wrap_ledger_cmd begin fun pp ->
+                    Ledgerwallet_tezos.get_all_high_watermarks ~pp hidapi
+                  end
+                  >>=? fun (`Main_hwm mh, `Test_hwm th, `Chain_id ci) ->
+                  cctxt#message
+                    "The high water mark values for@ %a@ are\
+                     @ %ld for the main-chain@ (%a)@ \
+                     and@ %ld for the test-chain."
+                    Ledger_uri.pp ledger_uri mh pp_ledger_chain_id ci th
+                  >>= fun () ->
+                  return_some () ) ) ;
+    Clic.command ~group
+      ~desc:(make_desc "Set high water mark of a Ledger")
+      no_options
+      (prefixes ([ "set" ; "ledger" ; "high" ] @ watermark_spelling @ [ "for" ])
+       @@ Ledger_uri.ledger_uri_or_alias_param
+       @@ (prefix "to")
+       @@ (param
+             ~name: "high watermark"
+             ~desc: "High watermark"
+             (parameter (fun _ctx s ->
+                  try return (Int32.of_string s)
+                  with _ -> failwith "%s is not an int32 value" s)))
+       @@ stop)
+      (fun () ledger_uri hwm (cctxt : Client_context.full) ->
+         use_ledger_or_fail ~ledger_uri ~filter:Filter.is_baking
+           (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+              match version.app_class with
+              | Tezos ->
+                  failwith "Fatal: this operation is only valid with TezBake"
+              | TezBake ->
+                  Ledger_commands.wrap_ledger_cmd begin fun pp ->
+                    Ledgerwallet_tezos.set_high_watermark ~pp hidapi hwm
+                  end >>=? fun () ->
+                  Ledger_commands.wrap_ledger_cmd begin fun pp ->
+                    Ledgerwallet_tezos.get_high_watermark ~pp hidapi
+                  end >>=? fun new_hwm ->
+                  cctxt#message
+                    "@[<v 0>%a has now high water mark: %ld@]"
+                    Ledger_uri.pp ledger_uri new_hwm >>= fun () ->
+                  return_some ())) ;
+  ]
 
 let commands =
-  let open Clic in
   let group =
     { Clic.name = "ledger" ;
       title = "Commands for managing the connected Ledger Nano S devices" } in
-  fun () -> [
-      Clic.command ~group
-        ~desc: "List supported Ledger Nano S devices connected."
-        no_options
-        (fixed [ "list" ; "connected" ; "ledgers" ])
-        (fun () (cctxt : Client_context.full) ->
-           find_ledgers () >>=? function
-           | [] ->
-               cctxt#message "No device found." >>= fun () ->
-               cctxt#message "Make sure a Ledger Nano S is connected and in the Tezos Wallet or Tezos Baking app." >>= fun () ->
-               return_unit
-           | ledgers ->
-               iter_s begin fun { Ledger.device_info = { Hidapi.path ;
-                                                         manufacturer_string ;
-                                                         product_string ; _ } ;
-                                  of_curve ; version ; git_commit ; _ } ->
-                 let manufacturer = Option.unopt ~default:"(none)" manufacturer_string in
-                 let product = Option.unopt ~default:"(none)" product_string in
-                 cctxt#message "Found a %a (commit %s) application running on %s %s at [%s]."
-                   Ledgerwallet_tezos.Version.pp version
-                   (match git_commit with None -> "unknown" | Some c -> c)
-                   manufacturer product path >>= fun () ->
-                 let of_curve = List.rev of_curve in
-                 begin match List.hd_opt of_curve with
-                   | None ->
-                       failwith "No curve available, upgrade Ledger software"
-                   | Some (_, (_, pkh)) ->
-                       return (Ledger_names.crouching_tiger
-                                 (Signature.Public_key_hash.to_string pkh))
-                 end >>=? fun animals ->
-                 cctxt#message
-                   "@[<v 0>@,To use keys at BIP32 path \
-                    m/44'/1729'/0'/0' (default Tezos key path), use \
-                    one of@, @[<v 0>%a@]@]"
-                   (Format.pp_print_list
-                      (fun ppf (curve, _) ->
-                         Format.fprintf ppf
-                           "tezos-client import secret key \
-                            ledger_%s \"ledger://%a/0'/0'\""
-                           (Sys.getenv "USER")
-                           pp_id (Animals (animals, Some curve))))
-                   of_curve >>= fun () ->
-                 return_unit
-               end ledgers) ;
-
-      Clic.command ~group
-        ~desc: "Display version/public-key/address information for a Ledger URI"
-        (args1 (switch ~doc:"Test signing operation" ~long:"test-sign" ()))
-        (prefixes [ "show" ; "ledger" ]
-         @@ Client_keys.sk_uri_param
-         @@ stop)
-        (fun test_sign sk_uri (cctxt : Client_context.full) ->
-           neuterize sk_uri >>=? fun pk_uri ->
-           id_of_pk_uri pk_uri >>=? fun id ->
-           find_ledgers ~id () >>=? function
-           | [] ->
-               failwith "No ledger found for %a" pp_id id
-           | { Ledger.device_info ; version ; _ } :: _ ->
-               let manufacturer =
-                 Option.unopt ~default:"(none)" device_info.manufacturer_string in
-               let product =
-                 Option.unopt ~default:"(none)" device_info.product_string in
-               cctxt#message
-                 "Found a %a application running on a \
-                  %s %s at [%s]."
-                 Ledgerwallet_tezos.Version.pp version
-                 manufacturer product device_info.path >>= fun () ->
-               begin match id with
-                 | (Pkh _ | Animals (_, Some _)) -> (* → Can public keys. *)
-                     public_key pk_uri >>=? fun pk ->
-                     public_key_hash pk_uri >>=? fun (pkh, _) ->
-                     cctxt#message
-                       "@[<v 0>Tezos address at this path/curve: %a@,\
-                        Corresponding full public key: %a@]"
-                       Signature.Public_key_hash.pp pkh
-                       Signature.Public_key.pp pk >>= fun () ->
-                     begin match test_sign, version.app_class with
-                       | true, Tezos ->
-                           let pkh_bytes = Signature.Public_key_hash.to_bytes pkh in
-                           (* Signing requires validation on the device.  *)
-                           cctxt#message "Attempting a signature, please \
-                                          validate on the ledger." >>= fun () ->
-                           sign ~watermark:Generic_operation
-                             sk_uri pkh_bytes >>=? fun signature ->
-                           begin match Signature.check ~watermark:Generic_operation
-                                         pk signature pkh_bytes with
-                           | false ->
-                               failwith "Fatal: Ledger cannot sign with %a"
-                                 Signature.Public_key_hash.pp pkh
-                           | true ->
-                               cctxt#message "Tezos Wallet successfully signed."
-                               >>= fun () ->
-                               return_unit
-                           end
-                       | true, TezBake ->
-                           failwith "Option --test-sign only works \
-                                     for the Tezos Wallet app."
-                       | false, _ ->
-                           return_unit
-                     end
-                 | Animals (_, None) when test_sign ->
-                     failwith "Option --test-sign only works \
-                               for the Tezos Wallet app with a \
-                               curve/path specification."
-                 | Animals (_, None) ->
-                     cctxt#message "No curve was provided, \
-                                    there is no Tezos-address/public-key \
-                                    to show/test."
-                     >>= fun () ->
-                     return_unit
-               end
-        ) ;
-
-      Clic.command ~group
-        ~desc: "Query the path of the authorized key"
-        no_options
-        (prefixes [ "get" ; "ledger" ; "authorized" ; "path" ; "for" ]
-         @@ sk_or_alias_param
-         @@ stop)
-        (fun () uri (cctxt : Client_context.full) ->
-           id_of_sk_or_pk uri >>=? fun root_id ->
-           with_ledger root_id begin fun h version _of_curve _to_curve ->
-             (if version.major < 2 then
-                wrap_ledger_cmd (fun pp -> Ledgerwallet_tezos.get_authorized_key ~pp h)
-                >>|? fun path -> (path, None)
-              else
-                wrap_ledger_cmd (fun pp -> Ledgerwallet_tezos.get_authorized_path_and_curve ~pp h)
-                >>= function
-                | Error (LedgerError (AppError {status = Ledgerwallet.Transport.Status.Referenced_data_not_found; _}) :: _) -> return ([], None)
-                | Error _ as e -> Lwt.return e
-                | Ok (path, curve) -> return (path, Some curve))
-             >>=? function
-             | ([], _) ->
-                 cctxt#message
-                   "@[<v 0>No baking key authorized for %a@]" pp_id root_id
-                 >>= fun () ->
-                 return_unit
-             | (path, None) ->
-                 cctxt#message
-                   "@[<v 0>Authorized baking path: %a@]"
-                   Bip32_path.pp_path path >>= fun () ->
-                 return_unit
-             | (path, Some curve) ->
-                 cctxt#message
-                   "@[<v 0>Authorized baking path: %a@]"
-                   Bip32_path.pp_path path >>= fun () ->
-                 cctxt#message
-                   "@[<v 0>Authorized baking curve: %a@]"
-                   Ledgerwallet_tezos.pp_curve curve >>= fun () ->
-                 (match root_id with
-                  | Pkh _ -> cctxt#message "@[<v 0>Authorized baking PKH: %a@]"
-                               pp_id root_id
-                  | Animals (cthd, _) -> cctxt#message "@[<v 0>Authorized baking URI: %a@]"
-                                           pp_animals_uri (cthd, curve, path))
-                 >>= fun () ->
-                 return_unit
-           end) ;
-
-      Clic.command ~group
-        ~desc: "Authorize a Ledger to bake for a key (deprecated, \
-                use `setup ledger ...` with recent versions of the Baking app)"
-        no_options
-        (prefixes [ "authorize" ; "ledger" ; "to" ; "bake" ; "for" ]
-         @@ Public_key.alias_param
-         @@ stop)
-        (fun () (_, (pk_uri, _)) (cctxt : Client_context.full) ->
-           id_of_pk_uri pk_uri >>=? fun root_id ->
-           with_ledger root_id begin fun h version _of_curve _of_pkh ->
-             begin match version with
-               | { Ledgerwallet_tezos.Version.app_class = Tezos ; _ } ->
-                   failwith "This command (`authorize ledger ...`) only \
-                             works with the Tezos Baking app"
-               | { Ledgerwallet_tezos.Version.app_class = TezBake ;
-                   major ; _ } when major >= 2 ->
-                   failwith
-                     "This command (`authorize ledger ...`) is@ \
-                      not compatible with@ this version of the Ledger@ \
-                      Baking app (%a >= 2.0.0),@ please use the command@ \
-                      `setup ledger to bake for ...`@ from now on."
-                     Ledgerwallet_tezos.Version.pp version
-               | _ ->
-                   cctxt#message
-                     "This Ledger Baking app is outdated (%a)@ running@ \
-                      in backwards@ compatibility mode."
-                     Ledgerwallet_tezos.Version.pp version
-                   >>= fun () ->
-                   return_unit
-             end
-             >>=? fun () ->
-             let path = path_of_pk_uri pk_uri in
-             curve_of_id root_id >>=? fun curve ->
-             public_key_returning_instruction `Authorize_baking h curve path
-             >>=? fun pk ->
-             let pkh = Signature.Public_key.hash pk in
-             cctxt#message
-               "@[<v 0>Authorized baking for address: %a@,\
-                Corresponding full public key: %a@]"
-               Signature.Public_key_hash.pp pkh
-               Signature.Public_key.pp pk >>= fun () ->
-             return_unit
-           end) ;
-
-      Clic.command ~group
-        ~desc: "Setup a Ledger to bake for a key"
-        (let hwm_arg kind =
-           let doc =
-             Printf.sprintf
-               "Use <HWM> as %s chain high watermark instead of asking the ledger."
-               kind in
-           let long = kind ^ "-hwm" in
-           default_arg ~doc ~long ~placeholder:"HWM"
-             ~default:"ASK-LEDGER"
-             (parameter
-                (fun _ -> function
-                   | "ASK-LEDGER" -> return None
-                   | s ->
-                       try return (Some (Int32.of_string s)) with _ ->
-                         failwith "Parameter %S should be a 32-bits integer" s))
-         in
-         args3
-           (default_arg
-              ~doc:"Use <ID> as main chain-id instead of asking the node."
-              ~long:"main-chain-id" ~placeholder:"ID"
-              ~default:"ASK-NODE"
-              (parameter
-                 (fun _ -> function
-                    | "ASK-NODE" -> return `Ask_node
-                    | s ->
-                        try return (`Int32 (Int32.of_string s))
-                        with _ ->
-                          (try return (`Chain_id (Chain_id.of_b58check_exn s))
-                           with _ ->
-                             failwith "Parameter %S should be a 32-bits integer \
-                                       or a Base58 chain-id" s))))
-           (hwm_arg "main") (hwm_arg "test"))
-        (prefixes [ "setup" ; "ledger" ; "to" ; "bake" ; "for" ]
-         @@ Public_key.alias_param
-         @@ stop)
-        (fun (chain_id_opt, main_hwm_opt, test_hwm_opt)
-          (_, (pk_uri, _)) (cctxt : Client_context.full) ->
-          id_of_pk_uri pk_uri >>=? fun root_id ->
-          with_ledger root_id begin fun h version _of_curve _of_pkh ->
-            begin
-              let open Ledgerwallet_tezos.Version in
-              match version with
-              | { app_class = Tezos ; _ } ->
-                  failwith "This command (`setup ledger ...`) only \
-                            works with the Tezos Baking app"
-              | { app_class = TezBake ;
-                  major ; _ } when major < 2 ->
-                  failwith
-                    "This command (`setup ledger ...`)@ is not@ compatible@ with \
-                     this version@ of the Ledger Baking app@ (%a < 2.0.0),@ \
-                     please upgrade@ your ledger@ or use the command@ \
-                     `authorize ledger to bake for ...`"
-                    pp version
-              | _ -> return_unit
-            end
-            >>=? fun () ->
-            let chain_id_of_int32 i32 =
-              let open Int32 in
-              let byte n =
-                logand 0xFFl (shift_right i32 (n * 8))
-                |> Int32.to_int |> char_of_int in
-              Chain_id.of_string_exn
-                (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i)))) in
-            begin match chain_id_opt with
-              | `Ask_node ->
-                  Chain_services.chain_id cctxt ()
-              | `Int32 s -> return (chain_id_of_int32 s)
-              | `Chain_id chid -> return chid
-            end
-            >>=? fun main_chain_id ->
-            let path = path_of_pk_uri pk_uri in
-            curve_of_id root_id >>=? fun curve ->
-            wrap_ledger_cmd begin fun pp ->
-              Ledgerwallet_tezos.get_all_high_watermarks ~pp h
-            end
-            >>=? fun (`Main_hwm current_mh, `Test_hwm current_th, `Chain_id current_ci) ->
-            let main_hwm = Option.unopt main_hwm_opt ~default:current_mh in
-            let test_hwm = Option.unopt test_hwm_opt ~default:current_th in
-            cctxt#message "Setting up the ledger:@.\
-                           * Main chain ID: %a -> %a@.\
-                           * Main chain High Watermark: %ld -> %ld@.\
-                           * Test chain High Watermark: %ld -> %ld"
-              pp_ledger_chain_id current_ci
-              Chain_id.pp main_chain_id
-              current_mh main_hwm
-              current_th test_hwm
-            >>= fun () ->
-            public_key_returning_instruction
-              (`Setup (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
-              h curve path
-            >>=? fun pk ->
-            let pkh = Signature.Public_key.hash pk in
-            cctxt#message
-              "@[<v 0>Authorized baking for address: %a@,\
-               Corresponding full public key: %a@]"
-              Signature.Public_key_hash.pp pkh
-              Signature.Public_key.pp pk >>= fun () ->
-            return_unit
-          end) ;
-
-      Clic.command ~group
-        ~desc: "Deauthorize Ledger from baking"
-        no_options
-        (prefixes [ "deauthorize" ; "ledger" ; "baking" ; "for" ]
-         @@ sk_or_alias_param
-         @@ stop)
-        (fun () uri (_ : Client_context.full) ->
-           id_of_sk_or_pk uri >>=? fun id ->
-           with_ledger id begin fun h version _ _ ->
-             match version.app_class with
-             | Tezos ->
-                 failwith "Fatal: this operation is only valid with the \
-                           Tezos Baking application"
-             | TezBake when version.major < 2 ->
-                 failwith "Fatal: this operation is only available with \
-                           Tezos Baking application version 2 or higher"
-             | TezBake ->
-                 wrap_ledger_cmd begin fun pp ->
-                   Ledgerwallet_tezos.deauthorize_baking ~pp h
-                 end
-           end
-        );
-
-      Clic.command ~group
-        ~desc: "Get high water mark of a Ledger"
-        (args1 (switch ~doc:"Prevent the fallback to the (deprecated) Ledger \
-                             instructions (for 1.x.y versions of the Baking app)"
-                  ~long:"no-legacy-instructions" ()))
-        (prefixes [ "get" ; "ledger" ; "high" ; "watermark" ; "for" ]
-         @@ sk_or_alias_param
-         @@ stop)
-        (fun no_legacy_apdu uri (cctxt : Client_context.full) ->
-           id_of_sk_or_pk uri >>=? fun id ->
-           with_ledger id begin fun h version _ _ ->
-             match version.app_class with
-             | Tezos ->
-                 failwith "Fatal: this operation is only valid with the \
-                           Tezos Baking application"
-             | TezBake when not no_legacy_apdu && version.major < 2 ->
-                 wrap_ledger_cmd begin fun pp ->
-                   Ledgerwallet_tezos.get_high_watermark ~pp h
-                 end
-                 >>=? fun hwm ->
-                 cctxt#message "The high water mark for@ %a@ is %ld."
-                   pp_id id hwm >>= fun () ->
-                 return_unit
-             | TezBake when no_legacy_apdu && version.major < 2 ->
-                 failwith
-                   "Cannot get the high water mark with@ \
-                    `--no-legacy-instructions` and version %a"
-                   Ledgerwallet_tezos.Version.pp version
-             | TezBake ->
-                 wrap_ledger_cmd begin fun pp ->
-                   Ledgerwallet_tezos.get_all_high_watermarks ~pp h
-                 end
-                 >>=? fun (`Main_hwm mh, `Test_hwm th, `Chain_id ci) ->
-                 cctxt#message
-                   "The high water mark values for@ %a@ are\
-                    @ %ld for the main-chain@ (%a)@ \
-                    and@ %ld for the test-chain."
-                   pp_id id mh pp_ledger_chain_id ci th
-                 >>= fun () ->
-                 return_unit
-           end
-        ) ;
-
-      Clic.command ~group
-        ~desc: "Set high water mark of a Ledger"
-        no_options
-        (prefixes [ "set" ; "ledger" ; "high" ; "watermark" ; "for" ]
-         @@ sk_or_alias_param
-         @@ (prefix "to")
-         @@ (param
-               ~name: "high watermark"
-               ~desc: "High watermark"
-               (parameter (fun _ctx s ->
-                    try return (Int32.of_string s)
-                    with _ -> failwith "%s is not an int32 value" s)))
-         @@ stop)
-        (fun () uri hwm (cctxt : Client_context.full) ->
-           id_of_sk_or_pk uri >>=? fun id ->
-           with_ledger id begin fun h version _ _ ->
-             match version.app_class with
-             | Tezos ->
-                 failwith "Fatal: this operation is only valid with TezBake"
-             | TezBake ->
-                 wrap_ledger_cmd begin fun pp ->
-                   Ledgerwallet_tezos.set_high_watermark ~pp h hwm
-                 end >>=? fun () ->
-                 wrap_ledger_cmd begin fun pp ->
-                   Ledgerwallet_tezos.get_high_watermark ~pp h
-                 end >>=? fun new_hwm ->
-                 cctxt#message
-                   "@[<v 0>%a has now high water mark: %ld@]"
-                   pp_id id new_hwm >>= fun () ->
-                 return_unit
-           end
-        ) ;
-    ]
+  fun () ->
+    generic_commands group @
+    baking_commands group @
+    high_water_mark_commands group [ "water" ; "mark" ] @
+    high_water_mark_commands group [ "watermark" ]
