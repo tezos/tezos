@@ -28,6 +28,7 @@ open Alpha_context
 
 let timestamp_tag = Tag.def ~doc:"Timestamp when event occurred" "timestamp" Time.pp_hum
 let valid_ops = Tag.def ~doc:"Valid Operations" "valid_ops" Format.pp_print_int
+let op_count = Tag.def ~doc:"Number of operations" "op_count" Format.pp_print_int
 let refused_ops = Tag.def ~doc:"Refused Operations" "refused_ops" Format.pp_print_int
 let bake_priority_tag = Tag.def ~doc:"Baking priority" "bake_priority" Format.pp_print_int
 let fitness_tag = Tag.def ~doc:"Fitness" "fitness" Fitness.pp
