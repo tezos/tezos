@@ -25,6 +25,7 @@
 
 val timestamp_tag : Time.t Tag.def
 val valid_ops : int Tag.def
+val op_count : int Tag.def
 val refused_ops : int Tag.def
 val bake_priority_tag : int Tag.def
 val fitness_tag : Fitness.t Tag.def

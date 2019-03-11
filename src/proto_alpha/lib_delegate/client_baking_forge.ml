@@ -867,10 +867,13 @@ let fetch_operations
             (limit_date, endorsers_per_block / 3) ]
         in
         lwt_log_notice Tag.DSL.(fun f ->
-            f "No endorsements present in the mempool. Waiting until %a (%a) for new operations."
+            f "Waiting until %a (%a) for more endorsements in the \
+               mempool (%a/%a arrived)."
             -% t event "waiting_operations"
             -% a timestamp_tag limit_date
             -% a timespan_tag (max 0L Time.(diff limit_date (now ())))
+            -% a op_count nb_arrived_endorsements
+            -% a op_count endorsers_per_block
           ) >>= fun () ->
         Shell_services.Mempool.request_operations cctxt ~chain () >>=? fun () ->
         let timeout = match Client_baking_scheduling.sleep_until limit_date with
