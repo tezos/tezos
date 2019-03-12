@@ -25,3 +25,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: alpha (economic-protocol definition, functor version)"
