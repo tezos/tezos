@@ -23,3 +23,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: common helpers for `tezos-client`"

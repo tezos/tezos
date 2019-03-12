@@ -19,3 +19,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: internal AST and parser for the Michelson language"

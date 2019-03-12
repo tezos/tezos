@@ -19,3 +19,4 @@ depends: [
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: 002_PsYLVpVv (protocol-specific commands for `tezos-client`)"

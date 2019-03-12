@@ -18,3 +18,4 @@ depends: [
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: 002_PsYLVpVv (base library for `tezos-client`)"

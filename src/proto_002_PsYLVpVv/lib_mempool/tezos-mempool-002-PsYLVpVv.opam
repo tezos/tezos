@@ -13,8 +13,9 @@ depends: [
   "tezos-shell"
 ]
 build: [
-  [ "jbuilder" "build" "-p" name "-j" jobs ]
+  [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: 002_PsYLVpVv (mempool-filters)"

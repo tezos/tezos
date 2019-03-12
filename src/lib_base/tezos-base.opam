@@ -26,3 +26,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: meta-package and pervasive type definitions for Tezos"
