@@ -595,7 +595,12 @@ end
 
 module Connection = struct
 
-  let trusted_node conn = P2p_peer_state.Info.trusted conn.peer_info
+  let trusted_node conn =
+    P2p_peer_state.Info.trusted conn.peer_info ||
+    Option.unopt_map
+      ~default:false
+      ~f:P2p_point_state.Info.trusted
+      conn.point_info
 
   let private_node conn = P2p_socket.private_node conn.conn
 
