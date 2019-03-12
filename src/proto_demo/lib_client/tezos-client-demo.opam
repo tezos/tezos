@@ -22,3 +22,4 @@ build: [
 build-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: demo (protocol-specific commands for `tezos-client`)"

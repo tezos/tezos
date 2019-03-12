@@ -21,3 +21,4 @@ depends: [
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: alpha (protocol-specific commands for `tezos-endorser`)"

@@ -16,3 +16,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: descriptions of RPCs exported by `tezos-node`"

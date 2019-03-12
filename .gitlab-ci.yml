@@ -540,35 +540,35 @@ opam:59:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:60:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:61:tezos-embedded-protocol-004-PsGn8G5U:
+opam:60:tezos-embedded-protocol-004-PsGn8G5U:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-004-PsGn8G5U
 
-opam:62:tezos-embedded-protocol-004-PsuzFErA:
+opam:61:tezos-embedded-protocol-004-PsuzFErA:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-004-PsuzFErA
 
-opam:63:tezos-embedded-protocol-alpha:
+opam:62:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:64:tezos-embedded-protocol-demo:
+opam:63:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:65:tezos-embedded-protocol-genesis:
+opam:64:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
+
+opam:65:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
 
 opam:66:tezos-endorser-alpha-commands:
   <<: *opam_definition
@@ -679,11 +679,6 @@ opam:87:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
-
-opam:88:tezos-baker-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-alpha-commands
 
 ##END_OPAM##
 

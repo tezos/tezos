@@ -19,3 +19,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: library of auto-documented RPCs (service and hierarchy descriptions)"

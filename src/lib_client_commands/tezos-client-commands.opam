@@ -20,3 +20,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: protocol agnostic commands for `tezos-client`"
