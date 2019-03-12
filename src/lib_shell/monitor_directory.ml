@@ -63,10 +63,11 @@ let build_rpc_directory validator mainchain_validator =
     let block_stream, stopper = State.watcher state in
     let shutdown () = Lwt_watcher.shutdown stopper in
     let in_chains block =
-      Lwt_list.filter_map_p (Chain_directory.get_chain_id_opt state) q#chains >>= function
-      | [] -> Lwt.return_false (* By default, q#chains contains `Main *)
+      match q#chains with
+      | [] -> Lwt.return_true
       | chains ->
           let chain_id = State.Block.chain_id block in
+          Lwt_list.filter_map_p (Chain_directory.get_chain_id_opt state) chains >>= fun chains ->
           Lwt.return (List.exists (Chain_id.equal chain_id) chains) in
     let in_protocols block =
       match q#protocols with
