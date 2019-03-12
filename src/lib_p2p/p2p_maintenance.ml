@@ -189,7 +189,11 @@ and too_many_connections st n_connected =
     ~init:(to_kill, Lwt.return_unit)
     ~f:(fun _ conn (i, t) ->
         if i = 0 then (0, t)
-        else (i - 1, t >>= fun () -> P2p_pool.disconnect conn))
+        else if (P2p_pool.Connection.private_node conn
+                 && P2p_pool.Connection.trusted_node conn) then
+          (i, t)
+        else
+          (i - 1, t >>= fun () -> P2p_pool.disconnect conn))
   >>= fun () ->
   maintain st
 
