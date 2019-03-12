@@ -595,6 +595,8 @@ end
 
 module Connection = struct
 
+  let trusted_node conn = P2p_peer_state.Info.trusted conn.peer_info
+
   let private_node conn = P2p_socket.private_node conn.conn
 
   let fold pool ~init ~f =
