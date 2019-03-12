@@ -283,6 +283,10 @@ module Connection : sig
   (** [private_node conn] returns 'true' if the node assocoatied to this
       connection is in private mode *)
 
+  val trusted_node: ('msg, 'peer_meta,'conn_meta) connection -> bool
+  (** [trusted_node conn] returns 'true' if the node assocoatied to this
+      connection is trusted *)
+
 end
 
 val on_new_connection:
