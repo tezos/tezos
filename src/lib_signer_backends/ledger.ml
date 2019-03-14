@@ -720,8 +720,10 @@ let generic_commands group = Clic.[
                           let pkh_bytes =
                             Signature.Public_key_hash.to_bytes pkh in
                           (* Signing requires validation on the device.  *)
-                          cctxt#message "Attempting a signature, please \
-                                         validate on the ledger."
+                          cctxt#message
+                            "@[Attempting a signature@ (of `%a`),@ please@ \
+                             validate on@ the ledger.@]"
+                            MBytes.pp_hex pkh_bytes
                           >>= fun () ->
                           Ledger_commands.sign
                             ~watermark:Generic_operation
@@ -734,7 +736,8 @@ let generic_commands group = Clic.[
                                 failwith "Fatal: Ledger cannot sign with %a"
                                   Signature.Public_key_hash.pp pkh
                             | true ->
-                                cctxt#message "Tezos Wallet successfully signed."
+                                cctxt#message "Tezos Wallet successfully signed:@ %a."
+                                  Signature.pp signature
                                 >>= fun () ->
                                 return_unit
                           end
