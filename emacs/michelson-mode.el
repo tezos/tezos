@@ -396,6 +396,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 (defun michelson-get-info (buffer-name)
   "Refresh the info about the program in `BUFFER-NAME' from the command."
   (lexical-let ((tmp-file (make-temp-file buffer-name)))
+    (set-file-modes tmp-file #o644)
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
     (let ((command
            (append (split-string michelson-client-command " ")
@@ -666,7 +667,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
   (michelson-make-suggest
    instr
    (michelson-literals-match-p types)))
-                            
+
 
 (defun michelson-suggest-or (instr pred1 pred2)
   (lexical-let ((pred1 pred1)
@@ -813,8 +814,8 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
    (michelson-make-suggest "REDUCE" (forall (elt b) ((lambda (pair elt b) b) (set elt) b)))
    (michelson-make-suggest "REDUCE" (forall (key val b) ((lambda (pair (pair key val) b) b) (map key val) b)))
    (michelson-make-suggest "REDUCE" (forall (a b) ((lambda (pair a b) b) (list a) b)))
-   
-   
+
+
 ))
 
 ;; Special handling
