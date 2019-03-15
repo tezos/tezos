@@ -693,15 +693,22 @@ let commands version () =
             cctxt#error "Too many proposals: %d > %d"
               n Constants.fixed.max_proposals_per_delegate
           else
-            fold_left_s (fun acc (p : Protocol_hash.t) ->
-                if (List.mem p known_protos) ||
-                   (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
-                then return acc
-                else cctxt#message "Protocol %a is not a known proposal"
-                    Protocol_hash.pp p >>= fun () ->
-                  return false)
-              true proposals
-        in
+            begin match Base.List.find_a_dup ~compare proposals with
+              | Some dup ->
+                  cctxt#error "There are duplicate proposals, e.g. %a"
+                    Protocol_hash.pp dup
+                  >>= fun () ->
+                  return_false
+              | None ->
+                  fold_left_s (fun acc (p : Protocol_hash.t) ->
+                      if (List.mem p known_protos) ||
+                         (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
+                      then return acc
+                      else cctxt#message "Protocol %a is not a known proposal"
+                          Protocol_hash.pp p >>= fun () ->
+                        return false)
+                    true proposals
+            end in
         check_proposals proposals >>=? fun all_valid ->
         begin if all_valid then
             cctxt#message "All proposals are valid"
