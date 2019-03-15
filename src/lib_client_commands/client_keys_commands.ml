@@ -452,7 +452,7 @@ let commands version : Client_context.full Clic.command list =
          ~name: "data"
          ~desc: "string from which to deterministically generate the nonce"
        @@ stop)
-      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+      (fun () (name, _pkh) data (cctxt : Client_context.full) ->
          let data = MBytes.of_string data in
          Secret_key.mem cctxt name >>=? fun sk_present ->
          fail_unless sk_present
@@ -470,7 +470,7 @@ let commands version : Client_context.full Clic.command list =
          ~name: "data"
          ~desc: "string from which to deterministically generate the nonce hash"
        @@ stop)
-      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+      (fun () (name, _pkh) data (cctxt : Client_context.full) ->
          let data = MBytes.of_string data in
          Secret_key.mem cctxt name >>=? fun sk_present ->
          fail_unless sk_present
