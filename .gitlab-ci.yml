@@ -441,135 +441,131 @@ opam:39:tezos-baking-alpha:
   variables:
     package: tezos-baking-alpha
 
-opam:40:tezos-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-genesis
-
-opam:41:ocplib-resto-json:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-json
-
-opam:42:tezos-p2p:
-  <<: *opam_definition
-  variables:
-    package: tezos-p2p
-
-opam:43:tezos-validation:
-  <<: *opam_definition
-  variables:
-    package: tezos-validation
-
-opam:44:tezos-baking-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-alpha-commands
-
-opam:45:tezos-client-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-alpha-commands
-
-opam:46:tezos-client-base-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-base-unix
-
-opam:47:tezos-client-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-genesis
-
-opam:48:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:49:tezos-embedded-protocol-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:50:tezos-embedded-protocol-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-demo
-
-opam:51:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis
-
-opam:52:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:53:tezos-endorser-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-alpha-commands
-
-opam:54:tezos-client:
-  <<: *opam_definition
-  variables:
-    package: tezos-client
-
-opam:55:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:56:tezos-accuser-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-alpha
-
-opam:57:tezos-endorser-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-alpha
-
-opam:58:tezos-accuser-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-alpha-commands
-
-opam:59:tezos-baker-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-alpha
-
-opam:60:tezos-protocol-demo:
+opam:40:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:61:tezos-signer:
+opam:41:tezos-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis
+
+opam:42:ocplib-resto-json:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-json
+
+opam:43:tezos-p2p:
+  <<: *opam_definition
+  variables:
+    package: tezos-p2p
+
+opam:44:tezos-validation:
+  <<: *opam_definition
+  variables:
+    package: tezos-validation
+
+opam:45:tezos-baking-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-alpha-commands
+
+opam:46:tezos-client-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha-commands
+
+opam:47:tezos-client-base-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-base-unix
+
+opam:48:tezos-client-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-demo
+
+opam:49:tezos-client-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis
+
+opam:50:ocplib-ezresto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto
+
+opam:51:tezos-embedded-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-alpha
+
+opam:52:tezos-embedded-protocol-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo
+
+opam:53:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:54:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
+
+opam:55:tezos-endorser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha-commands
+
+opam:56:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:57:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:58:tezos-accuser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha
+
+opam:59:tezos-endorser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha
+
+opam:60:tezos-accuser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha-commands
+
+opam:61:tezos-baker-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-alpha
+
+opam:62:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:62:tezos-node:
+opam:63:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:63:ocplib-json-typed-browser:
+opam:64:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:64:tezos-baker-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-alpha-commands
-
-opam:63:tezos-client-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-demo
 
 ##END_OPAM##
 
