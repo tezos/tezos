@@ -482,6 +482,7 @@ let get_proposals
   Alpha_services.Voting.proposals cctxt cb
 
 let submit_proposals
+    ?dry_run
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposals =
   (* We need the next level, not the current *)
@@ -490,7 +491,7 @@ let submit_proposals
   let contents = Single ( Proposals { source ; period ; proposals } ) in
   Injection.inject_operation cctxt ~chain ~block ?confirmations
     ~fee_parameter:Injection.dummy_fee_parameter
-    ~src_sk contents
+    ?dry_run ~src_sk contents
 
 let submit_ballot
     (cctxt : #Proto_alpha.full)

@@ -656,7 +656,8 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Submit protocol proposals"
-      (args1
+      (args2
+         dry_run_switch
          (switch
             ~doc:"Do not fail when the checks that try to prevent the user \
                   from shooting themselves in the foot do."
@@ -674,7 +675,7 @@ let commands version () =
                   match Protocol_hash.of_b58check_opt x with
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
-      begin fun force (_name, source) proposals (cctxt : Proto_alpha.full) ->
+      begin fun (dry_run, force) (_name, source) proposals (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -758,7 +759,8 @@ let commands version () =
           else
             cctxt#error "Submission failed because of invalid proposals."
         end >>= fun () ->
-        submit_proposals cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
+        submit_proposals ~dry_run
+          cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           proposals >>=? fun _res ->
         return_unit
       end ;
