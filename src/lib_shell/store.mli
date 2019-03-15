@@ -163,11 +163,6 @@ module Block : sig
      and type key = int
      and type value = Operation_hash.t list
 
-  module Operation_path : MAP_STORE
-    with type t = store * Block_hash.t
-     and type key = int
-     and type value = Operation_list_list_hash.path
-
   module Operations : MAP_STORE
     with type t = store * Block_hash.t
      and type key = int
