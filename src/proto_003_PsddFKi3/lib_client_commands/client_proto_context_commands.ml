@@ -815,6 +815,7 @@ let commands version () =
              Proto_alpha.Alpha_context.Voting_period.kind_encoding
              info.current_period_kind)
           info.remaining >>= fun () ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun props ->
         let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
                     List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
@@ -825,13 +826,17 @@ let commands version () =
         in
         match info.current_period_kind with
         | Proposal ->
-            (* TODO improve printing of proposals *)
-            let proposals_string =
-              if List.length ranks = 0 then " none" else
-                List.fold_left (fun acc (p,w) ->
-                    Format.asprintf "%s\n%a %ld" acc Protocol_hash.pp p w) "" ranks
-            in
-            cctxt#answer "Current proposals:%s" proposals_string
+            cctxt#answer "Current proposals:%t"
+              Format.(fun ppf ->
+                  pp_print_cut ppf () ;
+                  pp_open_vbox ppf 0 ;
+                  List.iter
+                    (fun (p, w) ->
+                       fprintf ppf "* %a %ld (%sknown by the node)@."
+                         Protocol_hash.pp p w
+                         (if (List.mem p known_protos) then "" else "not "))
+                    ranks ;
+                  pp_close_box ppf () )
             >>= fun () -> return_unit
         | Testing_vote | Promotion_vote ->
             print_proposal info.current_proposal >>= fun () ->
