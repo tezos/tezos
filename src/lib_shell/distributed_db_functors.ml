@@ -53,6 +53,7 @@ module type DISTRIBUTED_DB = sig
     key -> param -> value tzresult Lwt.t
 
   val clear_or_cancel: t -> key -> unit
+  val resolve_pending: t -> key -> value -> unit
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 
@@ -299,6 +300,17 @@ end = struct
     | Some (Pending _)
     | Some (Found _) ->
         Lwt.return_false
+
+  let resolve_pending s k v =
+    match Memory_table.find_opt s.memory k with
+    | Some (Pending { wakener ; _ }) ->
+        Scheduler.notify_cancelation s.scheduler k ;
+        Memory_table.replace s.memory k (Found v) ;
+        Lwt.wakeup_later wakener (Ok v) ;
+        Option.iter s.global_input
+          ~f:(fun input -> Lwt_watcher.notify input (k, v)) ;
+        Lwt_watcher.notify s.input (k, v) ;
+    | _ -> ()
 
   let clear_or_cancel s k =
     match Memory_table.find_opt s.memory k with

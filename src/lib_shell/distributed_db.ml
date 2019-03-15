@@ -938,6 +938,7 @@ let commit_block chain_db hash
   State.Block.store chain_db.chain_state
     header header_data operations operations_data result
     ~forking_testchain >>=? fun res ->
+  Raw_block_header.Table.resolve_pending chain_db.block_header_db.table hash header;
   clear_block chain_db hash header.shell.validation_passes ;
   return res
 
@@ -989,6 +990,7 @@ module Make
   let inject t k v = Table.inject (Kind.proj t) k v
   let pending t k = Table.pending (Kind.proj t) k
   let watch t = Table.watch (Kind.proj t)
+  let resolve_pending t k v = Table.resolve_pending (Kind.proj t) k v
 end
 
 module Block_header = struct

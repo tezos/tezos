@@ -101,6 +101,12 @@ module type DISTRIBUTED_DB = sig
       error [Canceled]. *)
   val clear_or_cancel: t -> key -> unit
 
+  (** [resolve_pending t pids k v] resolves pending request (if any) in the
+      local index for key k with [Found v]. It notifies the scheduler using
+      'notify_cancelation' for this key and wakes up the the waiter on this
+      request. *)
+  val resolve_pending: t -> key -> value -> unit
+
   val inject: t -> key -> value -> bool Lwt.t
 
   (** Monitor all the fetched data. A given data will appear only
