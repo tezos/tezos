@@ -690,7 +690,8 @@ let commands version () =
           let n = List.length proposals in
           if n = 0 then cctxt#error "Empty proposal"
           else if n > Constants.fixed.max_proposals_per_delegate then
-            cctxt#error "Too many proposals"
+            cctxt#error "Too many proposals: %d > %d"
+              n Constants.fixed.max_proposals_per_delegate
           else
             fold_left_s (fun acc (p : Protocol_hash.t) ->
                 if (List.mem p known_protos) ||
