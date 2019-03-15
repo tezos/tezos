@@ -251,6 +251,7 @@ val get_proposals :
   Int32.t Alpha_environment.Protocol_hash.Map.t tzresult Lwt.t
 
 val submit_proposals:
+  ?dry_run:bool ->
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -261,6 +262,7 @@ val submit_proposals:
   Kind.proposals Injection.result_list tzresult Lwt.t
 
 val submit_ballot:
+  ?dry_run:bool ->
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->

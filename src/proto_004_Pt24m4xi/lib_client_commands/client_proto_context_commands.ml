@@ -656,7 +656,12 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Submit protocol proposals"
-      no_options
+      (args2
+         dry_run_switch
+         (switch
+            ~doc:"Do not fail when the checks that try to prevent the user \
+                  from shooting themselves in the foot do."
+            ~long:"force" ()))
       (prefixes [ "submit" ; "proposals" ; "for" ]
        @@ ContractAlias.destination_param
          ~name: "delegate"
@@ -670,7 +675,7 @@ let commands version () =
                   match Protocol_hash.of_b58check_opt x with
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
-      begin fun () (_name, source) proposals (cctxt : Proto_alpha.full) ->
+      begin fun (dry_run, force) (_name, source) proposals (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -678,41 +683,106 @@ let commands version () =
         end >>=? fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun known_proposals ->
+        Alpha_services.Voting.listings cctxt (`Main, cctxt#block) >>=? fun listings ->
+        Client_proto_context.get_manager
+          cctxt ~chain:`Main ~block:cctxt#block
+          source >>=? fun (src_name, src_pkh, _src_pk, src_sk) ->
         (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
            the user is the first proposer and just injected it with
            tezos-admin-client *)
         let check_proposals proposals : bool tzresult Lwt.t =
           let n = List.length proposals in
-          if n = 0 then cctxt#error "Empty proposal"
-          else if n > Constants.fixed.max_proposals_per_delegate then
-            cctxt#error "Too many proposals"
+          let errors = ref [] in
+          let error ppf =
+            Format.kasprintf (fun s -> errors := s :: !errors) ppf in
+          if n = 0 then error "Empty proposal list." ;
+          if n > Constants.fixed.max_proposals_per_delegate then
+            error "Too many proposals: %d > %d."
+              n Constants.fixed.max_proposals_per_delegate ;
+          begin match
+              Base.List.find_all_dups ~compare:Protocol_hash.compare proposals with
+          | [] -> ()
+          | dups ->
+              error "There %s: %a."
+                (if List.length dups = 1
+                 then "is a duplicate proposal"
+                 else "are duplicate proposals")
+                Format.(
+                  pp_print_list
+                    ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+                    Protocol_hash.pp)
+                dups
+          end ;
+          List.iter (fun (p : Protocol_hash.t) ->
+              if (List.mem p known_protos) ||
+                 (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
+              then ()
+              else
+                error "Protocol %a is not a known proposal." Protocol_hash.pp p
+            ) proposals ;
+          if not (
+              List.exists
+                (fun (pkh, _) -> Signature.Public_key_hash.equal pkh src_pkh)
+                listings)
+          then
+            error "Public-key-hash `%a` from account `%s` does not appear to \
+                   have voting rights."
+              Signature.Public_key_hash.pp src_pkh
+              src_name ;
+          if !errors <> []
+          then
+            cctxt#message "There %s with the submission:%t"
+              (if List.length !errors = 1 then "is an issue" else "are issues")
+              Format.(fun ppf ->
+                  pp_print_cut ppf () ;
+                  pp_open_vbox ppf 0 ;
+                  List.iter (fun msg ->
+                      pp_open_hovbox ppf 2 ;
+                      pp_print_string ppf "* ";
+                      pp_print_text ppf msg ;
+                      pp_close_box ppf () ; 
+                      pp_print_cut ppf ())
+                    !errors ;
+                  pp_close_box ppf ())
+            >>= fun () ->
+            return_false
           else
-            fold_left_s (fun acc (p : Protocol_hash.t) ->
-                if (List.mem p known_protos) ||
-                   (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
-                then return acc
-                else cctxt#message "Protocol %a is not a known proposal"
-                    Protocol_hash.pp p >>= fun () ->
-                  return false)
-              true proposals
+            return_true
         in
         check_proposals proposals >>=? fun all_valid ->
         begin if all_valid then
-            cctxt#message "All proposals are valid"
+            cctxt#message "All proposals are valid."
+          else if force then
+            cctxt#message
+              "Some proposals are not valid, but `--force` was used."
           else
-            cctxt#error "Submission failed because of invalid proposals"
+            cctxt#error "Submission failed because of invalid proposals."
         end >>= fun () ->
-        Client_proto_context.get_manager
-          cctxt ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
-        submit_proposals cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
-          proposals >>=? fun _res ->
-        return_unit
+        submit_proposals ~dry_run
+          cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
+          proposals >>= function
+        | Ok _res -> return_unit
+        | Error errs ->
+            begin match errs with
+              | Unregistred_error
+                  (`O [ "kind", `String "generic" ;
+                        "error", `String msg ]) :: [] ->
+                  cctxt#message "Error:@[<hov>@.%a@]"
+                    Format.pp_print_text
+                    (String.split_on_char ' ' msg
+                     |> List.filter (function "" | "\n" -> false | _ -> true)
+                     |> String.concat " "
+                     |> String.map (function '\n' | '\t' -> ' ' | c -> c))
+              | el ->
+                  cctxt#message "Error:@ %a" pp_print_error el
+            end
+            >>= fun () ->
+            failwith "Failed to submit proposals"
       end ;
 
     command ~group ~desc: "Submit a ballot"
-      no_options
+      (args1 dry_run_switch)
       (prefixes [ "submit" ; "ballot" ; "for" ]
        @@ ContractAlias.destination_param
          ~name: "delegate"
@@ -727,7 +797,7 @@ let commands version () =
                | Some hash -> return hash))
        @@ param
          ~name:"ballot"
-         ~desc:"the ballot value (yay, nay or pass)"
+         ~desc:"the ballot value (yea/yay, nay, or pass)"
          (parameter
             ~autocomplete: (fun _ -> return [ "yea" ; "nay" ; "pass" ])
             (fun _ s -> (* We should have [Vote.of_string]. *)
@@ -737,7 +807,7 @@ let commands version () =
                | "pass" -> return Vote.Pass
                | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
-      begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
+      begin fun dry_run (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Testing_vote | Promotion_vote -> return_unit
@@ -747,7 +817,7 @@ let commands version () =
           cctxt ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
         submit_ballot cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
-          proposal ballot >>=? fun _res ->
+          ~dry_run proposal ballot >>=? fun _res ->
         return_unit
       end ;
 
@@ -763,6 +833,7 @@ let commands version () =
              Proto_alpha.Alpha_context.Voting_period.kind_encoding
              info.current_period_kind)
           info.remaining >>= fun () ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun props ->
         let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
                     List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
@@ -773,13 +844,17 @@ let commands version () =
         in
         match info.current_period_kind with
         | Proposal ->
-            (* TODO improve printing of proposals *)
-            let proposals_string =
-              if List.length ranks = 0 then " none" else
-                List.fold_left (fun acc (p,w) ->
-                    Format.asprintf "%s\n%a %ld" acc Protocol_hash.pp p w) "" ranks
-            in
-            cctxt#answer "Current proposals:%s" proposals_string
+            cctxt#answer "Current proposals:%t"
+              Format.(fun ppf ->
+                  pp_print_cut ppf () ;
+                  pp_open_vbox ppf 0 ;
+                  List.iter
+                    (fun (p, w) ->
+                       fprintf ppf "* %a %ld (%sknown by the node)@."
+                         Protocol_hash.pp p w
+                         (if (List.mem p known_protos) then "" else "not "))
+                    ranks ;
+                  pp_close_box ppf () )
             >>= fun () -> return_unit
         | Testing_vote | Promotion_vote ->
             print_proposal info.current_proposal >>= fun () ->
