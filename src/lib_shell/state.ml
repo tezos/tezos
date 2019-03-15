@@ -343,7 +343,6 @@ let tag_invalid_heads block_store chain_store heads level =
 
       Store.Block.Contents.remove (block_store, hash) >>= fun () ->
       Store.Block.Operation_hashes.remove_all (block_store, hash) >>= fun () ->
-      Store.Block.Operation_path.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Operations_metadata.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Operations.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Predecessors.remove_all (block_store, hash) >>= fun () ->
@@ -362,7 +361,6 @@ let tag_invalid_heads block_store chain_store heads level =
 let prune_block store block_hash =
   let st = (store, block_hash) in
   Store.Block.Contents.remove st >>= fun () ->
-  Store.Block.Operation_path.remove_all st >>= fun () ->
   Store.Block.Invalid_block.remove store block_hash >>= fun () ->
   Store.Block.Operations_metadata.remove_all st
 
@@ -1042,15 +1040,10 @@ module Block = struct
         } in
         Store.Block.Header.store (store, hash) header >>= fun () ->
         Store.Block.Contents.store (store, hash) contents >>= fun () ->
-        let hashes = List.map (List.map Operation.hash) operations in
-        let list_hashes = List.map Operation_list_hash.compute hashes in
-        Lwt_list.iteri_p
-          (fun i hashes ->
-             let path = Operation_list_list_hash.compute_path list_hashes i in
-             Store.Block.Operation_hashes.store
-               (store, hash) i hashes >>= fun () ->
-             Store.Block.Operation_path.store (store, hash) i path)
-          hashes >>= fun () ->
+        Lwt_list.iteri_p (fun i ops ->
+            Store.Block.Operation_hashes.store
+              (store,hash) i (List.map Operation.hash ops))
+          operations >>= fun () ->
         Lwt_list.iteri_p
           (fun i ops ->
              Store.Block.Operations.store (store, hash) i ops)
@@ -1100,13 +1093,19 @@ module Block = struct
   let watcher (state : chain_state) =
     Lwt_watcher.create_stream state.block_watcher
 
+  let compute_operation_path hashes =
+    let list_hashes = List.map Operation_list_hash.compute hashes in
+    Operation_list_list_hash.compute_path list_hashes
+
   let operation_hashes { chain_state ; hash ; header } i =
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Operation_hashes.read_exn (store, hash) i >>= fun hashes ->
-      Store.Block.Operation_path.read_exn (store, hash) i >>= fun path ->
-      Lwt.return (hashes, path)
+      Lwt_list.map_p
+        (Store.Block.Operation_hashes.read_exn (store, hash))
+        (0 -- (header.shell.validation_passes - 1)) >>= fun hashes ->
+      let path = compute_operation_path hashes in
+      Lwt.return (List.nth hashes i , path i)
     end
 
   let all_operation_hashes { chain_state ; hash ; header } =
@@ -1120,9 +1119,12 @@ module Block = struct
     if i < 0 || header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Operation_path.read_exn (store, hash) i >>= fun path ->
+      Lwt_list.map_p
+        (Store.Block.Operation_hashes.read_exn (store, hash))
+        (0 -- (header.shell.validation_passes - 1)) >>= fun hashes ->
+      let path = compute_operation_path hashes in
       Store.Block.Operations.read_exn (store, hash) i >>= fun ops ->
-      Lwt.return (ops, path)
+      Lwt.return (ops, path i)
     end
 
   let operations_metadata { chain_state ; hash ; header } i =

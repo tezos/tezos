@@ -210,14 +210,6 @@ module Block = struct
          let encoding = Data_encoding.list Operation_hash.encoding
        end))
 
-  module Operation_path =
-    Operations_index.Make_map
-      (struct let name = ["path"] end)
-      (Store_helpers.Make_value(struct
-         type t = Operation_list_list_hash.path
-         let encoding = Operation_list_list_hash.path_encoding
-       end))
-
   module Operations =
     Operations_index.Make_map
       (struct let name = ["contents"] end)
