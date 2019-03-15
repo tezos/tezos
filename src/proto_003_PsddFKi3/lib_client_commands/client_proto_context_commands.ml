@@ -766,7 +766,7 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Submit a ballot"
-      no_options
+      (args1 dry_run_switch)
       (prefixes [ "submit" ; "ballot" ; "for" ]
        @@ ContractAlias.destination_param
          ~name: "delegate"
@@ -791,7 +791,7 @@ let commands version () =
                | "pass" -> return Vote.Pass
                | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
-      begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
+      begin fun dry_run (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Testing_vote | Promotion_vote -> return_unit
@@ -801,7 +801,7 @@ let commands version () =
           cctxt ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
         submit_ballot cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
-          proposal ballot >>=? fun _res ->
+          ~dry_run proposal ballot >>=? fun _res ->
         return_unit
       end ;
 
