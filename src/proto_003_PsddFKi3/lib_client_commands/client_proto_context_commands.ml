@@ -751,12 +751,12 @@ let commands version () =
         in
         check_proposals proposals >>=? fun all_valid ->
         begin if all_valid then
-            cctxt#message "All proposals are valid"
+            cctxt#message "All proposals are valid."
           else if force then
             cctxt#message
-              "Some proposals are not valid, but `--force` was used"
+              "Some proposals are not valid, but `--force` was used."
           else
-            cctxt#error "Submission failed because of invalid proposals"
+            cctxt#error "Submission failed because of invalid proposals."
         end >>= fun () ->
         submit_proposals cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           proposals >>=? fun _res ->
