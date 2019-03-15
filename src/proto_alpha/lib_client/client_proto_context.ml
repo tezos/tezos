@@ -494,7 +494,7 @@ let submit_proposals
     ?dry_run ~src_sk contents
 
 let submit_ballot
-    (cctxt : #Proto_alpha.full)
+    ?dry_run (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
@@ -503,7 +503,7 @@ let submit_ballot
   let contents = Single ( Ballot { source ; period ; proposal ; ballot } ) in
   Injection.inject_operation cctxt ~chain ~block ?confirmations
     ~fee_parameter:Injection.dummy_fee_parameter
-    ~src_sk contents
+    ?dry_run ~src_sk contents
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match a.receipt, a.protocol_data with
