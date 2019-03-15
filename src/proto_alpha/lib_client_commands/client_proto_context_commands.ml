@@ -682,33 +682,73 @@ let commands version () =
         end >>=? fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun known_proposals ->
+        Alpha_services.Voting.listings cctxt (`Main, cctxt#block) >>=? fun listings ->
+        Client_proto_context.get_manager
+          cctxt ~chain:`Main ~block:cctxt#block
+          source >>=? fun (src_name, src_pkh, _src_pk, src_sk) ->
         (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
            the user is the first proposer and just injected it with
            tezos-admin-client *)
         let check_proposals proposals : bool tzresult Lwt.t =
           let n = List.length proposals in
-          if n = 0 then cctxt#error "Empty proposal"
-          else if n > Constants.fixed.max_proposals_per_delegate then
-            cctxt#error "Too many proposals: %d > %d"
-              n Constants.fixed.max_proposals_per_delegate
+          let errors = ref [] in
+          let error ppf =
+            Format.kasprintf (fun s -> errors := s :: !errors) ppf in
+          if n = 0 then error "Empty proposal list." ;
+          if n > Constants.fixed.max_proposals_per_delegate then
+            error "Too many proposals: %d > %d."
+              n Constants.fixed.max_proposals_per_delegate ;
+          begin match
+              Base.List.find_all_dups ~compare:Protocol_hash.compare proposals with
+          | [] -> ()
+          | dups ->
+              error "There %s: %a."
+                (if List.length dups = 1
+                 then "is a duplicate proposal"
+                 else "are duplicate proposals")
+                Format.(
+                  pp_print_list
+                    ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+                    Protocol_hash.pp)
+                dups
+          end ;
+          List.iter (fun (p : Protocol_hash.t) ->
+              if (List.mem p known_protos) ||
+                 (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
+              then ()
+              else
+                error "Protocol %a is not a known proposal." Protocol_hash.pp p
+            ) proposals ;
+          if not (
+              List.exists
+                (fun (pkh, _) -> Signature.Public_key_hash.equal pkh src_pkh)
+                listings)
+          then
+            error "Public-key-hash `%a` from account `%s` does not appear to \
+                   have voting rights."
+              Signature.Public_key_hash.pp src_pkh
+              src_name ;
+          if !errors <> []
+          then
+            cctxt#message "There %s with the submission:%t"
+              (if List.length !errors = 1 then "is an issue" else "are issues")
+              Format.(fun ppf ->
+                  pp_print_cut ppf () ;
+                  pp_open_vbox ppf 0 ;
+                  List.iter (fun msg ->
+                      pp_open_hovbox ppf 2 ;
+                      pp_print_string ppf "* ";
+                      pp_print_text ppf msg ;
+                      pp_close_box ppf () ; 
+                      pp_print_cut ppf ())
+                    !errors ;
+                  pp_close_box ppf ())
+            >>= fun () ->
+            return_false
           else
-            begin match Base.List.find_a_dup ~compare proposals with
-              | Some dup ->
-                  cctxt#error "There are duplicate proposals, e.g. %a"
-                    Protocol_hash.pp dup
-                  >>= fun () ->
-                  return_false
-              | None ->
-                  fold_left_s (fun acc (p : Protocol_hash.t) ->
-                      if (List.mem p known_protos) ||
-                         (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
-                      then return acc
-                      else cctxt#message "Protocol %a is not a known proposal"
-                          Protocol_hash.pp p >>= fun () ->
-                        return false)
-                    true proposals
-            end in
+            return_true
+        in
         check_proposals proposals >>=? fun all_valid ->
         begin if all_valid then
             cctxt#message "All proposals are valid"
@@ -718,9 +758,6 @@ let commands version () =
           else
             cctxt#error "Submission failed because of invalid proposals"
         end >>= fun () ->
-        Client_proto_context.get_manager
-          cctxt ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
         submit_proposals cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           proposals >>=? fun _res ->
         return_unit
