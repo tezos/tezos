@@ -139,6 +139,13 @@ module Ledger_commands = struct
           Ledgerwallet.Transport.pp_error e ;
         return_none
     | Ok version ->
+        (if (version.major, version.minor) < (1, 4)
+         then
+           failwith
+             "Version %a of the ledger apps is not supported by this client"
+             Ledgerwallet_tezos.Version.pp version
+         else return_unit)
+        >>=? fun () ->
         wrap_ledger_cmd (fun pp ->
             Ledgerwallet_tezos.get_git_commit ~pp h) >>=? fun git_commit ->
         log_info "Found a %a application at [%s] (git-description: %S)"
