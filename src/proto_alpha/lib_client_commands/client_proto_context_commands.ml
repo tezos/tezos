@@ -656,7 +656,11 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Submit protocol proposals"
-      no_options
+      (args1
+         (switch
+            ~doc:"Do not fail when the checks that try to prevent the user \
+                  from shooting themselves in the foot do."
+            ~long:"force" ()))
       (prefixes [ "submit" ; "proposals" ; "for" ]
        @@ ContractAlias.destination_param
          ~name: "delegate"
@@ -670,7 +674,7 @@ let commands version () =
                   match Protocol_hash.of_b58check_opt x with
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
-      begin fun () (_name, source) proposals (cctxt : Proto_alpha.full) ->
+      begin fun force (_name, source) proposals (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -700,6 +704,9 @@ let commands version () =
         check_proposals proposals >>=? fun all_valid ->
         begin if all_valid then
             cctxt#message "All proposals are valid"
+          else if force then
+            cctxt#message
+              "Some proposals are not valid, but `--force` was used"
           else
             cctxt#error "Submission failed because of invalid proposals"
         end >>= fun () ->
