@@ -761,8 +761,24 @@ let commands version () =
         end >>= fun () ->
         submit_proposals ~dry_run
           cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
-          proposals >>=? fun _res ->
-        return_unit
+          proposals >>= function
+        | Ok _res -> return_unit
+        | Error errs ->
+            begin match errs with
+              | Unregistred_error
+                  (`O [ "kind", `String "generic" ;
+                        "error", `String msg ]) :: [] ->
+                  cctxt#message "Error:@[<hov>@.%a@]"
+                    Format.pp_print_text
+                    (String.split_on_char ' ' msg
+                     |> List.filter (function "" | "\n" -> false | _ -> true)
+                     |> String.concat " "
+                     |> String.map (function '\n' | '\t' -> ' ' | c -> c))
+              | el ->
+                  cctxt#message "Error:@ %a" pp_print_error el
+            end
+            >>= fun () ->
+            failwith "Failed to submit proposals"
       end ;
 
     command ~group ~desc: "Submit a ballot"
