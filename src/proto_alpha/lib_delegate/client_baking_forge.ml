@@ -565,8 +565,7 @@ let filter_and_apply_operations
 
 (* Build the block header : mimics node prevalidation *)
 let finalize_block_header
-    shell_header
-    ~predecessor_timestamp
+    pred_shell_header
     ~timestamp
     validation_result
     operations =
@@ -583,7 +582,7 @@ let finalize_block_header
   begin Context.get_test_chain context >>= function
     | Not_running -> return context
     | Running { expiration } ->
-        if Time.(expiration <= predecessor_timestamp) then
+        if Time.(expiration <= timestamp) then
           Context.set_test_chain context Not_running >>= fun context ->
           return context
         else
@@ -593,8 +592,8 @@ let finalize_block_header
   Context.hash ~time:timestamp ?message context >>= fun context ->
   let header =
     Tezos_base.Block_header.
-      { shell_header with
-        level = Int32.succ shell_header.level ;
+      { pred_shell_header with
+        level = Int32.succ pred_shell_header.level ;
         validation_passes ;
         operations_hash ;
         fitness ;
@@ -693,8 +692,7 @@ let forge_block
         let current_protocol = bi.next_protocol in
         Context.get_protocol validation_result.context >>= fun next_protocol ->
         if Protocol_hash.equal current_protocol next_protocol then begin
-          finalize_block_header final_context.header
-            ~timestamp ~predecessor_timestamp:bi.timestamp
+          finalize_block_header final_context.header ~timestamp
             validation_result operations >>= function
           | Error [ Forking_test_chain ] ->
               Alpha_block_services.Helpers.Preapply.block
@@ -992,9 +990,7 @@ let build_block
             let current_protocol = bi.next_protocol in
             Context.get_protocol validation_result.context >>= fun next_protocol ->
             if Protocol_hash.equal current_protocol next_protocol then begin
-              finalize_block_header final_context.header
-                ~predecessor_timestamp:bi.timestamp ~timestamp
-                validation_result operations >>= function
+              finalize_block_header final_context.header ~timestamp validation_result operations >>= function
               | Error [ Forking_test_chain ] ->
                   shell_prevalidation cctxt ~chain ~block seed_nonce_hash
                     operations slot
