@@ -34,11 +34,11 @@ type result = {
   forking_testchain : bool ;
 }
 
-let update_testchain_status ctxt predecessor_header =
+let update_testchain_status ctxt predecessor_header timestamp =
   Context.get_test_chain ctxt >>= function
   | Not_running -> return ctxt
   | Running { expiration } ->
-      if Time.(expiration <= predecessor_header.Block_header.shell.timestamp) then
+      if Time.(expiration <= timestamp) then
         Context.set_test_chain ctxt Not_running >>= fun ctxt ->
         return ctxt
       else
@@ -181,7 +181,9 @@ module Make(Proto : Registered_protocol.T) = struct
       block_hash block_header >>=? fun () ->
     parse_block_header block_hash block_header >>=? fun block_header ->
     check_operation_quota block_hash operations >>=? fun () ->
-    update_testchain_status predecessor_context predecessor_block_header >>=? fun context ->
+    update_testchain_status
+      predecessor_context predecessor_block_header
+      block_header.shell.timestamp >>=? fun context ->
     parse_operations block_hash operations >>=? fun operations ->
     (* TODO wrap 'proto_error' into 'block_error' *)
     Proto.begin_application
