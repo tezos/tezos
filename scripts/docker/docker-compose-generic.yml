@@ -58,11 +58,11 @@ services:
     restart: on-failure
 
     # protocol A
-  baker-004-PsGLNcdz:
+  baker-004-PsGn8G5U:
     image: tezos/tezos:zeronet
-    hostname: baker-004-PsGLNcdz
+    hostname: baker-004-PsGn8G5U
     environment:
-      - PROTOCOL=004-PsGLNcdz
+      - PROTOCOL=004-PsGn8G5U
     command: tezos-baker
     links:
       - node
@@ -71,11 +71,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-004-PsGLNcdz:
+  endorser-004-PsGn8G5U:
     image: tezos/tezos:zeronet
-    hostname: endorser-004-PsGLNcdz
+    hostname: endorser-004-PsGn8G5U
     environment:
-      - PROTOCOL=004-PsGLNcdz
+      - PROTOCOL=004-PsGn8G5U
     command: tezos-endorser
     links:
       - node
@@ -83,11 +83,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  accuser-004-PsGLNcdz:
+  accuser-004-PsGn8G5U:
     image: tezos/tezos:zeronet
-    hostname: accuser-004-PsGLNcdz
+    hostname: accuser-004-PsGn8G5U
     environment:
-      - PROTOCOL=004-PsGLNcdz
+      - PROTOCOL=004-PsGn8G5U
     command: tezos-accuser
     links:
       - node
@@ -95,11 +95,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  baker-004-PsGLNcdz-test:
+  baker-004-PsGn8G5U-test:
     image: tezos/tezos:zeronet
-    hostname: baker-004-PsGLNcdz-test
+    hostname: baker-004-PsGn8G5U-test
     environment:
-      - PROTOCOL=004-PsGLNcdz
+      - PROTOCOL=004-PsGn8G5U
     command: tezos-baker-test
     links:
       - node
@@ -108,11 +108,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-004-PsGLNcdz-test:
+  endorser-004-PsGn8G5U-test:
     image: tezos/tezos:zeronet
-    hostname: endorser-004-PsGLNcdz-test
+    hostname: endorser-004-PsGn8G5U-test
     environment:
-      - PROTOCOL=004-PsGLNcdz
+      - PROTOCOL=004-PsGn8G5U
     command: tezos-endorser-test
     links:
       - node
@@ -120,11 +120,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  accuser-004-PsGLNcdz-test:
+  accuser-004-PsGn8G5U-test:
     image: tezos/tezos:zeronet
-    hostname: accuser-004-PsGLNcdz-test
+    hostname: accuser-004-PsGn8G5U-test
     environment:
-      - PROTOCOL=004-PsGLNcdz
+      - PROTOCOL=004-PsGn8G5U
     command: tezos-accuser-test
     links:
       - node
@@ -133,11 +133,11 @@ services:
     restart: on-failure
 
     # protocol B
-  baker-004-PshR5rQT:
+  baker-004-PsuzFErA:
     image: tezos/tezos:zeronet
-    hostname: baker-004-PshR5rQT
+    hostname: baker-004-PsuzFErA
     environment:
-      - PROTOCOL=004-PshR5rQT
+      - PROTOCOL=004-PsuzFErA
     command: tezos-baker
     links:
       - node
@@ -146,11 +146,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-004-PshR5rQT:
+  endorser-004-PsuzFErA:
     image: tezos/tezos:zeronet
-    hostname: endorser-004-PshR5rQT
+    hostname: endorser-004-PsuzFErA
     environment:
-      - PROTOCOL=004-PshR5rQT
+      - PROTOCOL=004-PsuzFErA
     command: tezos-endorser
     links:
       - node
@@ -158,11 +158,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  accuser-004-PshR5rQT:
+  accuser-004-PsuzFErA:
     image: tezos/tezos:zeronet
-    hostname: accuser-004-PshR5rQT
+    hostname: accuser-004-PsuzFErA
     environment:
-      - PROTOCOL=004-PshR5rQT
+      - PROTOCOL=004-PsuzFErA
     command: tezos-accuser
     links:
       - node
@@ -170,11 +170,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  baker-004-PshR5rQT-test:
+  baker-004-PsuzFErA-test:
     image: tezos/tezos:zeronet
-    hostname: baker-004-PshR5rQT-test
+    hostname: baker-004-PsuzFErA-test
     environment:
-      - PROTOCOL=004-PshR5rQT
+      - PROTOCOL=004-PsuzFErA
     command: tezos-baker-test
     links:
       - node
@@ -183,11 +183,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-004-PshR5rQT-test:
+  endorser-004-PsuzFErA-test:
     image: tezos/tezos:zeronet
-    hostname: endorser-004-PshR5rQT-test
+    hostname: endorser-004-PsuzFErA-test
     environment:
-      - PROTOCOL=004-PshR5rQT
+      - PROTOCOL=004-PsuzFErA
     command: tezos-endorser-test
     links:
       - node
@@ -195,11 +195,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  accuser-004-PshR5rQT-test:
+  accuser-004-PsuzFErA-test:
     image: tezos/tezos:zeronet
-    hostname: accuser-004-PshR5rQT-test
+    hostname: accuser-004-PsuzFErA-test
     environment:
-      - PROTOCOL=004-PshR5rQT
+      - PROTOCOL=004-PsuzFErA
     command: tezos-accuser-test
     links:
       - node
