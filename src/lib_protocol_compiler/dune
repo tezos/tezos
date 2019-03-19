@@ -107,11 +107,6 @@
  (modules Replace))
 
 (install
- (section share)
- (files jbuild_protocol_template
-        jbuild_embedded_protocol_template))
-
-(install
  (section libexec)
  (files (replace.exe as replace)
         dune_protocol
