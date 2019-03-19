@@ -797,7 +797,7 @@ let commands version () =
                | Some hash -> return hash))
        @@ param
          ~name:"ballot"
-         ~desc:"the ballot value (yay, nay or pass)"
+         ~desc:"the ballot value (yea/yay, nay, or pass)"
          (parameter
             ~autocomplete: (fun _ -> return [ "yea" ; "nay" ; "pass" ])
             (fun _ s -> (* We should have [Vote.of_string]. *)
