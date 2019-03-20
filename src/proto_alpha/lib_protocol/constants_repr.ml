@@ -81,6 +81,7 @@ type parametric = {
   blocks_per_voting_period: int32 ;
   time_between_blocks: Period_repr.t list ;
   endorsers_per_block: int ;
+  minimum_endorsements_per_priority: int list;
   hard_gas_limit_per_operation: Z.t ;
   hard_gas_limit_per_block: Z.t ;
   proof_of_work_threshold: int64 ;
@@ -105,6 +106,7 @@ let default = {
   time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
   endorsers_per_block = 32 ;
+  minimum_endorsements_per_priority = [ 24; 16; 8; 0; ] ;
   hard_gas_limit_per_operation = Z.of_int 400_000 ;
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
   proof_of_work_threshold =
@@ -139,6 +141,7 @@ let parametric_encoding =
           c.blocks_per_voting_period,
           c.time_between_blocks,
           c.endorsers_per_block,
+          c.minimum_endorsements_per_priority,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block),
         ((c.proof_of_work_threshold,
@@ -159,6 +162,7 @@ let parametric_encoding =
             blocks_per_voting_period,
             time_between_blocks,
             endorsers_per_block,
+            minimum_endorsements_per_priority,
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
@@ -179,6 +183,7 @@ let parametric_encoding =
         blocks_per_voting_period ;
         time_between_blocks ;
         endorsers_per_block ;
+        minimum_endorsements_per_priority ;
         hard_gas_limit_per_operation ;
         hard_gas_limit_per_block ;
         proof_of_work_threshold ;
@@ -194,7 +199,7 @@ let parametric_encoding =
         hard_storage_limit_per_operation ;
       } )
     (merge_objs
-       (obj9
+       (obj10
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
@@ -202,6 +207,7 @@ let parametric_encoding =
           (req "blocks_per_voting_period" int32)
           (req "time_between_blocks" (list Period_repr.encoding))
           (req "endorsers_per_block" uint16)
+          (req "minimum_endorsements_per_priority" (list uint16))
           (req "hard_gas_limit_per_operation" z)
           (req "hard_gas_limit_per_block" z))
        (merge_objs

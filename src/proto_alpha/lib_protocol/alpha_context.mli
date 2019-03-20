@@ -366,6 +366,7 @@ module Constants : sig
     blocks_per_voting_period: int32 ;
     time_between_blocks: Period.t list ;
     endorsers_per_block: int ;
+    minimum_endorsements_per_priority: int list ;
     hard_gas_limit_per_operation: Z.t ;
     hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
@@ -389,6 +390,7 @@ module Constants : sig
   val blocks_per_voting_period: context -> int32
   val time_between_blocks: context -> Period.t list
   val endorsers_per_block: context -> int
+  val minimum_endorsements_per_priority: context -> int list
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t
@@ -1143,6 +1145,8 @@ val init_endorsements:
   context ->
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
   context
+val included_endorsements:
+  context -> int
 
 val reset_internal_nonce: context -> context
 val fresh_internal_nonce: context -> (context * int) tzresult

@@ -58,6 +58,11 @@ type error += Outdated_double_baking_evidence
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Multiple_revelation
 type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
+type error +=
+    Not_enough_endorsements_for_priority of
+      { required : int ;
+        priority : int ;
+        endorsements : int ; }
 
 let () =
   register_error_kind
@@ -346,7 +351,24 @@ let () =
                   parse within the provided gas bounds."
     Data_encoding.empty
     (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
-    (fun () -> Gas_quota_exceeded_init_deserialize)
+    (fun () -> Gas_quota_exceeded_init_deserialize) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.not_enought_endorsements_for_priority"
+    ~title:"Not enought endorsements for priority"
+    ~description:"The block being validated does not include the \
+                  required minimum number of endorsements for this priority."
+    ~pp:(fun ppf (required, endorsements, priority) ->
+        Format.fprintf ppf "Wrong number of endorsments (%i) for priority (%i), %i are expected"
+          endorsements priority required)
+    Data_encoding.(obj3
+                     (req "required" int31)
+                     (req "endorsements" int31)
+                     (req "priority" int31))
+    (function Not_enough_endorsements_for_priority { required; endorsements; priority } ->
+       Some (required, endorsements, priority) | _ -> None)
+    (fun (required, endorsements, priority) ->
+       Not_enough_endorsements_for_priority { required; endorsements; priority }) ;
 
 open Apply_results
 
@@ -758,7 +780,6 @@ let apply_contents_list
       else
         let ctxt = record_endorsement ctxt delegate in
         let gap = List.length slots in
-        let ctxt = Fitness.increase ~gap ctxt in
         Lwt.return
           Tez.(Constants.endorsement_security_deposit ctxt *?
                Int64.of_int gap) >>=? fun deposit ->
@@ -992,7 +1013,31 @@ let begin_application ctxt chain_id block_header pred_timestamp =
       let ctxt = init_endorsements ctxt rights in
       return (ctxt, delegate_pk)
 
+let check_minimum_endorsements_constraint_for_priority ctxt
+    (protocol_data:Alpha_context.Block_header.contents) =
+  let rec find_constraint priority minimum =
+    match minimum with
+    | [] -> 0
+    | h :: minimum ->
+        if Compare.Int.(priority = 0) then
+          h
+        else
+          find_constraint (pred priority) minimum
+  in
+  let minimum =
+    find_constraint protocol_data.priority
+      (Constants.minimum_endorsements_per_priority ctxt)
+  in
+  if Compare.Int.(included_endorsements ctxt >= minimum) then
+    Ok ()
+  else
+    error ( Not_enough_endorsements_for_priority
+              { required = minimum;
+                priority = protocol_data.priority ;
+                endorsements = included_endorsements ctxt } )
+
 let finalize_application ctxt protocol_data delegate =
+  Lwt.return (check_minimum_endorsements_constraint_for_priority ctxt protocol_data) >>=? fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit >>=? fun ctxt ->
   let reward = (Constants.block_reward ctxt) in

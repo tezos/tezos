@@ -239,6 +239,7 @@ let genesis
     ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
     ?(time_between_blocks = Constants_repr.default.time_between_blocks)
     ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
+    ?(minimum_endorsements_per_priority = [])
     ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
     ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
     ?(proof_of_work_threshold = Int64.(neg one))
@@ -282,6 +283,7 @@ let genesis
     blocks_per_voting_period ;
     time_between_blocks ;
     endorsers_per_block ;
+    minimum_endorsements_per_priority ;
     hard_gas_limit_per_operation ;
     hard_gas_limit_per_block ;
     proof_of_work_threshold ;

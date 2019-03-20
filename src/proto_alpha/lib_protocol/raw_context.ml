@@ -33,6 +33,7 @@ type t = {
   timestamp: Time.t ;
   fitness: Int64.t ;
   deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
+  included_endorsements: int ;
   allowed_endorsements:
     (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ;
   fees: Tez_repr.t ;
@@ -62,6 +63,7 @@ let record_endorsement ctxt k =
   | Some (_, _, true) -> assert false (* right already used *)
   | Some (d, s, false) ->
       { ctxt with
+        included_endorsements = ctxt.included_endorsements + (List.length s);
         allowed_endorsements =
           Signature.Public_key_hash.Map.add k (d,s,true) ctxt.allowed_endorsements }
 
@@ -76,6 +78,9 @@ let init_endorsements ctxt allowed_endorsements =
 
 let allowed_endorsements ctxt =
   ctxt.allowed_endorsements
+
+let included_endorsements ctxt =
+  ctxt.included_endorsements
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -448,6 +453,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
     context = ctxt ; constants ; level ;
     timestamp ; fitness ; first_level ;
     allowed_endorsements = Signature.Public_key_hash.Map.empty ;
+    included_endorsements = 0 ;
     fees = Tez_repr.zero ;
     rewards = Tez_repr.zero ;
     deposits = Signature.Public_key_hash.Map.empty ;
@@ -514,6 +520,7 @@ let register_resolvers enc resolve =
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
       allowed_endorsements = Signature.Public_key_hash.Map.empty ;
+      included_endorsements = 0 ;
       storage_space_to_pay = None ;
       allocated_contracts = None ;
       fees = Tez_repr.zero ;

@@ -97,6 +97,7 @@ val genesis:
   ?blocks_per_voting_period:int32 ->
   ?time_between_blocks:Period_repr.t list ->
   ?endorsers_per_block:int ->
+  ?minimum_endorsements_per_priority:int list ->
   ?hard_gas_limit_per_operation:Z.t ->
   ?hard_gas_limit_per_block:Z.t ->
   ?proof_of_work_threshold:int64 ->

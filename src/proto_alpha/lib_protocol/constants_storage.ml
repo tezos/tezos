@@ -44,6 +44,9 @@ let time_between_blocks c =
 let endorsers_per_block c =
   let constants = Raw_context.constants c in
   constants.endorsers_per_block
+let minimum_endorsements_per_priority c =
+  let constants = Raw_context.constants c in
+  constants.minimum_endorsements_per_priority
 let hard_gas_limit_per_operation c =
   let constants = Raw_context.constants c in
   constants.hard_gas_limit_per_operation

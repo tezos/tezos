@@ -271,9 +271,7 @@ let check_signature block chain_id key =
     fail (Invalid_block_signature (Block_header.hash block,
                                    Signature.Public_key.hash key))
 
-let max_fitness_gap ctxt =
-  let slots = Int64.of_int (Constants.endorsers_per_block ctxt + 1) in
-  Int64.add slots 1L
+let max_fitness_gap _ctxt = 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =
   let current_fitness = Fitness.current ctxt in

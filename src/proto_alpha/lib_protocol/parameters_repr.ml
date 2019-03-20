@@ -93,6 +93,7 @@ let constants_encoding =
   conv
     (fun (c : Constants_repr.parametric) ->
        let module Compare_time_between_blocks = Compare.List (Period_repr) in
+       let module Compare_minimum_endorsements_per_priority = Compare.List (Compare.Int) in
        let module Compare_keys = Compare.List (Ed25519.Public_key) in
        let opt (=) def v = if def = v then None else Some v in
        let default = Constants_repr.default in
@@ -117,6 +118,9 @@ let constants_encoding =
        and endorsers_per_block =
          opt Compare.Int.(=)
            default.endorsers_per_block c.endorsers_per_block
+       and minimum_endorsements_per_priority =
+         opt Compare_minimum_endorsements_per_priority.(=)
+           default.minimum_endorsements_per_priority c.minimum_endorsements_per_priority
        and hard_gas_limit_per_operation =
          opt Compare.Z.(=)
            default.hard_gas_limit_per_operation c.hard_gas_limit_per_operation
@@ -164,6 +168,7 @@ let constants_encoding =
           blocks_per_voting_period,
           time_between_blocks,
           endorsers_per_block,
+          minimum_endorsements_per_priority,
           hard_gas_limit_per_operation,
           hard_gas_limit_per_block),
         ((proof_of_work_threshold,
@@ -184,6 +189,7 @@ let constants_encoding =
             blocks_per_voting_period,
             time_between_blocks,
             endorsers_per_block,
+            minimum_endorsements_per_priority,
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
@@ -214,6 +220,8 @@ let constants_encoding =
           time_between_blocks ;
         endorsers_per_block =
           unopt default.endorsers_per_block endorsers_per_block ;
+        minimum_endorsements_per_priority =
+          unopt default.minimum_endorsements_per_priority minimum_endorsements_per_priority ;
         hard_gas_limit_per_operation =
           unopt default.hard_gas_limit_per_operation hard_gas_limit_per_operation ;
         hard_gas_limit_per_block =
@@ -242,7 +250,7 @@ let constants_encoding =
           unopt default.hard_storage_limit_per_operation hard_storage_limit_per_operation ;
       } )
     (merge_objs
-       (obj9
+       (obj10
           (opt "preserved_cycles" uint8)
           (opt "blocks_per_cycle" int32)
           (opt "blocks_per_commitment" int32)
@@ -250,6 +258,7 @@ let constants_encoding =
           (opt "blocks_per_voting_period" int32)
           (opt "time_between_blocks" (list Period_repr.encoding))
           (opt "endorsers_per_block" uint16)
+          (opt "minimum_endorsements_per_priority" (list uint16))
           (opt "hard_gas_limit_per_operation" z)
           (opt "hard_gas_limit_per_block" z))
        (merge_objs

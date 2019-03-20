@@ -241,6 +241,10 @@ val allowed_endorsements:
   context ->
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
 
+(** Keep track of the number of endorsements that are included in a block *)
+val included_endorsements:
+  context -> int
+
 (** Initializes the map of allowed endorsements, this function must only be
     called once. *)
 val init_endorsements:
