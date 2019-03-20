@@ -249,11 +249,19 @@ let test_set_checkpoint_then_purge_full (s : state) =
   >>= fun () -> (* Assert b1 has been pruned.. *)
   begin State.Block.known s.chain hb1 >|= fun b -> assert (not b) end
   >>= fun () -> (* pruned, so we can still access its header. *)
-  begin State.Block.Header.known s.chain hb1 >|= fun b -> assert b end
+  begin
+    State.Block.read_opt s.chain hb1 >|= function
+    | Some _header -> assert true
+    | None -> assert false
+  end
   >>= fun () -> (* Assert a1 has also been pruned .. *)
   begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
   >>= fun () -> (* and we can also access its header. *)
-  begin State.Block.Header.known s.chain ha1 >|= fun b -> assert b end
+  begin
+    State.Block.read_opt s.chain ha1 >|= function
+    | Some _header -> assert true
+    | None -> assert false
+  end
   >>= fun () -> return_unit
 
 (** Chain.set_checkpoint_then_purge_rolling *)
@@ -279,7 +287,7 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   assert (Int32.compare checkpoint_lvl la1 = -1) ;
   assert (Int32.compare checkpoint_lvl lb1 = -1) ;
   assert (Int32.compare checkpoint_lvl lb2 = -1) ;
-  let max_op_ttl = State.Block.max_operations_ttl b2 in
+  State.Block.max_operations_ttl b2 >>=? fun max_op_ttl ->
   assert (max_op_ttl > 0) ;
   let ilb1 = Int32.to_int lb1 in
   let ilb2 = Int32.to_int lb2 in
@@ -301,11 +309,19 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   >>= fun () -> (* Assert b1 has been pruned.. *)
   begin State.Block.known s.chain hb1 >|= fun b -> assert (not b) end
   >>= fun () -> (* pruned, so we can still access its header. *)
-  begin State.Block.Header.known s.chain hb1 >|= fun b -> assert b end
+  begin
+    State.Block.read_opt s.chain hb1 >|= function
+    | Some _header -> assert true
+    | None -> assert false
+  end
   >>= fun () -> (* Assert a1 has been deleted.. *)
   begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
   >>= fun () -> (* deleted, so we can not access its header anymore. *)
-  begin State.Block.Header.known s.chain ha1 >|= fun b -> assert (not b) end
+  begin
+    State.Block.read_opt s.chain ha1 >|= function
+    | Some _header -> assert false
+    | None -> assert true
+  end
   >>= fun () -> return_unit
 
 (****************************************************************************)
