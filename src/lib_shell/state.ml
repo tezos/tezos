@@ -36,6 +36,17 @@ module Shared = struct
     Lwt_mutex.with_lock lock (fun () -> f data)
 end
 
+type hashed_header = {
+  header: Block_header.t ;
+  hash: Block_hash.t ;
+}
+
+type genesis = {
+  time: Time.t ;
+  block: Block_hash.t ;
+  protocol: Protocol_hash.t ;
+}
+
 type global_state = {
   global_data: global_data Shared.t ;
   protocol_store: Store.Protocol.store Shared.t ;
@@ -67,12 +78,6 @@ and chain_state = {
     block RPC_directory.t Protocol_hash.Map.t Protocol_hash.Table.t  ;
 }
 
-and genesis = {
-  time: Time.t ;
-  block: Block_hash.t ;
-  protocol: Protocol_hash.t ;
-}
-
 and chain_data_state = {
   mutable data: chain_data ;
   mutable checkpoint: Int32.t * Block_hash.t ;
@@ -94,10 +99,6 @@ and block = {
   header: Block_header.t ;
 }
 
-and hashed_header = {
-  header: Block_header.t ;
-  hash: Block_hash.t ;
-}
 
 let read_chain_data { chain_data } f =
   Shared.use chain_data begin fun state ->
