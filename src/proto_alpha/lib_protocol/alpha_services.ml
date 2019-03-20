@@ -110,6 +110,42 @@ module Nonce = struct
 
 end
 
+module Endorsing_power = struct
+
+  let endorsing_power ctxt chain_id (operation:packed_operation) =
+    let Operation_data data = operation.protocol_data in
+    match data.contents with
+    | Single Endorsement _ ->
+        Baking.check_endorsement_rights ctxt chain_id {
+          shell = operation.shell ;
+          protocol_data = data ;
+        } >>=? fun (_, slots, _) ->
+        return (List.length slots)
+    | _ ->
+        failwith "Operation is not an endorsement"
+
+  module S = struct
+    let endorsing_power =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:"Count the endorsing power of an operation."
+        ~query: RPC_query.empty
+        ~input: (tup2 Operation.encoding Chain_id.encoding)
+        ~output: int31
+        RPC_path.(open_root / "endorsing_power")
+  end
+
+  let register () =
+    let open Services_registration in
+    register0 S.endorsing_power begin fun ctxt () (op, chain_id) ->
+      endorsing_power ctxt chain_id op
+    end
+
+  let get ctxt block op chain_id =
+    RPC_context.make_call0 S.endorsing_power ctxt block () (op, chain_id)
+
+end
+
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
@@ -124,4 +160,5 @@ let register () =
   Delegate.register () ;
   Helpers.register () ;
   Nonce.register () ;
-  Voting.register ()
+  Voting.register () ;
+  Endorsing_power.register ()
