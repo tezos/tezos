@@ -359,7 +359,7 @@ let () =
     ~description:"The block being validated does not include the \
                   required minimum number of endorsements for this priority."
     ~pp:(fun ppf (required, endorsements, priority) ->
-        Format.fprintf ppf "Wrong number of endorsments (%i) for priority (%i), %i are expected"
+        Format.fprintf ppf "Wrong number of endorsements (%i) for priority (%i), %i are expected"
           endorsements priority required)
     Data_encoding.(obj3
                      (req "required" int31)
