@@ -419,17 +419,18 @@ let may_update_checkpoint chain_state new_head =
      Or TODO: set a level where allow to have a fork
   *)
   let old_level = checkpoint_header.shell.level in
-  let new_level = State.Block.last_allowed_fork_level new_head in
+  State.Block.last_allowed_fork_level new_head >>=? fun new_level ->
   if new_level <= old_level then
-    Lwt.return_unit
+    return_unit
   else
     let head_level = State.Block.level new_head in
     State.Block.predecessor_n new_head
       (Int32.to_int (Int32.sub head_level new_level)) >>= function
-    | None -> Assert.fail_msg "Unexpected None in predecessor query"
+    | None -> return @@ Assert.fail_msg "Unexpected None in predecessor query"
     | Some hash ->
         State.Block.read_exn chain_state hash >>= fun b ->
-        State.Chain.set_checkpoint chain_state (State.Block.header b)
+        State.Chain.set_checkpoint chain_state (State.Block.header b) >>= fun () ->
+        return_unit
 
 let test_may_update_checkpoint s =
   let block = vblock s "A3" in
@@ -438,7 +439,7 @@ let test_may_update_checkpoint s =
   State.Chain.checkpoint s.chain >>= fun _ ->
   Chain.set_head s.chain (vblock s "A4") >>= fun _ ->
   Chain.head s.chain >>= fun head ->
-  may_update_checkpoint s.chain head >>= fun () ->
+  may_update_checkpoint s.chain head >>=? fun () ->
   return ()
 
 (* Check function may_update_checkpoint in Node.ml
