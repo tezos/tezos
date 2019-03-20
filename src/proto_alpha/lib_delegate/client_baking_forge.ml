@@ -1107,7 +1107,7 @@ let bake (cctxt : #Proto_alpha.full) ~chain state : bake_result tzresult Lwt.t =
           return Continue
     end
   | Not_enough_endorsements ->
-      return (Retry_same_slot_later (slot, 1))
+      return (Retry_same_slot_later (slot, 2))
   | Nop -> return Continue
 
 (** [get_baking_slots] calls the node via RPC to retrieve the potential
