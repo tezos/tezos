@@ -282,7 +282,7 @@ let () =
   register_error_kind
     `Branch
     ~id:"node.validator.checkpoint_error"
-    ~title: "Block incompatble with the current checkpoint."
+    ~title: "Block incompatible with the current checkpoint."
     ~description: "The block belongs to a branch that is not compatible \
                    with the current checkpoint."
     ~pp: (fun ppf (block, peer) ->
