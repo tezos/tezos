@@ -532,7 +532,7 @@ module Encoding: sig
     'a lazy_t -> 'b
 
   (** Create a {!Data_encoding.t} value which records knowledge of
-      older versions of a given encoding as long as one can “upgrade”
+      older versions of a given encoding as long as one can "upgrade"
       from an older version to the next (if upgrade is impossible one
       should consider that the encoding is completely different).
 
@@ -553,7 +553,7 @@ module Encoding: sig
     val next_version : 'a encoding -> ('b -> 'a) -> 'b t -> 'a t
 
     (** Make an encoding from an encapsulation of versions; the
-        argument [~name] is used to prefix the version “tag” in the
+        argument [~name] is used to prefix the version "tag" in the
         encoding, it should not change from one version to the next. *)
     val encoding : name: string -> 'a t -> 'a encoding
   end

@@ -24,12 +24,12 @@
 (*****************************************************************************)
 
 (**
-   This module defines a “structured event logging framework.”
+   This module defines a "structured event logging framework."
 
    Internal-Event streams are like traditional logs but they have a proper
    {!Data_encoding} format in order to be processed by software.
 
-   The module defines “Sinks” {!SINK} as the receptacle for structured
+   The module defines "Sinks" {!SINK} as the receptacle for structured
    events: pluggable modules which can absorb (i.e. display, store,
    forward) the events emitted within the code-base.
 *)
@@ -155,7 +155,7 @@ end
 
 (** An implementation of {!SINK} is responsible for handling/storing
     events, for instance, a sink could be output to a file, to a
-    database, or a simple “memory-less” forwarding mechanism.  *)
+    database, or a simple "memory-less" forwarding mechanism.  *)
 module type SINK = sig
 
   (** A sink can store any required state, e.g. a database handle, in

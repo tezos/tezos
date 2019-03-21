@@ -30,7 +30,7 @@
 (** This module is a simple example of use of {!With_version}. *)
 module Documented_example = struct
   (** 
-     Here we show how to {i “versionize”} a given random encoding (which
+     Here we show how to {i "versionize"} a given random encoding (which
      just happens to be very similar to {!Internal_event.Debug_event}). *)
 
   (** We are going to provide successive versions of a module
@@ -51,7 +51,7 @@ module Documented_example = struct
   module V0 = struct
     type t = { message : string ; attachment : (string * string) list }
 
-    (** This is the “naked” (i.e. non-versioned) encoding of version-0: *)
+    (** This is the "naked" (i.e. non-versioned) encoding of version-0: *)
     let encoding =
       let open Data_encoding in
       conv
@@ -89,7 +89,7 @@ module Documented_example = struct
 
     let make ?(attach = `Null) message () = { message ; attachment = attach }
 
-    (** Note the “upgrade” function which can make a {!V1.t} from a {!V0.t}: *)
+    (** Note the "upgrade" function which can make a {!V1.t} from a {!V0.t}: *)
     let of_v0 { V0.message ; attachment } =
       { message ;
         attachment = `O (List.map (fun (k, v) -> (k, `String v)) attachment) }
@@ -123,7 +123,7 @@ module Documented_example = struct
   end
 
 
-  (** This test “serializes” successively using
+  (** This test "serializes" successively using
       {!First_version.encoding} and {!Second_version.encoding}, and then
       shows that the former's output can be parsed with the later. *)
   let actual_test () =
@@ -159,7 +159,7 @@ module Documented_example = struct
         Alcotest.failf "Json-v1: %a@ Vs@ %a"
           Data_encoding.Json.pp json_v1 Data_encoding.Json.pp expected_json_v1
     end;
-    (* Now the {b interesting part}, we decode (“destruct”) the JSON from
+    (* Now the {b interesting part}, we decode ("destruct") the JSON from
        {!First_version} with {!Second_version}: *)
     let v0_decoded_later : Second_version.t =
       Data_encoding.Json.destruct Second_version.encoding json_v0 in
