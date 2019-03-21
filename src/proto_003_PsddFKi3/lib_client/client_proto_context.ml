@@ -366,7 +366,7 @@ let inject_activate_operation
         return_unit
     | Some _confirmations ->
         Alpha_services.Contract.balance
-          cctxt (`Main, `Head 0)
+          cctxt (chain, block)
           (Contract.implicit_contract (Ed25519 pkh)) >>=? fun balance ->
         cctxt#message "Account %s (%a) activated with %s%a."
           alias
@@ -531,7 +531,7 @@ let get_operation_from_block
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
       Proto_alpha.Alpha_block_services.Operations.operation cctxt
-        ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
+        ~chain ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
     (cctxt : #Proto_alpha.full)
