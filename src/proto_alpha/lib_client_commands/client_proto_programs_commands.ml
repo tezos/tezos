@@ -72,7 +72,7 @@ let commands () =
   let resolve_max_gas cctxt block = function
     | None ->
         Alpha_services.Constants.all cctxt
-          (`Main, block) >>=? fun { parametric = {
+          (cctxt#chain, block) >>=? fun { parametric = {
             hard_gas_limit_per_operation
           } } ->
         return hard_gas_limit_per_operation
@@ -229,7 +229,7 @@ let commands () =
        @@ stop)
       (fun custom_gas data typ cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Alpha_services.Helpers.Scripts.pack_data cctxt (`Main, cctxt#block)
+         Alpha_services.Helpers.Scripts.pack_data cctxt (cctxt#chain, cctxt#block)
            (data.expanded, typ.expanded, Some original_gas) >>= function
          | Ok (bytes, remaining_gas) ->
              let hash = Script_expr_hash.hash_bytes [ bytes ] in

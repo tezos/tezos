@@ -143,7 +143,7 @@ let delegate_commands () =
        @@ stop)
       (fun () (cctxt : #Client_context.full) ->
          cctxt#with_lock begin fun () ->
-           Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
+           Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain () >>=? fun main_chain_id ->
            Client_baking_nonces.upgrade_nonce_file ~main_chain_id cctxt >>=? fun () ->
            Client_baking_highwatermarks.upgrade_files cctxt >>=? fun () ->
            return_unit

@@ -366,7 +366,7 @@ let inject_activate_operation
         return_unit
     | Some _confirmations ->
         Alpha_services.Contract.balance
-          cctxt (`Main, `Head 0)
+          cctxt (chain, `Head 0)
           (Contract.implicit_contract (Ed25519 pkh)) >>=? fun balance ->
         cctxt#message "Account %s (%a) activated with %s%a."
           alias
