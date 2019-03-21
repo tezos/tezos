@@ -6,10 +6,10 @@ Online OCaml Documentation
 
     <iframe id="docframe" height="100%" width="100%" src="../api/odoc/_html/index.html"></iframe>
     <style>
-    @media (max-width: 771px) {
+    @media (max-width: 768px) {
          #docframe { border:none; position: fixed; top: 70px; bottom: 0; right: 0; left: 0; }
     }
-    @media (min-width: 770px) {
+    @media (min-width: 769px) {
          #docframe { border:none; position: fixed; top: 0px; bottom: 0; right: 0; left: 300px; }
     }
     </style>
