@@ -100,7 +100,7 @@ let commands version () =
       (fixed [ "get" ; "timestamp" ])
       begin fun seconds (cctxt : Proto_alpha.full) ->
         Shell_services.Blocks.Header.shell_header
-          cctxt ~block:cctxt#block () >>=? fun { timestamp = v } ->
+          cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v } ->
         begin
           if seconds
           then cctxt#message "%Ld" (Time.to_seconds v)
@@ -114,7 +114,7 @@ let commands version () =
       (fixed [ "list" ; "contracts" ])
       begin fun () (cctxt : Proto_alpha.full) ->
         list_contract_labels cctxt
-          ~chain:`Main ~block:cctxt#block >>=? fun contracts ->
+          ~chain:cctxt#chain ~block:cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts >>= fun () ->
@@ -128,7 +128,7 @@ let commands version () =
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         get_balance cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun amount ->
         cctxt#answer "%a %s" Tez.pp amount Client_proto_args.tez_sym >>= fun () ->
         return_unit
@@ -141,7 +141,7 @@ let commands version () =
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         get_storage cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
@@ -163,7 +163,7 @@ let commands version () =
        @@ stop)
       begin fun () key key_type (_, contract) (cctxt : Proto_alpha.full) ->
         get_big_map_value cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract (key.expanded, key_type.expanded) >>=? function
         | None ->
             cctxt#error "No value associated to this key."
@@ -179,7 +179,7 @@ let commands version () =
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         get_script cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
@@ -199,7 +199,7 @@ let commands version () =
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         Client_proto_contracts.get_manager cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun manager ->
         Public_key_hash.rev_find cctxt manager >>=? fun mn ->
         Public_key_hash.to_source manager >>=? fun m ->
@@ -215,7 +215,7 @@ let commands version () =
        @@ stop)
       begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         Client_proto_contracts.get_delegate cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
         | None ->
             cctxt#message "none" >>= fun () ->
@@ -256,10 +256,10 @@ let commands version () =
           burn_cap ;
         } in
         source_to_keys cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun (src_pk, manager_sk) ->
         set_delegate cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           ~fee_parameter
           ?fee
@@ -283,7 +283,7 @@ let commands version () =
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun (src_pk, manager_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
@@ -294,7 +294,7 @@ let commands version () =
           burn_cap ;
         } in
         set_delegate cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           ~fee_parameter
           contract None ?fee ~src_pk ~manager_sk >>=? fun _ ->
@@ -327,7 +327,7 @@ let commands version () =
         new_contract manager_pkh balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
@@ -338,7 +338,7 @@ let commands version () =
           burn_cap ;
         } in
         originate_account cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           ?fee ?delegate ~delegatable ~manager_pkh ~balance
           ~fee_parameter
@@ -383,7 +383,7 @@ let commands version () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
@@ -394,7 +394,7 @@ let commands version () =
           burn_cap ;
         } in
         originate_contract cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           ?fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
           ~manager ~balance ~source ~src_pk ~src_sk ~code
@@ -430,7 +430,7 @@ let commands version () =
        @@ stop)
       begin fun (fee, dry_run, gas_limit, storage_limit, counter, arg, no_print_source, minimal_fees, minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
@@ -441,7 +441,7 @@ let commands version () =
           burn_cap ;
         } in
         transfer cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
           ~fee_parameter
           ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
@@ -466,7 +466,7 @@ let commands version () =
       begin fun (fee, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) (_, source) cctxt ->
         source_to_keys cctxt
-          ~chain:`Main ~block:cctxt#block
+          ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
         let fee_parameter = {
           Injection.minimal_fees ;
@@ -477,7 +477,7 @@ let commands version () =
           burn_cap ;
         } in
         reveal cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~source ?fee ~src_pk ~src_sk
           ~fee_parameter
           () >>=? fun _res ->
@@ -509,7 +509,7 @@ let commands version () =
           burn_cap ;
         } in
         register_as_delegate cctxt
-          ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run ~fee_parameter
           ?fee ~manager_sk:src_sk src_pk
         >>= function
@@ -546,7 +546,7 @@ let commands version () =
                  Data_encoding.Json.pp json
            | key ->
                activate_account cctxt
-                 ~chain:`Main ~block:cctxt#block ?confirmations:cctxt#confirmations
+                 ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
                  ~encrypted ~force key name >>=? fun _res ->
                return_unit
         );
@@ -564,7 +564,7 @@ let commands version () =
            ~desc:"Activation code obtained from the Tezos foundation."
          @@ stop)
         (fun dry_run (name, _pkh) code cctxt ->
-           activate_existing_account cctxt ~chain:`Main
+           activate_existing_account cctxt ~chain:cctxt#chain
              ~block:cctxt#block ?confirmations:cctxt#confirmations
              ~dry_run
              name code >>=? fun _res ->
@@ -603,9 +603,9 @@ let commands version () =
                | Some hash -> return hash))
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
-      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Proto_alpha.full) ->
-        Client_confirmations.wait_for_operation_inclusion ctxt
-          ~chain:`Main ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
+      begin fun (confirmations, predecessors, branch) operation_hash (cctxt : Proto_alpha.full) ->
+        Client_confirmations.wait_for_operation_inclusion cctxt
+          ~chain:cctxt#chain ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
         return_unit
       end ;
 
@@ -627,9 +627,9 @@ let commands version () =
                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                | Some hash -> return hash))
        @@ stop)
-      begin fun predecessors operation_hash (ctxt : Proto_alpha.full) ->
-        display_receipt_for_operation ctxt
-          ~chain:`Main ~predecessors operation_hash >>=? fun _ ->
+      begin fun predecessors operation_hash (cctxt : Proto_alpha.full) ->
+        display_receipt_for_operation cctxt
+          ~chain:cctxt#chain ~predecessors operation_hash >>=? fun _ ->
         return_unit
       end ;
 
@@ -671,13 +671,13 @@ let commands version () =
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
       begin fun () (_name, source) proposals (cctxt : Proto_alpha.full) ->
-        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
           | _ -> cctxt#error "Not in a proposal period"
         end >>=? fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
-        get_proposals ~chain:`Main ~block:cctxt#block cctxt >>=? fun known_proposals ->
+        get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun known_proposals ->
         (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
            the user is the first proposer and just injected it with
@@ -704,9 +704,9 @@ let commands version () =
             cctxt#error "Submission failed because of invalid proposals"
         end >>= fun () ->
         Client_proto_context.get_manager
-          cctxt ~chain:`Main ~block:cctxt#block
+          cctxt ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
-        submit_proposals cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh
+        submit_proposals cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           proposals >>=? fun _res ->
         return_unit
       end ;
@@ -738,15 +738,15 @@ let commands version () =
                | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
       begin fun () (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
-        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Testing_vote | Promotion_vote -> return_unit
           | _ -> cctxt#error "Not in a Testing_vote or Promotion_vote period"
         end >>=? fun () ->
         Client_proto_context.get_manager
-          cctxt ~chain:`Main ~block:cctxt#block
+          cctxt ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
-        submit_ballot cctxt ~chain:`Main ~block:cctxt#block ~src_sk src_pkh
+        submit_ballot cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           proposal ballot >>=? fun _res ->
         return_unit
       end ;
@@ -755,7 +755,7 @@ let commands version () =
       no_options
       (fixed [ "show" ; "voting" ; "period" ])
       begin fun () (cctxt : Proto_alpha.full) ->
-        get_period_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun info ->
+        get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         cctxt#message "Current period: %a\n\
                        Blocks remaining until end of period: %ld"
           Data_encoding.Json.pp
@@ -763,7 +763,7 @@ let commands version () =
              Proto_alpha.Alpha_context.Voting_period.kind_encoding
              info.current_period_kind)
           info.remaining >>= fun () ->
-        get_proposals ~chain:`Main ~block:cctxt#block cctxt >>=? fun props ->
+        get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun props ->
         let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
                     List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
         let print_proposal = function
@@ -783,7 +783,7 @@ let commands version () =
             >>= fun () -> return_unit
         | Testing_vote | Promotion_vote ->
             print_proposal info.current_proposal >>= fun () ->
-            get_ballots_info ~chain:`Main ~block:cctxt#block cctxt >>=? fun ballots_info ->
+            get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun ballots_info ->
             cctxt#answer "Ballots: %a@,\
                           Current participation %.2f%%, necessary quorum %.2f%%@,\
                           Current in favor %ld, needed supermajority %ld"
