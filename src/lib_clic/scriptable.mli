@@ -33,7 +33,9 @@ type output_format
 
 val clic_arg : unit -> (output_format option, _) Clic.arg
 (** Command line argument for {!Clic.command} (and the [Clic.args*]
-    functions). *)
+    functions). Not that this is the only way to obtain a value of type
+    [output_format]. On the command line, it appears as [--for-script] with
+    values [TSV] or [CSV]. *)
 
 val output :
   ?channel: Lwt_io.output_channel ->
@@ -41,10 +43,16 @@ val output :
   for_human:(unit -> unit tzresult Lwt.t) ->
   for_script:(unit -> string list list) ->
   unit tzresult Lwt.t
-(** Output a list of rows of data (the result of [for_script ()]) to
-    [formatter] (default: {!Format.std_formatter}) if the ["--for-script"]
-    option has been set (is [Some _]), if the format is [None] the function
-    [~for_human] is called instead. *)
+(** [output fmt_opt ~for_human ~for_script] behaves in one of two ways.
+    If [fmt_opt] is [Some _], then it formats the value returned by
+    [for_script ()]. The function's return value is formatted as lines of
+    columns of values (list of lists of strings). This is to help scripts to
+    decode/interpret/parse the output.
+    Otherwise, if [fmt_opt] is [None], it calls [for_human ()] which is
+    responsible for the whole formatting.
+
+    The optional argument [channel] is used when automatically formatting the
+    value returned by [for_script ()]. It has no effect on [for_human ()]. *)
 
 val output_row :
   ?channel: Lwt_io.output_channel ->
@@ -56,5 +64,9 @@ val output_row :
 
 val output_for_human :
   output_format option -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
-(** [output_for_human fmt_opt for_human] calls [for_human] when
-    [fmt_opt] is [None]. *)
+(** [output_for_human fmt_opt for_human] behaves in either of two ways.
+    If [fmt_opt] is [None], then it calls [for_human ()].
+    Otherwise, it does nothing.
+
+    Use this function to provide output that is of no interest to automatic
+    tools. *)

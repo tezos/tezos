@@ -233,8 +233,8 @@ module Error_event : sig
     ?message:string ->
     ?severity:[ `Fatal | `Recoverable ] ->
     (unit -> (unit, error list) result Lwt.t) -> unit Lwt.t
-    (** [to_lwt f] calls [f ()] and emits an {!Error_event.t} event if
-        it results in an error. It then continues in the [_ Lwt.t]
+    (** [log_error_and_recover f] calls [f ()] and emits an {!Error_event.t}
+        event if it results in an error. It then continues in the [_ Lwt.t]
         monad (e.g. there is no call to [Lwt.fail]). *)
 end
 
