@@ -151,10 +151,10 @@ let commands () =
          Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
          let show_source = not no_print_source in
          (if trace_exec then
-            trace cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
+            trace cctxt ~chain:cctxt#chain cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_trace_result cctxt ~show_source ~parsed:program res
           else
-            run cctxt cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
+            run cctxt ~chain:cctxt#chain cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
             print_run_result cctxt ~show_source ~parsed:program res)) ;
     command ~group ~desc: "Ask the node to typecheck a script."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
@@ -165,7 +165,7 @@ let commands () =
          match program with
          | program, [] ->
              resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
-             typecheck_program cctxt cctxt#block ~gas:original_gas program >>= fun res ->
+             typecheck_program ~chain:cctxt#chain cctxt cctxt#block ~gas:original_gas program >>= fun res ->
              print_typecheck_result
                ~emacs:emacs_mode
                ~show_types
@@ -199,7 +199,7 @@ let commands () =
        @@ stop)
       (fun (no_print_source, custom_gas) data ty cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Client_proto_programs.typecheck_data cctxt cctxt#block
+         Client_proto_programs.typecheck_data cctxt ~chain:cctxt#chain cctxt#block
            ~gas:original_gas ~data ~ty () >>= function
          | Ok gas ->
              cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"

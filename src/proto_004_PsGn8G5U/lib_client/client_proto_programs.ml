@@ -96,7 +96,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
 
 let run
     (cctxt : #Proto_alpha.rpc_context)
-    ?(chain = `Main)
+    ~chain
     block
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
@@ -113,7 +113,7 @@ let run
 
 let trace
     (cctxt : #Proto_alpha.rpc_context)
-    ?(chain = `Main)
+    ~chain
     block
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
@@ -130,7 +130,7 @@ let trace
 
 let typecheck_data
     cctxt
-    ?(chain = `Main)
+    ~chain
     block
     ?gas
     ~(data : Michelson_v1_parser.parsed)
@@ -142,7 +142,7 @@ let typecheck_data
 
 let typecheck_program
     cctxt
-    ?(chain = `Main)
+    ~chain
     block
     ?gas
     (program : Michelson_v1_parser.parsed) =
