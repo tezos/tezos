@@ -561,7 +561,7 @@ let inject_operation
           Client_confirmations.wait_for_operation_inclusion
             ~branch:op.shell.branch ~confirmations cctxt ~chain oph >>=? fun (h, i , j) ->
           Alpha_block_services.Operations.operation
-            cctxt ~block:(`Hash (h, 0)) i j >>=? fun op' ->
+            cctxt ~chain ~block:(`Hash (h, 0)) i j >>=? fun op' ->
           match op'.receipt with
           | No_operation_metadata ->
               failwith "Internal error: unexpected receipt."
