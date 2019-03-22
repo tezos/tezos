@@ -283,6 +283,11 @@ val best_known_head_for_checkpoint:
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
+val update_testchain:
+  Block.t ->
+  testchain_state: Chain.t ->
+  unit Lwt.t
+
 val fork_testchain:
   Block.t ->
   Chain_id.t -> Block_hash.t -> Block_header.t ->

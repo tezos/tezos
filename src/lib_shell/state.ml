@@ -1339,6 +1339,12 @@ let read_block_exn t hash =
   | None -> Lwt.fail Not_found
   | Some b -> Lwt.return b
 
+let update_testchain block ~testchain_state =
+  update_chain_data block.chain_state begin fun _ chain_data ->
+    Lwt.return (Some { chain_data with test_chain = Some testchain_state.chain_id }, ())
+  end >>= fun () ->
+  Lwt.return_unit
+
 let fork_testchain block chain_id genesis_hash genesis_header protocol expiration =
   Shared.use block.chain_state.global_state.global_data begin fun data ->
     let chain_store = Store.Chain.get data.global_store chain_id in
@@ -1355,11 +1361,9 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
         time = genesis_header.shell.timestamp ;
         protocol } in
     Chain.locked_create block.chain_state.global_state data
-      chain_id ~expiration genesis genesis_header >>= fun chain ->
-    update_chain_data block.chain_state begin fun _ chain_data ->
-      Lwt.return (Some { chain_data with test_chain = Some chain.chain_id }, ())
-    end >>= fun () ->
-    return chain
+      chain_id ~expiration genesis genesis_header >>= fun testchain_state ->
+    update_testchain block ~testchain_state >>= fun () ->
+    return testchain_state
   end
 
 let best_known_head_for_checkpoint chain_state checkpoint =
