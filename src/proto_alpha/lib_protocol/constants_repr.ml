@@ -93,6 +93,9 @@ type parametric = {
   endorsement_security_deposit: Tez_repr.t ;
   block_reward: Tez_repr.t ;
   endorsement_reward: Tez_repr.t ;
+  endorsement_reward_priority_bonus: Tez_repr.t ;
+  endorsement_bonus_intercept: int ;
+  endorsement_bonus_slope: int ;
   cost_per_byte: Tez_repr.t ;
   hard_storage_limit_per_operation: Z.t ;
 }
@@ -120,10 +123,13 @@ let default = {
     | Error _ -> assert false
   end ;
   origination_size = 257 ;
-  block_security_deposit = Tez_repr.(mul_exn one 512) ;
-  endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
-  block_reward = Tez_repr.(mul_exn one 16) ;
-  endorsement_reward = Tez_repr.(mul_exn one 2) ;
+  block_security_deposit = Tez_repr.(mul_exn one 576) ;
+  endorsement_security_deposit = Tez_repr.(mul_exn one 72) ;
+  block_reward = Tez_repr.(mul_exn one 12) ;
+  endorsement_reward = Tez_repr.(mul_exn one 1) ;
+  endorsement_reward_priority_bonus = Tez_repr.(mul_exn one 1) ;
+  endorsement_bonus_intercept = 1024 ;
+  endorsement_bonus_slope = 16 ;
   hard_storage_limit_per_operation = Z.of_int 60_000 ;
   cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
 }
@@ -153,6 +159,9 @@ let parametric_encoding =
           c.endorsement_security_deposit,
           c.block_reward),
          (c.endorsement_reward,
+          c.endorsement_reward_priority_bonus,
+          c.endorsement_bonus_intercept,
+          c.endorsement_bonus_slope,
           c.cost_per_byte,
           c.hard_storage_limit_per_operation))) )
     (fun (( preserved_cycles,
@@ -174,6 +183,9 @@ let parametric_encoding =
             endorsement_security_deposit,
             block_reward),
            (endorsement_reward,
+            endorsement_reward_priority_bonus,
+            endorsement_bonus_intercept,
+            endorsement_bonus_slope,
             cost_per_byte,
             hard_storage_limit_per_operation))) ->
       { preserved_cycles ;
@@ -195,6 +207,9 @@ let parametric_encoding =
         endorsement_security_deposit ;
         block_reward ;
         endorsement_reward ;
+        endorsement_reward_priority_bonus ;
+        endorsement_bonus_intercept ;
+        endorsement_bonus_slope ;
         cost_per_byte ;
         hard_storage_limit_per_operation ;
       } )
@@ -220,8 +235,11 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj3
+          (obj6
              (req "endorsement_reward" Tez_repr.encoding)
+             (req "endorsement_reward_priority_bonus" Tez_repr.encoding)
+             (req "endorsement_bonus_intercept" uint16)
+             (req "endorsement_bonus_slope " uint16)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z))))
 

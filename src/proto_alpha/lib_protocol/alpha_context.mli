@@ -378,6 +378,9 @@ module Constants : sig
     endorsement_security_deposit: Tez.t ;
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
+    endorsement_reward_priority_bonus: Tez.t ;
+    endorsement_bonus_intercept: int ;
+    endorsement_bonus_slope: int ;
     cost_per_byte: Tez.t ;
     hard_storage_limit_per_operation: Z.t ;
   }
