@@ -73,7 +73,7 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
           if cleanup_nonces then
             (* Clean-up existing nonces *)
             cctxt#with_lock begin fun () ->
-              Client_baking_nonces.resolve_location cctxt ~chain:`Test >>=? fun nonces_location ->
+              Client_baking_files.resolve_location cctxt ~chain:`Test `Nonce >>=? fun nonces_location ->
               Client_baking_nonces.(save cctxt nonces_location empty)
             end
           else

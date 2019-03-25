@@ -63,9 +63,6 @@ end
 
 type t = (string * Raw_level.t) list
 
-let endorsements_basename = "endorsement"
-let blocks_basename = "block"
-
 let encoding =
   let open Data_encoding in
   def "highwatermarks" @@
@@ -73,26 +70,11 @@ let encoding =
 
 let empty = []
 
-let resolve_filename (cctxt : #Proto_alpha.full) ~chain basename =
-  let test_filename chain_id =
-    Format.kasprintf return "test_%a_%s" Chain_id.pp_short chain_id basename in
-  match chain with
-  | `Main -> return basename
-  | `Test ->
-      Chain_services.chain_id cctxt ~chain:`Test () >>=? fun chain_id ->
-      test_filename chain_id
-  | `Hash chain_id ->
-      Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
-      if Chain_id.(chain_id = main_chain_id) then
-        return basename
-      else
-        test_filename chain_id
-
 let resolve_blocks_filename cctxt ~chain =
-  resolve_filename cctxt ~chain blocks_basename
+  Client_baking_files.resolve_location cctxt ~chain `Block
 
 let resolve_endorsements_filename cctxt ~chain =
-  resolve_filename cctxt ~chain endorsements_basename
+  Client_baking_files.resolve_location cctxt ~chain `Endorsement
 
 (* We do not lock these functions. The caller will be already locked. *)
 let load_highwatermarks (cctxt : #Proto_alpha.full) filename : t tzresult Lwt.t =
@@ -104,42 +86,31 @@ let save_highwatermarks (cctxt : #Proto_alpha.full) filename highwatermarks : un
 let retrieve_highwatermark cctxt filename =
   load_highwatermarks cctxt filename
 
-let may_inject_block (cctxt : #Proto_alpha.full) ~chain ~delegate level =
-  resolve_blocks_filename cctxt ~chain >>=? fun blocks_filename ->
-  retrieve_highwatermark cctxt blocks_filename  >>=? fun blocks_highwatermark ->
+let may_inject (cctxt : #Proto_alpha.full) location ~delegate level =
+  retrieve_highwatermark cctxt (Client_baking_files.filename location) >>=? fun highwatermark ->
   let delegate = Signature.Public_key_hash.to_short_b58check delegate in
   List.find_opt
     (fun (delegate', _) -> String.compare delegate delegate' = 0)
-    blocks_highwatermark |> function
+    highwatermark |> function
   | None -> return_true
   | Some (_, past_level) -> return Raw_level.(past_level < level)
 
-let may_inject_endorsement (cctxt : #Proto_alpha.full) ~chain ~delegate level =
-  resolve_endorsements_filename cctxt ~chain >>=? fun endorsements_filename ->
-  retrieve_highwatermark cctxt endorsements_filename  >>=? fun endorsements_highwatermark ->
-  let delegate = Signature.Public_key_hash.to_short_b58check delegate in
-  List.find_opt
-    (fun (delegate', _) -> String.compare delegate delegate' = 0)
-    endorsements_highwatermark |> function
-  | None -> return_true
-  | Some (_, past_level) -> return Raw_level.(past_level < level)
+let may_inject_block = may_inject
+let may_inject_endorsement = may_inject
 
-let record_block (cctxt : #Proto_alpha.full) ~chain ~delegate level =
+let record (cctxt : #Proto_alpha.full) location ~delegate level =
+  let filename = Client_baking_files.filename location in
   let delegate = Signature.Public_key_hash.to_short_b58check delegate in
-  resolve_blocks_filename cctxt ~chain >>=? fun blocks_filename ->
-  load_highwatermarks cctxt blocks_filename >>=? fun highwatermarks ->
-  save_highwatermarks cctxt blocks_filename
+  load_highwatermarks cctxt filename >>=? fun highwatermarks ->
+  let level = match List.assoc_opt delegate highwatermarks with
+    | None -> level
+    | Some lower_prev_level when level >= lower_prev_level -> level
+    | Some higher_prev_level -> higher_prev_level (* should only happen in `forced` mode *) in
+  save_highwatermarks cctxt filename
     ((delegate, level) ::
      (List.filter (fun (delegate', _) ->
           String.compare delegate delegate' <> 0
         ) highwatermarks))
 
-let record_endorsement (cctxt : #Proto_alpha.full) ~chain ~delegate level =
-  let delegate = Signature.Public_key_hash.to_short_b58check delegate in
-  resolve_endorsements_filename cctxt ~chain >>=? fun endorsements_filename ->
-  load_highwatermarks cctxt endorsements_filename >>=? fun highwatermarks ->
-  save_highwatermarks cctxt endorsements_filename
-    ((delegate, level) ::
-     (List.filter (fun (delegate', _) ->
-          String.compare delegate delegate' <> 0
-        ) highwatermarks))
+let record_block = record
+let record_endorsement = record

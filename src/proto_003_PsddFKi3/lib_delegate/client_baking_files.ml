@@ -23,40 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
-open Alpha_context
+type _ location =
+  { filename : string ;
+    chain : Chain_services.chain }
 
-type error += Level_previously_endorsed of Raw_level.t
-type error += Level_previously_baked of Raw_level.t
+let resolve_location (cctxt : #Client_context.full) ~chain (kind : 'a) : 'a location tzresult Lwt.t =
+  let basename = match kind with
+    | `Block -> "block"
+    | `Endorsement -> "endorsement"
+    | `Nonce -> "nonce" in
+  let test_filename chain_id =
+    Format.kasprintf return "test_%a_%s" Chain_id.pp_short chain_id basename in
+  begin match chain with
+    | `Main -> return basename
+    | `Test ->
+        Chain_services.chain_id cctxt ~chain:`Test () >>=? fun chain_id ->
+        test_filename chain_id
+    | `Hash chain_id ->
+        Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
+        if Chain_id.(chain_id = main_chain_id) then
+          return basename
+        else
+          test_filename chain_id
+  end >>=? fun filename -> return { filename ; chain }
 
-type t
-
-val encoding: t Data_encoding.t
-
-val may_inject_block:
-  #Proto_alpha.full ->
-  [ `Block ] Client_baking_files.location ->
-  delegate: Signature.public_key_hash ->
-  Raw_level.t ->
-  bool tzresult Lwt.t
-
-val may_inject_endorsement:
-  #Proto_alpha.full ->
-  [ `Endorsement ] Client_baking_files.location ->
-  delegate: Signature.public_key_hash ->
-  Raw_level.t ->
-  bool tzresult Lwt.t
-
-val record_block:
-  #Proto_alpha.full ->
-  [ `Block ] Client_baking_files.location ->
-  delegate:Signature.public_key_hash ->
-  Raw_level.t ->
-  unit tzresult Lwt.t
-
-val record_endorsement:
-  #Proto_alpha.full ->
-  [ `Endorsement ] Client_baking_files.location ->
-  delegate:Signature.public_key_hash ->
-  Raw_level.t ->
-  unit tzresult Lwt.t
+let filename { filename } = filename
+let chain { chain } = chain

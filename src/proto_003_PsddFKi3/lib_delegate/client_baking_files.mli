@@ -23,40 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
-open Alpha_context
+type _ location
 
-type error += Level_previously_endorsed of Raw_level.t
-type error += Level_previously_baked of Raw_level.t
+val resolve_location:
+  #Client_context.full ->
+  chain: Chain_services.chain ->
+  ([< `Block | `Endorsement | `Nonce ] as 'kind) ->
+  'kind location tzresult Lwt.t
 
-type t
-
-val encoding: t Data_encoding.t
-
-val may_inject_block:
-  #Proto_alpha.full ->
-  [ `Block ] Client_baking_files.location ->
-  delegate: Signature.public_key_hash ->
-  Raw_level.t ->
-  bool tzresult Lwt.t
-
-val may_inject_endorsement:
-  #Proto_alpha.full ->
-  [ `Endorsement ] Client_baking_files.location ->
-  delegate: Signature.public_key_hash ->
-  Raw_level.t ->
-  bool tzresult Lwt.t
-
-val record_block:
-  #Proto_alpha.full ->
-  [ `Block ] Client_baking_files.location ->
-  delegate:Signature.public_key_hash ->
-  Raw_level.t ->
-  unit tzresult Lwt.t
-
-val record_endorsement:
-  #Proto_alpha.full ->
-  [ `Endorsement ] Client_baking_files.location ->
-  delegate:Signature.public_key_hash ->
-  Raw_level.t ->
-  unit tzresult Lwt.t
+val filename : _ location -> string
+val chain : _ location -> Chain_services.chain

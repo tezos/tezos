@@ -48,7 +48,7 @@ type state = {
   context_path: string ;
   mutable index : Context.index ;
   (* Nonces file location *)
-  nonces_location: Client_baking_nonces.location ;
+  nonces_location: [ `Nonce ] Client_baking_files.location ;
   (* see [get_delegates] below to find delegates when the list is empty *)
   delegates: public_key_hash list ;
   (* lazy-initialisation with retry-on-error *)
@@ -153,9 +153,10 @@ let inject_block
   (* Record baked blocks to prevent double baking  *)
   let open Client_baking_highwatermarks in
   cctxt#with_lock begin fun () ->
-    may_inject_block cctxt ~chain ~delegate:delegate_pkh level >>=? function
+    Client_baking_files.resolve_location cctxt ~chain `Block >>=? fun block_location ->
+    may_inject_block cctxt block_location ~delegate:delegate_pkh level >>=? function
     | true ->
-        record_block cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
+        record_block cctxt block_location ~delegate:delegate_pkh level >>=? fun () ->
         return_true
     | false ->
         lwt_log_error Tag.DSL.(fun f ->
@@ -679,7 +680,7 @@ let forge_block
         Context.init ~readonly:true context_path >>= fun index ->
         Client_baking_blocks.info cctxt ~chain block >>=? fun bi ->
         Alpha_services.Constants.all cctxt (chain, `Head 0) >>=? fun constants ->
-        Client_baking_nonces.resolve_location cctxt ~chain >>=? fun nonces_location ->
+        Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
         let state = {
           context_path ;
           index ;
@@ -1154,7 +1155,7 @@ let compute_best_slot_on_current_level
 (** [reveal_potential_nonces] reveal registered nonces *)
 let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain ~block =
   cctxt#with_lock begin fun () ->
-    Client_baking_nonces.resolve_location cctxt ~chain >>=? fun nonces_location ->
+    Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     Client_baking_nonces.load cctxt nonces_location >>= function
     | Error err ->
         lwt_log_error Tag.DSL.(fun f ->
@@ -1209,7 +1210,7 @@ let create
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency
       index bi.Client_baking_blocks.context >>=? fun () ->
-    Client_baking_nonces.resolve_location cctxt ~chain:cctxt#chain >>=? fun nonces_location ->
+    Client_baking_files.resolve_location cctxt ~chain:cctxt#chain `Nonce >>=? fun nonces_location ->
     let state = create_state
         ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
         ?await_endorsements
