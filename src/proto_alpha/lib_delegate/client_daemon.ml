@@ -66,7 +66,6 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
     match testchain with
     | Some (Active_test { protocol ; expiration_date })
       when Protocol_hash.equal Proto_alpha.hash protocol -> begin
-        Chain_services.chain_id cctxt ~chain:`Test () >>=? fun test_chain_id ->
         let abort_daemon () =
           cctxt#message "Test chain's expiration date reached \
                          (%a)... Stopping the daemon.@."
@@ -74,9 +73,8 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
           if cleanup_nonces then
             (* Clean-up existing nonces *)
             cctxt#with_lock begin fun () ->
-              Client_baking_nonces.load cctxt >>=? fun nonces ->
-              let nonces = Client_baking_nonces.remove_all nonces test_chain_id in
-              Client_baking_nonces.save cctxt nonces
+              Client_baking_nonces.resolve_location cctxt ~chain:`Test >>=? fun nonces_location ->
+              Client_baking_nonces.(save cctxt nonces_location empty)
             end
           else
             return_unit >>=? fun () ->

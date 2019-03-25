@@ -77,12 +77,11 @@ let bake_block
     | Some seed_nonce ->
         cctxt#with_lock begin fun () ->
           let open Client_baking_nonces in
-          load cctxt >>=? fun nonces ->
-          Chain_services.chain_id cctxt () >>=? fun chain_id ->
-          let nonces = add nonces chain_id block_hash seed_nonce in
-          save cctxt nonces
-        end
-        |> trace_exn (Failure "Error while recording block")
+          resolve_location cctxt ~chain >>=? fun nonces_location ->
+          load cctxt nonces_location >>=? fun nonces ->
+          let nonces = add nonces block_hash seed_nonce in
+          save cctxt nonces_location nonces
+        end |> trace_exn (Failure "Error while recording block")
   end >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return_unit
@@ -114,7 +113,9 @@ let do_reveal cctxt ~chain ~block nonces =
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   cctxt#with_lock begin fun () ->
-    Client_baking_nonces.load cctxt
+    let open Client_baking_nonces in
+    resolve_location cctxt ~chain >>=? fun nonces_location ->
+    load cctxt nonces_location
   end >>=? fun nonces ->
   Lwt_list.filter_map_p
     (fun hash ->
@@ -130,9 +131,8 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
               Block_hash.pp_short hash >>= fun () ->
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
-  Chain_services.chain_id cctxt () >>=? fun chain_id ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      match Client_baking_nonces.find_opt nonces chain_id bi.hash with
+      match Client_baking_nonces.find_opt nonces bi.hash with
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
@@ -143,12 +143,15 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   let nonces = List.map snd nonces in
   do_reveal cctxt ~chain ~block nonces
 
-let reveal_nonces cctxt ~chain ~block () =
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun block_hash ->
-  Client_baking_forge.get_unrevealed_nonces
-    cctxt ~chain ~head:block_hash () >>=? fun blocks ->
-  let nonces = List.map snd blocks in
-  do_reveal cctxt ~chain ~block nonces >>=? fun () ->
-  Client_baking_forge.filter_outdated_nonces
-    cctxt ~chain ~head:block_hash >>=? fun () ->
-  return_unit
+let reveal_nonces (cctxt : #Proto_alpha.full) ~chain ~block () =
+  let open Client_baking_nonces in
+  cctxt#with_lock begin fun () ->
+    resolve_location cctxt ~chain >>=? fun nonces_location ->
+    load cctxt nonces_location >>=? fun nonces ->
+    get_unrevealed_nonces cctxt nonces_location nonces >>=? fun nonces_to_reveal ->
+    do_reveal cctxt ~chain ~block nonces_to_reveal >>=? fun () ->
+    filter_outdated_nonces
+      cctxt nonces_location nonces >>=? fun nonces ->
+    save cctxt nonces_location nonces >>=? fun () ->
+    return_unit
+  end

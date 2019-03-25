@@ -105,17 +105,3 @@ val create:
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t
-
-val get_unrevealed_nonces:
-  #Proto_alpha.full ->
-  ?force:bool ->
-  chain:Chain_services.chain ->
-  head: Block_hash.t ->
-  unit ->
-  (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t
-
-val filter_outdated_nonces:
-  #Proto_alpha.full ->
-  chain: Block_services.chain ->
-  head: Block_hash.t ->
-  unit tzresult Lwt.t
