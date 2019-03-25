@@ -30,26 +30,6 @@ include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.nonces" end
 
 type t = Nonce.t Block_hash.Map.t
 
-type location = { name: string ; chain: Chain_services.chain }
-
-let basename = "nonce"
-
-let resolve_location cctxt ~chain =
-  let test_filename chain_id =
-    Format.kasprintf return "test_%a_%s" Chain_id.pp_short chain_id basename in
-  begin match chain with
-    | `Main -> return basename
-    | `Test ->
-        Chain_services.chain_id cctxt ~chain:`Test () >>=? fun chain_id ->
-        test_filename chain_id
-    | `Hash chain_id ->
-        Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
-        if Chain_id.(chain_id = main_chain_id) then
-          return basename
-        else
-          test_filename chain_id
-  end >>=? fun name -> return { name ; chain }
-
 let empty = Block_hash.Map.empty
 
 let encoding =
@@ -68,10 +48,10 @@ let encoding =
        (req "nonce" Nonce.encoding))
 
 let load (wallet : #Client_context.wallet) location =
-  wallet#load location.name ~default:empty encoding
+  wallet#load (Client_baking_files.filename location) ~default:empty encoding
 
 let save (wallet : #Client_context.wallet) location nonces =
-  wallet#write location.name nonces encoding
+  wallet#write (Client_baking_files.filename location) nonces encoding
 
 let mem nonces hash =
   Block_hash.Map.mem hash nonces
@@ -102,14 +82,15 @@ let filter_outdated_nonces cctxt ?constants location nonces =
     | None -> Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0)
     | Some constants -> return constants
   end >>=? fun { Constants.parametric = { blocks_per_cycle }} ->
-  get_block_level cctxt ~chain:location.chain ~block:(`Head 0) >>=? fun current_level ->
+  let chain = Client_baking_files.chain location in
+  get_block_level cctxt ~chain ~block:(`Head 0) >>=? fun current_level ->
   let current_cycle = Int32.(div current_level blocks_per_cycle) in
   let is_older_than_5_cycles block_level =
     let block_cycle = Int32.(div block_level blocks_per_cycle) in
     Int32.sub current_cycle block_cycle > 5l in
   Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
       acc >>=? fun acc ->
-      get_block_level cctxt ~chain:location.chain ~block:(`Hash (hash, 0)) >>= function
+      get_block_level cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
       | Ok level ->
           if is_older_than_5_cycles level then
             return (remove acc hash)
@@ -119,7 +100,7 @@ let filter_outdated_nonces cctxt ?constants location nonces =
     nonces (return nonces)
 
 let get_unrevealed_nonces cctxt location nonces =
-  let chain = location.chain in
+  let chain = Client_baking_files.chain location in
   Client_baking_blocks.blocks_from_current_cycle cctxt
     ~chain (`Head 0)
     ~offset:(-1l) () >>=? fun blocks ->

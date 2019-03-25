@@ -53,9 +53,10 @@ let inject_endorsement
   (* Double-check the right to inject an endorsement *)
   let open Client_baking_highwatermarks in
   wallet#with_lock begin fun () ->
-    may_inject_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? function
+    Client_baking_files.resolve_location cctxt ~chain `Endorsement >>=? fun endorsement_location ->
+    may_inject_endorsement cctxt endorsement_location ~delegate:delegate_pkh level >>=? function
     | true ->
-        record_endorsement cctxt ~chain ~delegate:delegate_pkh level >>=? fun () ->
+        record_endorsement cctxt endorsement_location ~delegate:delegate_pkh level >>=? fun () ->
         return_true
     | false -> return_false
   end >>=? fun is_allowed_to_endorse ->
@@ -170,7 +171,8 @@ let allowed_to_endorse cctxt bi delegate  =
           -% s Client_keys.Logging.tag name
           -% a endorsement_slots_tag slots) >>= fun () ->
       cctxt#with_lock begin fun () ->
-        Client_baking_highwatermarks.may_inject_endorsement cctxt ~chain ~delegate level
+        Client_baking_files.resolve_location cctxt ~chain `Endorsement >>=? fun endorsement_location ->
+        Client_baking_highwatermarks.may_inject_endorsement cctxt endorsement_location ~delegate level
       end >>=? function
       | false ->
           lwt_debug Tag.DSL.(fun f ->

@@ -77,7 +77,7 @@ let bake_block
     | Some seed_nonce ->
         cctxt#with_lock begin fun () ->
           let open Client_baking_nonces in
-          resolve_location cctxt ~chain >>=? fun nonces_location ->
+          Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
           load cctxt nonces_location >>=? fun nonces ->
           let nonces = add nonces block_hash seed_nonce in
           save cctxt nonces_location nonces
@@ -113,9 +113,8 @@ let do_reveal cctxt ~chain ~block nonces =
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   cctxt#with_lock begin fun () ->
-    let open Client_baking_nonces in
-    resolve_location cctxt ~chain >>=? fun nonces_location ->
-    load cctxt nonces_location
+    Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
+    Client_baking_nonces.load cctxt nonces_location
   end >>=? fun nonces ->
   Lwt_list.filter_map_p
     (fun hash ->
@@ -146,7 +145,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
 let reveal_nonces (cctxt : #Proto_alpha.full) ~chain ~block () =
   let open Client_baking_nonces in
   cctxt#with_lock begin fun () ->
-    resolve_location cctxt ~chain >>=? fun nonces_location ->
+    Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     load cctxt nonces_location >>=? fun nonces ->
     get_unrevealed_nonces cctxt nonces_location nonces >>=? fun nonces_to_reveal ->
     do_reveal cctxt ~chain ~block nonces_to_reveal >>=? fun () ->

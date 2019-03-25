@@ -26,18 +26,12 @@
 open Proto_alpha.Alpha_context
 
 type t
-type location
-
-val resolve_location:
-  #Client_context.full ->
-  chain: Chain_services.chain ->
-  location tzresult Lwt.t
 
 val empty: t
 
-val load: #Client_context.wallet -> location -> t tzresult Lwt.t
+val load: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t tzresult Lwt.t
 
-val save: #Client_context.wallet -> location -> t -> unit tzresult Lwt.t
+val save: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t -> unit tzresult Lwt.t
 
 val mem: t -> Block_hash.t -> bool
 
@@ -51,13 +45,13 @@ val remove: t -> Block_hash.t -> t
 val filter_outdated_nonces:
   #Proto_alpha.full ->
   ?constants: Constants.t ->
-  location ->
+  [ `Nonce ] Client_baking_files.location ->
   t ->
   t tzresult Lwt.t
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 val get_unrevealed_nonces:
   #Proto_alpha.full ->
-  location ->
+  [ `Nonce ] Client_baking_files.location ->
   t ->
   (Raw_level.t * Nonce.t) list tzresult Lwt.t
