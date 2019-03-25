@@ -62,10 +62,9 @@ launch_node() {
             mv "$node_data_dir/identity.json" /tmp
         fi
         rm -rf "$node_data_dir"
-        rm -rf "$client_dir/nonces"
-        rm -rf "$client_dir/endorsements"
-        rm -rf "$client_dir/blocks"
-	rm -rf "$client_dir/highwatermarks"
+        rm -rf "$client_dir/"*nonces
+        rm -rf "$client_dir/"*endorsements
+        rm -rf "$client_dir/"*blocks
         if [ -f "/tmp/identity.json" ]; then \
             mkdir -p "$node_data_dir"
             mv /tmp/identity.json "$node_data_dir/"
