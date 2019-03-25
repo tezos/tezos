@@ -389,7 +389,7 @@ can use the `DATA_DIR` environment variable.
     mkdir /tmp/tz-data
     DATA_DIR='/tmp/tz-data' ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
 
-You can event provide a custom `identity.json` and `config.json` to the
+You can even provide a custom `identity.json` and `config.json` to the
 sandboxed node by placing them in the data directory.
 
 
