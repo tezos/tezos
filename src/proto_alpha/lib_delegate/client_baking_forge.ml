@@ -137,7 +137,7 @@ let assert_valid_operations_hash shell_header operations =
 
 let inject_block
     cctxt
-    ?force
+    ?(force = false)
     ?seed_nonce_hash
     ~chain
     ~shell_header
@@ -162,12 +162,12 @@ let inject_block
             f "Level %a : previously baked"
             -% t event "double_bake_near_miss"
             -% a level_tag level)
-        >>= fun () -> return_false
+        >>= fun () -> return force
   end >>=? function
   | false -> fail (Level_previously_baked level)
   | true ->
       Shell_services.Injection.block cctxt
-        ?force ~chain signed_header operations >>=? fun block_hash ->
+        ~force ~chain signed_header operations >>=? fun block_hash ->
       lwt_log_info Tag.DSL.(fun f ->
           f "Client_baking_forge.inject_block: inject %a"
           -% t event "inject_baked_block"
