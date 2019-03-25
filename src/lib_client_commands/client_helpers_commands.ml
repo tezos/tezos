@@ -61,8 +61,8 @@ let commands () = Clic.[
            (fun (hash, time) ->
               cctxt#message "Current head: %a (timestamp: %a, validation: %a)"
                 Block_hash.pp_short hash
-                Time.pp_hum time
-                Time.pp_hum (Time.now ())) stream >>= fun () ->
+                Time.System.pp_hum (Time.System.of_protocol_exn time)
+                Time.System.pp_hum (Time.System.now ())) stream >>= fun () ->
          cctxt#answer "Bootstrapped." >>= fun () ->
          return_unit
       )

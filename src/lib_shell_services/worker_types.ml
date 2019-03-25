@@ -28,10 +28,10 @@ type limits =
     backlog_level : Internal_event.level ; }
 
 type worker_status =
-  | Launching of Time.t
-  | Running of Time.t
-  | Closing of Time.t * Time.t
-  | Closed of Time.t * Time.t * error list option
+  | Launching of Time.System.t
+  | Running of Time.System.t
+  | Closing of Time.System.t * Time.System.t
+  | Closed of Time.System.t * Time.System.t * error list option
 
 let worker_status_encoding error_encoding =
   let open Data_encoding in
@@ -40,38 +40,38 @@ let worker_status_encoding error_encoding =
         ~title:"Launching"
         (obj2
            (req "phase" (constant "launching"))
-           (req "since" Time.encoding))
+           (req "since" Time.System.encoding))
         (function Launching t -> Some ((), t) | _ -> None)
         (fun ((), t) -> Launching t) ;
       case (Tag 1)
         ~title:"Running"
         (obj2
            (req "phase" (constant "running"))
-           (req "since" Time.encoding))
+           (req "since" Time.System.encoding))
         (function Running t -> Some ((), t) | _ -> None)
         (fun ((), t) -> Running t) ;
       case (Tag 2)
         ~title:"Closing"
         (obj3
            (req "phase" (constant "closing"))
-           (req "birth" Time.encoding)
-           (req "since" Time.encoding))
+           (req "birth" Time.System.encoding)
+           (req "since" Time.System.encoding))
         (function Closing (t0, t) -> Some ((), t0, t) | _ -> None)
         (fun ((), t0, t) -> Closing (t0, t))  ;
       case (Tag 3)
         ~title:"Closed"
         (obj3
            (req "phase" (constant "closed"))
-           (req "birth" Time.encoding)
-           (req "since" Time.encoding))
+           (req "birth" Time.System.encoding)
+           (req "since" Time.System.encoding))
         (function Closed (t0, t, None) -> Some ((), t0, t) | _ -> None)
         (fun ((), t0, t) -> Closed (t0, t, None)) ;
       case (Tag 4)
         ~title:"Crashed"
         (obj4
            (req "phase" (constant "crashed"))
-           (req "birth" Time.encoding)
-           (req "since" Time.encoding)
+           (req "birth" Time.System.encoding)
+           (req "since" Time.System.encoding)
            (req "errors" error_encoding))
         (function Closed (t0, t, Some errs) -> Some ((), t0, t, errs) | _ -> None)
         (fun ((), t0, t, errs) -> Closed (t0, t, Some errs )) ]
@@ -97,9 +97,9 @@ let worker_information_encoding error_encoding =
   )
 
 type request_status =
-  { pushed : Time.t ;
-    treated : Time.t ;
-    completed : Time.t }
+  { pushed : Time.System.t ;
+    treated : Time.System.t ;
+    completed : Time.System.t }
 
 let request_status_encoding =
   let open Data_encoding in
@@ -109,22 +109,22 @@ let request_status_encoding =
     (fun (pushed, treated, completed) ->
        { pushed ; treated ; completed })
     (obj3
-       (req "pushed" Time.encoding)
-       (req "treated" Time.encoding)
-       (req "completed" Time.encoding))
+       (req "pushed" Time.System.encoding)
+       (req "treated" Time.System.encoding)
+       (req "completed" Time.System.encoding))
 
 type ('req, 'evt) full_status =
   { status : worker_status ;
-    pending_requests : (Time.t * 'req) list ;
+    pending_requests : (Time.System.t * 'req) list ;
     backlog : (Internal_event.level * 'evt list) list ;
-    current_request : (Time.t * Time.t * 'req) option }
+    current_request : (Time.System.t * Time.System.t * 'req) option }
 
 let full_status_encoding req_encoding evt_encoding error_encoding =
   let open Data_encoding in
   let requests_encoding =
     list
       (obj2
-         (req "pushed" Time.encoding)
+         (req "pushed" Time.System.encoding)
          (req "request" (dynamic_size req_encoding))) in
   let events_encoding =
     list
@@ -133,8 +133,8 @@ let full_status_encoding req_encoding evt_encoding error_encoding =
          (req "events" (dynamic_size (list (dynamic_size evt_encoding))))) in
   let current_request_encoding =
     obj3
-      (req "pushed" Time.encoding)
-      (req "treated" Time.encoding)
+      (req "pushed" Time.System.encoding)
+      (req "treated" Time.System.encoding)
       (req "request" req_encoding) in
   conv
     (fun { status  ; pending_requests ; backlog ; current_request } ->

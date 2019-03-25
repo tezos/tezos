@@ -53,5 +53,5 @@ val notify_head: t -> Block_header.t -> unit
 val running_workers: unit -> ((Chain_id.t * P2p_peer.Id.t) * t) list
 val status: t -> Worker_types.worker_status
 
-val current_request : t -> (Time.t * Time.t * Peer_validator_worker_state.Request.view) option
+val current_request : t -> (Time.System.t * Time.System.t * Peer_validator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Peer_validator_worker_state.Event.t list) list

@@ -39,7 +39,7 @@ val common_ancestor: Block.t -> Block.t -> Block.t Lwt.t
 val iter_predecessors:
   ?max:int ->
   ?min_fitness:Fitness.t ->
-  ?min_date:Time.t ->
+  ?min_date:Time.Protocol.t ->
   Block.t list ->
   f:(Block.t -> unit Lwt.t) ->
   unit Lwt.t

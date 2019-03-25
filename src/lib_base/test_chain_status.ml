@@ -27,13 +27,13 @@ type t =
   | Not_running
   | Forking of {
       protocol: Protocol_hash.t ;
-      expiration: Time.t ;
+      expiration: Time.Protocol.t ;
     }
   | Running of {
       chain_id: Chain_id.t ;
       genesis: Block_hash.t ;
       protocol: Protocol_hash.t ;
-      expiration: Time.t ;
+      expiration: Time.Protocol.t ;
     }
 
 let encoding =
@@ -48,7 +48,7 @@ let encoding =
       (obj3
          (req "status" (constant "forking"))
          (req "protocol" Protocol_hash.encoding)
-         (req "expiration" Time.encoding))
+         (req "expiration" Time.Protocol.encoding))
       (function
         | Forking { protocol ; expiration } ->
             Some ((), protocol, expiration)
@@ -61,7 +61,7 @@ let encoding =
          (req "chain_id" Chain_id.encoding)
          (req "genesis" Block_hash.encoding)
          (req "protocol" Protocol_hash.encoding)
-         (req "expiration" Time.encoding))
+         (req "expiration" Time.Protocol.encoding))
       (function
         | Running { chain_id ; genesis ; protocol ; expiration } ->
             Some ((), chain_id, genesis, protocol, expiration)
@@ -77,8 +77,7 @@ let pp ppf = function
         "@[<v 2>Forking %a (expires %a)@]"
         Protocol_hash.pp
         protocol
-        Time.pp_hum
-        expiration
+        Time.System.pp_hum (Time.System.of_protocol_exn expiration)
   | Running { chain_id ; genesis ; protocol ; expiration } ->
       Format.fprintf ppf
         "@[<v 2>Running %a\
@@ -88,4 +87,4 @@ let pp ppf = function
         Protocol_hash.pp protocol
         Block_hash.pp genesis
         Chain_id.pp chain_id
-        Time.pp_hum expiration
+        Time.System.pp_hum (Time.System.of_protocol_exn expiration)

@@ -46,7 +46,7 @@ module type T = sig
   val create :
     ?protocol_data: MBytes.t ->
     predecessor: State.Block.t ->
-    timestamp: Time.t ->
+    timestamp: Time.Protocol.t ->
     unit -> t tzresult Lwt.t
 
   type result =
@@ -117,6 +117,8 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
       { shell = op2.raw.shell ; protocol_data = op2.protocol_data }
 
   let create ?protocol_data ~predecessor ~timestamp () =
+    (* The prevalidation module receives input from the system byt handles
+       protocol values. It translates timestamps here. *)
     let { Block_header.shell =
             { fitness = predecessor_fitness ;
               timestamp = predecessor_timestamp ;

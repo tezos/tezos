@@ -69,7 +69,7 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
         let abort_daemon () =
           cctxt#message "Test chain's expiration date reached \
                          (%a)... Stopping the daemon.@."
-            Time.pp_hum expiration_date >>= fun () ->
+            Time.Protocol.pp_hum expiration_date >>= fun () ->
           if cleanup_nonces then
             (* Clean-up existing nonces *)
             cctxt#with_lock begin fun () ->
@@ -81,7 +81,8 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
             exit 0 in
         let canceler = Lwt_canceler.create () in
         Lwt_canceler.on_cancel canceler (fun () -> abort_daemon () >>= function _ -> Lwt.return_unit) ;
-        let delay = Int64.to_int Time.(diff expiration_date (now ())) in
+        let now = Time.System.(to_protocol (now ())) in
+        let delay = Int64.to_int (Time.Protocol.diff expiration_date now) in
         if delay <= 0 then
           (* Testchain already expired... Retrying. *)
           loop ()

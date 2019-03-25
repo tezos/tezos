@@ -219,7 +219,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
       val block:
         #simple -> ?chain:chain -> ?block:block ->
         ?sort:bool ->
-        ?timestamp:Time.t ->
+        ?timestamp:Time.Protocol.t ->
         protocol_data:Next_proto.block_header_data ->
         Next_proto.operation list list ->
         (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
@@ -387,7 +387,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         val block:
           ([ `POST ], prefix,
            prefix, < sort_operations : bool;
-                     timestamp : Time.t option >, block_param,
+                     timestamp : Time.Protocol.t option >, block_param,
            Block_header.shell_header * error Preapply_result.t list) RPC_service.t
 
         val operations:

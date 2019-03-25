@@ -39,14 +39,13 @@ let genesis_protocol =
   Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
-let genesis_time =
-  Time.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 let chain_id = Chain_id.of_block_hash genesis_block
 
 (** Context creation *)
 
-let commit = commit ~time:Time.epoch ~message:""
+let commit = commit ~time:Time.Protocol.epoch ~message:""
 
 let block2 =
   Block_hash.of_hex_exn

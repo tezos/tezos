@@ -46,7 +46,7 @@ module Chain : sig
 
   (** The chain starts from a genesis block associated to a seed protocol *)
   type genesis = {
-    time: Time.t ;
+    time: Time.Protocol.t ;
     block: Block_hash.t ;
     protocol: Protocol_hash.t ;
   }
@@ -86,7 +86,7 @@ module Chain : sig
   val faked_genesis_hash: chain_state -> Block_hash.t
 
   (** Return the expiration timestamp of a test chain. *)
-  val expiration: chain_state -> Time.t option
+  val expiration: chain_state -> Time.Protocol.t option
   val allow_forked_chain: chain_state -> bool
 
   val checkpoint: chain_state -> (Int32.t * Block_hash.t) Lwt.t
@@ -171,7 +171,7 @@ module Block : sig
     val hash: t -> Block_hash.t
     val header: t -> Block_header.t
     val shell_header: t -> Block_header.shell_header
-    val timestamp: t -> Time.t
+    val timestamp: t -> Time.Protocol.t
     val fitness: t -> Fitness.t
     val validation_passes: t -> int
     val level: t -> Int32.t
@@ -190,7 +190,7 @@ module Block : sig
   val hash: t -> Block_hash.t
   val header: t -> Block_header.t
   val shell_header: t -> Block_header.shell_header
-  val timestamp: t -> Time.t
+  val timestamp: t -> Time.Protocol.t
   val fitness: t -> Fitness.t
   val validation_passes: t -> int
   val chain_id: t -> Chain_id.t
@@ -264,7 +264,7 @@ val update_testchain:
 val fork_testchain:
   Block.t ->
   Chain_id.t -> Block_hash.t -> Block_header.t ->
-  Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
+  Protocol_hash.t -> Time.Protocol.t -> Chain.t tzresult Lwt.t
 
 type chain_data = {
   current_head: Block.t ;

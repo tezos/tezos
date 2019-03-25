@@ -9,6 +9,7 @@
             tezos-client-alpha
             tezos-client-commands
             tezos-storage
+            tezos-stdlib-unix
             tezos-rpc-http
             tezos-rpc)
  (library_flags (:standard -linkall))

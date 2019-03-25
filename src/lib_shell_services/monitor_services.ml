@@ -27,7 +27,7 @@ type chain_status =
   | Active_main of Chain_id.t
   | Active_test of { chain : Chain_id.t ;
                      protocol : Protocol_hash.t ;
-                     expiration_date : Time.t }
+                     expiration_date : Time.Protocol.t }
   | Stopping of Chain_id.t
 
 let chain_status_encoding =
@@ -45,7 +45,7 @@ let chain_status_encoding =
          (obj3
             (req "chain_id" Chain_id.encoding)
             (req "test_protocol" Protocol_hash.encoding)
-            (req "expiration_date" Time.encoding)
+            (req "expiration_date" Time.Protocol.encoding)
          )
          (function | Active_test { chain ; protocol ; expiration_date } -> Some (chain, protocol, expiration_date)
                    | _ -> None)
@@ -75,7 +75,7 @@ module S = struct
       ~query: RPC_query.empty
       ~output: (obj2
                   (req "block" Block_hash.encoding)
-                  (req "timestamp" Time.encoding))
+                  (req "timestamp" Time.Protocol.encoding))
       RPC_path.(path / "bootstrapped")
 
   let valid_blocks_query =

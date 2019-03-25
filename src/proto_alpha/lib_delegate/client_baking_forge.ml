@@ -32,6 +32,11 @@ include Internal_event.Legacy_logging.Make_semantic(struct
 
 open Logging
 
+(* Just proving a point *)
+let [@warning "-32"] time_protocol__is__protocol_time
+  : Alpha_context.Timestamp.t -> Time.Protocol.t
+  = fun x -> x
+
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
@@ -65,7 +70,7 @@ type state = {
   (* Await endorsements *)
   await_endorsements: bool ;
   (* truly mutable *)
-  mutable best_slot: (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
+  mutable best_slot: (Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
 
 let create_state
@@ -422,15 +427,15 @@ let decode_priority cctxt chain block = function
 
 let unopt_timestamp timestamp minimal_timestamp =
   match timestamp, minimal_timestamp with
-  | None, None -> return (Time.now ())
+  | None, None -> return Time.System.(to_protocol (now ()))
   | None, Some timestamp -> return timestamp
   | Some timestamp, None -> return timestamp
   | Some timestamp, Some minimal_timestamp ->
       if timestamp < minimal_timestamp then
         failwith
           "Proposed timestamp %a is earlier than minimal timestamp %a"
-          Time.pp_hum timestamp
-          Time.pp_hum minimal_timestamp
+          Time.Protocol.pp_hum timestamp
+          Time.Protocol.pp_hum minimal_timestamp
       else
         return timestamp
 
@@ -581,7 +586,7 @@ let finalize_block_header
   begin Context.get_test_chain context >>= function
     | Not_running -> return context
     | Running { expiration ; _ } ->
-        if Time.(expiration <= timestamp) then
+        if Time.Protocol.(expiration <= timestamp) then
           Context.set_test_chain context Not_running >>= fun context ->
           return context
         else
@@ -719,7 +724,7 @@ let forge_block
       -% t event "found_valid_operations"
       -% s valid_ops valid_op_count
       -% s refused_ops (total_op_count - valid_op_count)
-      -% a timestamp_tag timestamp
+      -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
       -% a fitness_tag shell_header.fitness) >>= fun () ->
 
   begin match Alpha_environment.wrap_error (Raw_level.of_int32 shell_header.level) with
@@ -824,7 +829,7 @@ let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate)) oper
 let rec filter_limits tnow limits =
   match limits with
   | [] -> []
-  | (time, _) :: _ as limits when Time.(tnow < time) -> limits
+  | (time, _) :: _ as limits when Time.Protocol.(tnow < time) -> limits
   | _ :: limits -> filter_limits tnow limits
 
 (** [fetch_operations] retrieve the operations present in the
@@ -855,7 +860,7 @@ let fetch_operations
         next_baking_delay state priority >>=? fun next_slot_delay ->
         let hard_delay = Int64.div next_slot_delay 2L in
         (* The time limit is defined as 1/2 of the next baking slot's time *)
-        let limit_date = Time.add timestamp hard_delay in
+        let limit_date = Time.Protocol.add timestamp hard_delay in
         (* Time limits :
            - We expect all of the endorsements until 1/3 of the time limit has passed ;
            - We expect 2/3 of the endorsements until 2/3 of the time limit has passed ;
@@ -863,16 +868,24 @@ let fetch_operations
            - We bake with what we have when the time limit has been reached.
         *)
         let limits =
-          [ (Time.add timestamp (Int64.div hard_delay 3L), endorsers_per_block) ;
-            (Time.add timestamp (Int64.div (Int64.mul hard_delay 2L) 3L), 2 * endorsers_per_block / 3) ;
+          [ (Time.Protocol.add timestamp (Int64.div hard_delay 3L), endorsers_per_block) ;
+            (Time.Protocol.add timestamp (Int64.div (Int64.mul hard_delay 2L) 3L), 2 * endorsers_per_block / 3) ;
             (limit_date, endorsers_per_block / 3) ]
         in
+        let timespan =
+          let timespan =
+            Ptime.diff
+              (Time.System.of_protocol_exn limit_date) (Time.System.now ()) in
+          if Ptime.Span.compare timespan Ptime.Span.zero > 0 then
+            timespan
+          else
+            Ptime.Span.zero in
         lwt_log_notice Tag.DSL.(fun f ->
             f "Waiting until %a (%a) for more endorsements in the \
                mempool (%a/%a arrived)."
             -% t event "waiting_operations"
-            -% a timestamp_tag limit_date
-            -% a timespan_tag (max 0L Time.(diff limit_date (now ())))
+            -% a timestamp_tag (Time.System.of_protocol_exn limit_date)
+            -% a timespan_tag timespan
             -% a op_count nb_arrived_endorsements
             -% a op_count endorsers_per_block
           ) >>= fun () ->
@@ -897,7 +910,7 @@ let fetch_operations
               operations := op_list @ !operations ;
               count_slots_endorsements inc slot op_list >>= fun new_endorsements ->
               let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
-              let limits = filter_limits (Time.now ()) limits in
+              let limits = filter_limits Time.System.(to_protocol (now ())) limits in
               let required =
                 match limits with
                 | [] -> 0 (* If we are late, we do not require endorsements *)
@@ -941,7 +954,7 @@ let build_block
       -% a Block_hash.Logging.tag bi.hash
       -% s bake_priority_tag priority
       -% s Client_keys.Logging.tag name
-      -% a timestamp_tag timestamp) >>= fun () ->
+      -% a timestamp_tag (Time.System.of_protocol_exn timestamp)) >>= fun () ->
 
   fetch_operations cctxt ~chain state slot >>=? function
   | None ->
@@ -990,7 +1003,7 @@ let build_block
                 -% a Block_hash.Logging.tag bi.hash
                 -% s bake_priority_tag priority
                 -% s Client_keys.Logging.tag name
-                -% a timestamp_tag timestamp) >>= fun () ->
+                -% a timestamp_tag (Time.System.of_protocol_exn timestamp)) >>= fun () ->
             let current_protocol = bi.next_protocol in
             Context.get_protocol validation_result.context >>= fun next_protocol ->
             if Protocol_hash.equal current_protocol next_protocol then begin
@@ -1135,7 +1148,7 @@ let compute_best_slot_on_current_level
           -% t event "have_baking_slot"
           -% a level_tag level
           -% s bake_priority_tag priority
-          -% a timestamp_tag timestamp
+          -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
           -% s Client_keys.Logging.tag name
           -% a Block_hash.Logging.tag new_head.hash
           -% t Signature.Public_key_hash.Logging.tag delegate) >>= fun () ->

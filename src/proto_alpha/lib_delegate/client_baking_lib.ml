@@ -57,13 +57,18 @@ let bake_block
       Some seed_nonce, Some seed_nonce_hash
     else
       None, None in
+  let timestamp =
+    if minimal_timestamp then
+      None
+    else
+      Some Time.System.(to_protocol (now ())) in
   Client_baking_forge.forge_block cctxt
     ?force
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
     ~await_endorsements
-    ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
+    ?timestamp
     ?seed_nonce_hash
     ?mempool
     ?context_path

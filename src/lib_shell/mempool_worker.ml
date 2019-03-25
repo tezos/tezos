@@ -221,12 +221,12 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           Format.fprintf ppf
             "@[<v 0>%a@,Pushed: %a, Treated: %a, Completed: %a@]"
             Request.pp view
-            Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+            Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
       | Request (view, { pushed ; treated ; completed }, Some errors)  ->
           Format.fprintf ppf
             "@[<v 0>%a@,Pushed: %a, Treated: %a, Failed: %a@,Errors: %a@]"
             Request.pp view
-            Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+            Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
             (Format.pp_print_list Error_monad.pp) errors
   end
 
@@ -567,7 +567,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       let on_request = on_request
     end in
     Chain.data chain_state >>= fun { current_head = predecessor ; _ } ->
-    let timestamp = Time.now () in
+    let timestamp = Time.System.(to_protocol (now ())) in
     create ~predecessor ~timestamp () >>=? fun validation_state ->
     Worker.launch
       table

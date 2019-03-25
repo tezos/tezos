@@ -119,20 +119,20 @@ end
 (* patricia trees using IpV6 addresses as keys *)
 module IpSet = struct
 
-  include PatriciaTree(Time)
+  include PatriciaTree(Time.System)
 
   let remove_old t ~older_than =
     let module MI =
     struct
-      type result = Time.t
-      let default = Time.max_value
+      type result = Time.System.t
+      let default = Ptime.max
       let map _t _key value = value
-      let reduce _t left right = Time.(min left right)
+      let reduce _t left right = Time.System.(min left right)
     end
     in
     let module MR = M.Map_Reduce(MI) in
     MR.filter (fun addtime ->
-        Time.(older_than <= addtime)
+        Time.System.(older_than <= addtime)
       ) t
 
 end

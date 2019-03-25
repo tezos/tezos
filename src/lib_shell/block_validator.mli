@@ -59,6 +59,6 @@ val shutdown: t -> unit Lwt.t
 val running_worker: unit -> t
 val status: t -> Worker_types.worker_status
 
-val pending_requests : t -> (Time.t * Block_validator_worker_state.Request.view) list
-val current_request : t -> (Time.t * Time.t * Block_validator_worker_state.Request.view) option
+val pending_requests : t -> (Time.System.t * Block_validator_worker_state.Request.view) list
+val current_request : t -> (Time.System.t * Time.System.t * Block_validator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Block_validator_worker_state.Event.t list) list

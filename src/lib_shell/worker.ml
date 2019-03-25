@@ -188,7 +188,7 @@ module type T = sig
     type 'a t
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
-    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests : 'a t -> (Time.System.t * Request.view) list
     val pending_requests_length : 'a t -> int
   end
   module type BOUNDED_QUEUE = sig
@@ -236,6 +236,8 @@ module type T = sig
   (** Access the event backlog. *)
   val last_events : _ t -> (Internal_event.level * Event.t list) list
 
+  (** Introspect the message queue, gives the times requests were pushed. *)
+  val pending_requests : _ queue t -> (Time.System.t * Request.view) list
 
   (** Get the running status of a worker. *)
   val status : _ t -> Worker_types.worker_status
@@ -243,7 +245,7 @@ module type T = sig
   (** Get the request being treated by a worker.
       Gives the time the request was pushed, and the time its
       treatment started. *)
-  val current_request : _ t -> (Time.t * Time.t * Request.view) option
+  val current_request : _ t -> (Time.System.t * Time.System.t * Request.view) option
 
   val information : _ t -> Worker_types.worker_information
 
@@ -288,9 +290,10 @@ module Make
   and any_request = Any_request : _ Request.t -> any_request
 
   and _ buffer =
-    | Queue_buffer : (Time.t * message) Lwt_pipe.t -> infinite queue buffer
-    | Bounded_buffer : (Time.t * message) Lwt_pipe.t -> bounded queue buffer
-    | Dropbox_buffer : (Time.t * message) Lwt_dropbox.t -> dropbox buffer
+    | Queue_buffer : (Time.System.t * message) Lwt_pipe.t -> infinite queue buffer
+    | Bounded_buffer : (Time.System.t * message) Lwt_pipe.t -> bounded queue buffer
+    | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
+
   and 'kind t = {
     limits : Worker_types.limits ;
     timeout : float option ;
@@ -304,7 +307,7 @@ module Make
     name : Name.t ;
     id : int ;
     mutable status : Worker_types.worker_status ;
-    mutable current_request : (Time.t * Time.t * Request.view) option ;
+    mutable current_request : (Time.System.t * Time.System.t * Request.view) option ;
     table : 'kind table ;
   }
   and 'kind table = {
@@ -314,7 +317,7 @@ module Make
   }
 
   let queue_item ?u r =
-    Time.now (),
+    Time.System.now (),
     Message (r, u)
 
   let drop_request w merge message_box request =
@@ -329,7 +332,7 @@ module Make
       with
       | None -> ()
       | Some (Any_request neu) ->
-          Lwt_dropbox.put message_box (Time.now (), Message (neu, None))
+          Lwt_dropbox.put message_box (Time.System.now (), Message (neu, None))
     with Lwt_dropbox.Closed -> ()
 
   let push_request_and_wait w message_queue request =
@@ -365,7 +368,7 @@ module Make
     type 'a t
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
-    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests : 'a t -> (Time.System.t * Request.view) list
     val pending_requests_length : 'a t -> int
   end
   module type BOUNDED_QUEUE = sig
@@ -517,10 +520,10 @@ module Make
       let t0 = match w.status with
         | Running t0 -> t0
         | Launching _ | Closing _ | Closed _ -> assert false in
-      w.status <- Closing (t0, Time.now ()) ;
+      w.status <- Closing (t0, Time.System.now ()) ;
       close w ;
       Lwt_canceler.cancel w.canceler >>= fun () ->
-      w.status <- Closed (t0, Time.now (), errs) ;
+      w.status <- Closed (t0, Time.System.now (), errs) ;
       Hashtbl.remove w.table.instances w.name ;
       Handlers.on_close w >>= fun () ->
       w.state <- None ;
@@ -536,14 +539,14 @@ module Make
         | None -> Handlers.on_no_request w
         | Some (pushed, Message (request, u)) ->
             let current_request = Request.view request in
-            let treated = Time.now () in
+            let treated = Time.System.now () in
             w.current_request <- Some (pushed, treated, current_request) ;
             Logger.debug "@[<v 2>Request:@,%a@]"
               Request.pp current_request ;
             match u with
             | None ->
                 Handlers.on_request w request >>=? fun res ->
-                let completed = Time.now () in
+                let completed = Time.System.now () in
                 w.current_request <- None ;
                 Handlers.on_completion w
                   request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
@@ -552,7 +555,7 @@ module Make
                 Handlers.on_request w request >>= fun res ->
                 Lwt.wakeup_later u res ;
                 Lwt.return res >>=? fun res ->
-                let completed = Time.now () in
+                let completed = Time.System.now () in
                 w.current_request <- None ;
                 Handlers.on_completion w
                   request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
@@ -568,7 +571,7 @@ module Make
       | Error errs ->
           begin match w.current_request with
             | Some (pushed, treated, request) ->
-                let completed = Time.now () in
+                let completed = Time.System.now () in
                 w.current_request <- None ;
                 Handlers.on_error w
                   request Worker_types.{ pushed ; treated ; completed } errs
@@ -632,7 +635,7 @@ module Make
                 worker = Lwt.return_unit ;
                 event_log ; timeout ;
                 current_request = None ;
-                status = Launching (Time.now ())} in
+                status = Launching (Time.System.now ())} in
       Hashtbl.add table.instances name w ;
       begin
         if id_name = base_name then
@@ -641,7 +644,7 @@ module Make
           Logger.lwt_log_notice "Worker started for %s" name_s
       end >>= fun () ->
       Handlers.on_launch w name parameters >>=? fun state ->
-      w.status <- Running (Time.now ()) ;
+      w.status <- Running (Time.System.now ()) ;
       w.state <- Some state ;
       w.worker <-
         Lwt_utils.worker
@@ -673,6 +676,9 @@ module Make
              base_name Name.pp w.name)
     | None, _  -> assert false
     | Some state, _ -> state
+
+  let pending_requests q =
+    Queue.pending_requests q
 
   let last_events w =
     List.map

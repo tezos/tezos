@@ -77,7 +77,7 @@ val flush: t -> Block_hash.t -> unit tzresult Lwt.t
 
 (** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
     reset of the prevalidation context *)
-val timestamp: t -> Time.t
+val timestamp: t -> Time.System.t
 
 (** Returns the fitness of the current prevalidation context *)
 val fitness: t -> Fitness.t Lwt.t
@@ -104,8 +104,8 @@ val parameters: t -> limits * Distributed_db.chain_db
 
 (* None indicates the there are no workers for the current protocol. *)
 val status: t -> Worker_types.worker_status
-val pending_requests : t -> (Time.t * Prevalidator_worker_state.Request.view) list
-val current_request : t -> (Time.t * Time.t * Prevalidator_worker_state.Request.view) option
+val pending_requests : t -> (Time.System.t * Prevalidator_worker_state.Request.view) list
+val current_request : t -> (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 
 val rpc_directory : t option RPC_directory.t

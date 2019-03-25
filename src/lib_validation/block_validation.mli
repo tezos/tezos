@@ -32,7 +32,7 @@ val may_patch_protocol:
 val update_testchain_status:
   Context.t ->
   Block_header.t ->
-  Time.t ->
+  Time.Protocol.t ->
   Context.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)

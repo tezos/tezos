@@ -259,7 +259,7 @@ let genesis_with_parameters
   let shell = Forge.make_shell
       ~level:0l
       ~predecessor:hash
-      ~timestamp:Time.epoch
+      ~timestamp:Time.Protocol.epoch
       ~fitness: (Fitness_repr.from_int64 0L)
       ~operations_hash: Operation_list_list_hash.zero in
   let contents = Forge.make_contents

@@ -23,107 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open CalendarLib
+module Protocol = struct
 
-module T = struct
-  include Int64
-
-  let diff a b =
-    let sign = a >= b in
-    let res = Int64.sub a b in
-    let res_sign = res >= 0L in
-    if sign = res_sign then res else invalid_arg "Time.diff" ;;
-
-  let add a d =
-    let sign = d >= 0L in
-    let res = Int64.add a d in
-    let incr_sign = res >= a in
-    if sign = incr_sign then res else invalid_arg "Time.add" ;;
-
-  let recent a1 a2 =
-    match a1, a2 with
-    | (None, None) -> None
-    | (None, (Some _ as a))
-    | (Some _ as a, None) -> a
-    | (Some (_, t1), Some (_, t2)) ->
-        if compare t1 t2 < 0 then a2 else a1
-
-  let hash = to_int
-  let min_value = min_int
+  type t = int64
   let epoch = 0L
-  let max_value = max_int
 
-  let now () = Int64.of_float (Unix.gettimeofday ())
+  let diff = Int64.sub
+  let add = Int64.add
+
+  let of_ptime t =
+    Option.map
+      ~f:Int64.of_int
+      (Ptime.Span.to_int_s (Ptime.to_span t))
+  let to_ptime t =
+    match Ptime.of_span (Ptime.Span.of_int_s (Int64.to_int t)) with
+    | None -> invalid_arg ("Time.Protocol.to_ptime")
+    | Some ptime -> ptime
+
+  let of_notation s =
+    match Ptime.of_rfc3339 s with
+    | Ok (t, _, _) -> of_ptime t
+    | Error _ -> None
+  let of_notation_exn s =
+    match Ptime.(rfc3339_error_to_msg (of_rfc3339 s)) with
+    | Error (`Msg msg) -> invalid_arg ("Time.Protocol.of_notation: " ^ msg)
+    | Ok (t, _, _) ->
+        match of_ptime t with
+        | None -> invalid_arg "Time.Protocol.of_notation"
+        | Some t -> t
+  let to_notation t =
+    match Ptime.of_span (Ptime.Span.of_int_s (Int64.to_int t)) with
+    | None -> invalid_arg ("Time.Protocol.to_notation")
+    | Some ptime -> Ptime.to_rfc3339 ptime
 
   let of_seconds x = x
   let to_seconds x = x
 
-  let formats =
-    [ "%Y-%m-%dT%H:%M:%SZ" ; "%Y-%m-%d %H:%M:%SZ";
-      "%Y-%m-%dT%H:%M:%S%:z"; "%Y-%m-%d %H:%M:%S%:z"; ]
-
-  let int64_of_calendar c =
-    let round fc =
-      let f, i = modf fc in
-      Int64.(add (of_float i) Pervasives.(if f < 0.5 then 0L else 1L)) in
-    round @@ Calendar.Precise.to_unixfloat c
-
-  let rec iter_formats s = function
-    | [] -> None
-    | f :: fs ->
-        try
-          Some (int64_of_calendar @@ Printer.Precise_Calendar.from_fstring f s)
-        with _ -> iter_formats s fs
-
-  let of_notation s =
-    iter_formats s formats
-  let of_notation_exn s =
-    match of_notation s with
-    | None -> invalid_arg "Time.of_notation: can't parse."
-    | Some t -> t
-
-  let to_notation t =
-    let ft = Int64.to_float t in
-    if Int64.of_float ft <> t then
-      "out_of_range"
-    else
-      Printer.Precise_Calendar.sprint
-        "%Y-%m-%dT%H:%M:%SZ"
-        (Calendar.Precise.from_unixfloat ft)
-
+  let encoding = Data_encoding.int64
   let rfc_encoding =
     let open Data_encoding in
     def
       "timestamp.rfc"
-      ~title:
-        "RFC 3339 formatted timestamp"
-      ~description:
-        "A date in human readble form as specified in RFC 3339." @@
+      ~title: "RFC 3339 formatted timestamp"
+      ~description: "A date in RFC 3339 notation." @@
     conv
       to_notation
       (fun s -> match of_notation s with
          | Some s -> s
-         | None -> Data_encoding.Json.cannot_destruct "Time.of_notation")
+         | None -> Data_encoding.Json.cannot_destruct "Time.Protocol.of_notation")
       string
-
-  let encoding =
-    let open Data_encoding in
-    def "timestamp" @@
-    splitted
-      ~binary: int64
-      ~json:
-        (union [
-            case Json_only
-              ~title:"RFC encoding"
-              rfc_encoding
-              (fun i -> Some i)
-              (fun i -> i) ;
-            case Json_only
-              ~title:"Second since epoch"
-              int64
-              (fun _ -> None)
-              (fun i -> i) ;
-          ])
 
   let rpc_arg =
     RPC_arg.make
@@ -134,39 +82,166 @@ module T = struct
            if s = "none" || s = "epoch" then
              Ok epoch
            else
-             match of_notation s with
-             | None -> begin
-                 match Int64.of_string s with
-                 | exception _ -> begin
-                     Error (Format.asprintf "failed to parse time (epoch): %S" s)
-                   end
-                 | t -> Ok t
-               end
-             | Some t -> Ok t)
+             match Int64.of_string s with
+             | t -> Ok t
+             | exception _ ->
+                 Error (Format.asprintf "failed to parse time (epoch): %S" s))
       ~construct:Int64.to_string
       ()
 
-  type 'a timed_data = {
-    data: 'a ;
-    time: t ;
-  }
+  let pp_hum ppf t = Ptime.pp_rfc3339 () ppf (to_ptime t)
 
-  let timed_encoding arg_encoding =
-    let open Data_encoding in
-    conv
-      (fun {time; data} -> (time, data))
-      (fun (time, data) -> {time; data})
-      (tup2 encoding arg_encoding)
+  include Compare.Make(Int64)
 
-  let make_timed data = {
-    data ; time = now () ;
-  }
-
-  let pp_hum ppf t = Format.pp_print_string ppf (to_notation t)
 end
 
-include T
-include Compare.Make (T)
-module Set = Set.Make (T)
-module Map = Map.Make (T)
-module Table = Hashtbl.Make (T)
+module System = struct
+
+  type t = Ptime.t
+  let now () = Ptime_clock.now ()
+
+  module Span = struct
+    type t = Ptime.Span.t
+    let sleep s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
+    let multiply_exn f s =
+      let open Ptime.Span in
+      Option.unopt_exn
+        (Failure "Time.System.Span.multiply_exn")
+        (of_float_s (f *. Ptime.Span.to_float_s s))
+    let of_seconds_exn f =
+      match Ptime.Span.of_float_s f with
+      | None -> invalid_arg "Time.System.Span.of_seconds_exn"
+      | Some s -> s
+    let encoding =
+      let open Data_encoding in
+      conv
+        Ptime.Span.to_float_s
+        (fun f -> match Ptime.Span.of_float_s f with
+           | None -> invalid_arg "Time.System.Span.encoding"
+           | Some s -> s)
+        float
+    let rpc_arg =
+      RPC_arg.make
+        ~name:(Format.asprintf "timespan")
+        ~descr:(Format.asprintf "A span of time in seconds")
+        ~destruct:
+          (fun s ->
+             match Ptime.Span.of_float_s (float_of_string s) with
+             | Some t -> Ok t
+             | None -> Error (Format.asprintf "failed to parse timespan: %S" s)
+             | exception _ -> Error (Format.asprintf "failed to parse timespan: %S" s))
+        ~construct:(fun s -> string_of_float (Ptime.Span.to_float_s s))
+        ()
+
+  end
+
+  let of_seconds_opt x =
+    (* NOTE: on 32 bit machines, may behave incorrectly on times beyond the
+       int31 end of time *)
+    Ptime.of_span
+      (Ptime.Span.of_int_s (Int64.to_int x))
+  let of_seconds_exn x = match of_seconds_opt x with
+    | Some t -> t
+    | None -> invalid_arg "Time.of_seconds"
+  let to_seconds x =
+    match Ptime.(Span.to_int_s (to_span x)) with
+    | Some s -> Int64.of_int s
+    | None -> invalid_arg "Time.to_seconds"
+
+  let of_protocol_exn = of_seconds_exn
+  let of_protocol_opt = of_seconds_opt
+  let to_protocol = to_seconds
+
+  let of_notation_opt s =
+    match Ptime.of_rfc3339 s with
+    | Ok (t, _, _) -> Some t
+    | Error _ -> None
+  let of_notation_exn s =
+    match Ptime.(rfc3339_error_to_msg (of_rfc3339 s)) with
+    | Ok (t, _, _) -> t
+    | Error (`Msg msg) -> invalid_arg ("Time.of_notation: " ^ msg)
+  let to_notation t = Ptime.to_rfc3339 t
+
+  let rfc_encoding =
+    let open Data_encoding in
+    def
+      "timestamp.rfc"
+      ~title: "RFC 3339 formatted timestamp"
+      ~description: "A date in RFC 3339 notation." @@
+    conv
+      to_notation
+      (fun s -> match of_notation_opt s with
+         | Some s -> s
+         | None -> Data_encoding.Json.cannot_destruct "Time.of_notation")
+      string
+
+  let encoding =
+    let open Data_encoding in
+    let binary = conv to_seconds of_seconds_exn int64 in
+    let json =
+      union [
+        case Json_only
+          ~title:"RFC encoding"
+          rfc_encoding
+          (fun i -> Some i)
+          (fun i -> i) ;
+        case Json_only
+          ~title:"Second since epoch"
+          int64
+          (fun _ -> None)
+          (fun i -> of_seconds_exn i) ;
+      ] in
+    def "timestamp" @@
+    splitted ~binary ~json
+
+  let rpc_arg =
+    RPC_arg.make
+      ~name:(Format.asprintf "date")
+      ~descr:(Format.asprintf "A date in seconds from epoch")
+      ~destruct:
+        (fun s ->
+           if s = "none" || s = "epoch" then
+             Ok Ptime.epoch
+           else
+             match of_notation_opt s with
+             | Some t -> Ok t
+             | None ->
+                 match of_seconds_exn (Int64.of_string s) with
+                 | t -> Ok t
+                 | exception _ ->
+                     Error (Format.asprintf "failed to parse time (epoch): %S" s))
+      ~construct:to_notation
+      ()
+
+  let pp_hum ppf t = Ptime.pp_rfc3339 () ppf t
+
+  type 'a stamped = {
+    data: 'a ;
+    stamp: Ptime.t ;
+  }
+  let stamped_encoding arg_encoding =
+    let open Data_encoding in
+    conv
+      (fun {stamp; data} -> (stamp, data))
+      (fun (stamp, data) -> {stamp; data})
+      (tup2 encoding arg_encoding)
+  let stamp ?time data =
+    let stamp = match time with
+      | None -> now ()
+      | Some t -> t in
+    { data ; stamp }
+  let recent a1 a2 =
+    match a1, a2 with
+    | (None, None) -> None
+    | (None, (Some _ as a))
+    | (Some _ as a, None) -> a
+    | (Some (_, t1), Some (_, t2)) ->
+        if Ptime.compare t1 t2 < 0 then a2 else a1
+
+  let hash t = Int64.to_int (to_seconds t)
+  include Compare.Make (Ptime)
+  module Set = Set.Make (Ptime)
+  module Map = Map.Make (Ptime)
+  module Table = Hashtbl.Make (struct include Ptime let hash = hash end)
+
+end

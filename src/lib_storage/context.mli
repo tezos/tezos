@@ -49,7 +49,7 @@ val compute_testchain_genesis:
 val commit_genesis:
   index ->
   chain_id:Chain_id.t ->
-  time:Time.t ->
+  time:Time.Protocol.t ->
   protocol:Protocol_hash.t ->
   Context_hash.t Lwt.t
 
@@ -57,7 +57,6 @@ val commit_test_chain_genesis:
   context ->
   Block_header.t ->
   Block_header.t Lwt.t
-
 
 (** {2 Generic interface} *)
 
@@ -84,10 +83,10 @@ val fold:
 val exists: index -> Context_hash.t -> bool Lwt.t
 val checkout: index -> Context_hash.t -> context option Lwt.t
 val checkout_exn: index -> Context_hash.t -> context Lwt.t
-val hash:   time:Time.t ->
+val hash:   time:Time.Protocol.t ->
   ?message:string -> t -> Context_hash.t Lwt.t
 val commit:
-  time:Time.t ->
+  time:Time.Protocol.t ->
   ?message:string ->
   context ->
   Context_hash.t Lwt.t
@@ -106,6 +105,6 @@ val set_test_chain: context -> Test_chain_status.t -> context Lwt.t
 val del_test_chain: context -> context Lwt.t
 
 val fork_test_chain:
-  context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
+  context -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> context Lwt.t
 val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
 

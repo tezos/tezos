@@ -77,10 +77,10 @@ and shell = {
 }
 
 let default_p2p_limits : P2p.limits = {
-  connection_timeout = 10. ;
-  authentication_timeout = 5. ;
-  greylist_timeout = 86400 ; (* one day *)
-  maintenance_idle_time = 120. ; (* two minutes *)
+  connection_timeout = Time.System.Span.of_seconds_exn 10. ;
+  authentication_timeout = Time.System.Span.of_seconds_exn 5. ;
+  greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *) ;
+  maintenance_idle_time = Time.System.Span.of_seconds_exn 120. (* two minutes *) ;
   min_connections = 10 ;
   expected_connections = 50 ;
   max_connections = 100 ;
@@ -98,7 +98,7 @@ let default_p2p_limits : P2p.limits = {
   known_peer_ids_history_size = 500 ;
   max_known_points = Some (400, 300) ;
   max_known_peer_ids = Some (400, 300) ;
-  swap_linger = 30. ;
+  swap_linger = Time.System.Span.of_seconds_exn 30. ;
   binary_chunks_size = None ;
 }
 
@@ -189,11 +189,11 @@ let limit : P2p.limits Data_encoding.t =
              (dft "connection-timeout"
                 ~description: "Delay acceptable when initiating a \
                                connection to a new peer, in seconds."
-                float default_p2p_limits.authentication_timeout)
+                Time.System.Span.encoding default_p2p_limits.authentication_timeout)
              (dft "authentication-timeout"
                 ~description: "Delay granted to a peer to perform authentication, \
                                in seconds."
-                float default_p2p_limits.authentication_timeout)
+                Time.System.Span.encoding default_p2p_limits.authentication_timeout)
              (dft "min-connections"
                 ~description: "Strict minimum number of connections (triggers an \
                                urgent maintenance)."
@@ -225,7 +225,7 @@ let limit : P2p.limits Data_encoding.t =
              (opt "max-upload-speed"
                 ~description: "Max upload speeds in KiB/s."
                 int31)
-             (dft "swap-linger" float default_p2p_limits.swap_linger))
+             (dft "swap-linger" Time.System.Span.encoding default_p2p_limits.swap_linger))
           (obj10
              (opt "binary-chunks-size" uint8)
              (dft "read-buffer-size"
@@ -247,11 +247,11 @@ let limit : P2p.limits Data_encoding.t =
           (opt "max_known_peer_ids" (tup2 uint16 uint16))
           (dft "greylist-timeout"
              ~description: "GC delay for the greylists tables, in seconds."
-             int31 default_p2p_limits.greylist_timeout)
+             Time.System.Span.encoding default_p2p_limits.greylist_timeout)
           (dft "maintenance-idle-time"
              ~description: "How long to wait at most, in seconds, \
                             before running a maintenance loop."
-             float default_p2p_limits.maintenance_idle_time)
+             Time.System.Span.encoding default_p2p_limits.maintenance_idle_time)
        )
     )
 

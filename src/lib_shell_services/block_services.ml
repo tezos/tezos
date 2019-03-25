@@ -572,7 +572,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                   method timestamp = timestamp
                 end)
           |+ flag "sort" (fun t -> t#sort_operations)
-          |+ opt_field "timestamp" Time.rpc_arg (fun t -> t#timestamp)
+          |+ opt_field "timestamp" Time.Protocol.rpc_arg (fun t -> t#timestamp)
           |> seal
 
         let block =

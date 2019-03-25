@@ -37,8 +37,8 @@ type block_error =
         originating_block: Block_hash.t }
   | Expired_chain of
       { chain_id: Chain_id.t ;
-        expiration: Time.t ;
-        timestamp: Time.t ;
+        expiration: Time.Protocol.t ;
+        timestamp: Time.Protocol.t ;
       }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of { pass: int; found: int; max: int }
@@ -219,8 +219,8 @@ let block_error_encoding =
         (obj4
            (req "error" (constant "expired_chain"))
            (req "chain_id" Chain_id.encoding)
-           (req "expiration" Time.encoding)
-           (req "timestamp" Time.encoding))
+           (req "expiration" Time.Protocol.encoding)
+           (req "timestamp" Time.Protocol.encoding))
         (function
           | Expired_chain { chain_id ; expiration ; timestamp } ->
               Some ((), chain_id, expiration, timestamp)
@@ -330,8 +330,8 @@ let pp_block_error ppf = function
       Format.fprintf ppf
         "The block timestamp (%a) is later than \
          its chain expiration date: %a (chain: %a)."
-        Time.pp_hum timestamp
-        Time.pp_hum expiration
+        Time.System.pp_hum (Time.System.of_protocol_exn timestamp)
+        Time.System.pp_hum (Time.System.of_protocol_exn expiration)
         Chain_id.pp_short chain_id
   | Unexpected_number_of_validation_passes n ->
       Format.fprintf ppf

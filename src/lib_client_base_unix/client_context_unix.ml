@@ -119,10 +119,7 @@ class unix_prompter = object
 end
 
 class unix_logger ~base_dir =
-  let startup =
-    CalendarLib.Printer.Precise_Calendar.sprint
-      "%Y-%m-%dT%H:%M:%SZ"
-      (CalendarLib.Calendar.Precise.now ()) in
+  let startup = Format.asprintf "%a" Time.System.pp_hum (Time.System.now ()) in
   let log channel msg = match channel with
     | "stdout" ->
         print_endline msg ;

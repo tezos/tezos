@@ -73,10 +73,10 @@ type config = {
 
 type limits = {
 
-  connection_timeout : float ;
-  authentication_timeout : float ;
-  greylist_timeout : int ;
-  maintenance_idle_time : float ;
+  connection_timeout : Ptime.Span.t ;
+  authentication_timeout : Ptime.Span.t ;
+  greylist_timeout : Ptime.Span.t ;
+  maintenance_idle_time : Ptime.Span.t ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -100,7 +100,7 @@ type limits = {
   max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
 
-  swap_linger : float ;
+  swap_linger : Ptime.Span.t ;
 
   binary_chunks_size : int option ;
 }
@@ -419,13 +419,15 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 let check_limits =
   let fail_1 v orig =
-    if not (v <= 0.) then return_unit
+    if not (Ptime.Span.compare v Ptime.Span.zero <= 0) then
+      return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative or null@."
         orig
   in
   let fail_2 v orig =
-    if not (v < 0) then return_unit
+    if not (v < 0) then
+      return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative@." orig
   in

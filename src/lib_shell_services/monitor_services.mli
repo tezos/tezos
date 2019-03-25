@@ -29,11 +29,11 @@ type chain_status =
   | Active_main of Chain_id.t
   | Active_test of { chain : Chain_id.t ;
                      protocol : Protocol_hash.t ;
-                     expiration_date : Time.t }
+                     expiration_date : Time.Protocol.t }
   | Stopping of Chain_id.t
 
 val bootstrapped:
-  #streamed -> ((Block_hash.t * Time.t) Lwt_stream.t * stopper) tzresult Lwt.t
+  #streamed -> ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * stopper) tzresult Lwt.t
 
 val valid_blocks:
   #streamed ->
@@ -63,7 +63,7 @@ module S : sig
   val bootstrapped:
     ([ `GET ], unit,
      unit, unit, unit,
-     Block_hash.t * Time.t) RPC_service.t
+     Block_hash.t * Time.Protocol.t) RPC_service.t
 
   val valid_blocks:
     ([ `GET ], unit,

@@ -44,7 +44,11 @@ let timeout_query =
   query (fun timeout -> object
           method timeout = timeout
         end)
-  |+ field "timeout" RPC_arg.float 10. (fun t -> t#timeout)
+  |+ field
+    "timeout"
+    Time.System.Span.rpc_arg
+    (Time.System.Span.of_seconds_exn 10.)
+    (fun t -> t#timeout)
   |> seal
 
 module S = struct

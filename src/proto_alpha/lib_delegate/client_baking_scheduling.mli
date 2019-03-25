@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 
-val sleep_until: Time.t -> unit Lwt.t option
+val sleep_until: Time.Protocol.t -> unit Lwt.t option
 
 val wait_for_first_event:
   name:string ->

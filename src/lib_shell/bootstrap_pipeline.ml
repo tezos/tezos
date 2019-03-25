@@ -26,8 +26,13 @@
 include Internal_event.Legacy_logging.Make_semantic
     (struct let name = "node.validator.bootstrap_pipeline" end)
 
-let node_time_tag = Tag.def ~doc:"local time at this node" "node_time" Time.pp_hum
-let block_time_tag = Tag.def ~doc:"claimed creation time of block" "block_time" Time.pp_hum
+let node_time_tag =
+  Tag.def ~doc:"local time at this node" "node_time" Time.System.pp_hum
+let block_time_tag =
+  Tag.def
+    ~doc:"claimed creation time of block"
+    "block_time"
+    (fun fmt prot_time -> Time.System.(pp_hum fmt (of_protocol_exn prot_time)))
 
 open Validation_errors
 
@@ -56,9 +61,12 @@ let operations_index_tag = Tag.def ~doc:"Operations index" "operations_index" Fo
 let assert_acceptable_header pipeline
     hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
-  let time_now = Time.now () in
+  let time_now = Time.System.now () in
   fail_unless
-    (Time.(add time_now 15L >= header.shell.timestamp))
+    (Time.Protocol.compare
+       (Time.Protocol.add Time.System.(to_protocol (now ())) 15L)
+       header.shell.timestamp
+     >= 0)
     (Future_block_header { block = hash; time = time_now;
                            block_time = header.shell.timestamp }) >>=? fun () ->
   State.Chain.checkpoint chain_state >>= fun (checkpoint_level, checkpoint) ->

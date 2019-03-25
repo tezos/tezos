@@ -37,7 +37,7 @@ let genesis_protocol =
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let genesis_time =
-  Time.of_seconds 0L
+  Time.Protocol.of_seconds 0L
 
 module Proto = (val Registered_protocol.get_exn genesis_protocol)
 
@@ -71,7 +71,7 @@ let incr_fitness fitness =
   [ new_fitness ]
 
 let incr_timestamp timestamp =
-  Time.add timestamp (Int64.add 1L (Random.int64 10L))
+  Time.Protocol.add timestamp (Int64.add 1L (Random.int64 10L))
 
 let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.Block.t) name
   : Block_header.t =
@@ -120,7 +120,7 @@ let build_valid_chain state vtbl pred names =
              Proto.finalize_block vstate
            end >>=? fun (result, _metadata) ->
            Context.commit
-             ~time:(Time.now ())
+             ~time:Time.System.(to_protocol (now ()))
              ?message:result.message
              result.context >>= fun context_hash ->
            let validation_store =
@@ -378,8 +378,8 @@ let test_reach_checkpoint s =
   let checkpoint = level, block_hash in
   State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
   State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
-  let time_now = Time.now () in
-  if Time.(add time_now 15L >= header.shell.timestamp)
+  let time_now = Time.System.(to_protocol (now ())) in
+  if Time.Protocol.compare (Time.Protocol.add time_now 15L) header.shell.timestamp >= 0
   then
     if Int32.equal header.shell.level c_level &&
        not (Block_hash.equal c_block block_hash)

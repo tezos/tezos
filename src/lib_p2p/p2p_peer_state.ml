@@ -46,14 +46,14 @@ module Info = struct
 
   type ('conn, 'peer_meta, 'conn_meta) t = {
     peer_id : Id.t ;
-    created : Time.t ;
+    created : Time.System.t ;
     mutable state : ('conn, 'conn_meta) state ;
     mutable peer_metadata : 'peer_meta ;
     mutable trusted : bool ;
-    mutable last_failed_connection : (P2p_connection.Id.t * Time.t) option ;
-    mutable last_rejected_connection : (P2p_connection.Id.t * Time.t) option ;
-    mutable last_established_connection : (P2p_connection.Id.t * Time.t) option ;
-    mutable last_disconnection : (P2p_connection.Id.t * Time.t) option ;
+    mutable last_failed_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    mutable last_rejected_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    mutable last_established_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    mutable last_disconnection : (P2p_connection.Id.t * Time.System.t) option ;
     events : Pool_event.t Ring.t ;
     watchers : Pool_event.t Lwt_watcher.input ;
   }
@@ -63,7 +63,7 @@ module Info = struct
 
   let log_size = 100
 
-  let create ?(created = Time.now ()) ?(trusted = false) ~peer_metadata peer_id =
+  let create ?(created = Time.System.now ()) ?(trusted = false) ~peer_metadata peer_id =
     { peer_id ;
       created ;
       state = Disconnected ;
@@ -103,18 +103,18 @@ module Info = struct
         })
       (obj9
          (req "peer_id" Id.encoding)
-         (req "created" Time.encoding)
+         (req "created" Time.System.encoding)
          (dft "trusted" bool false)
          (req "peer_metadata" peer_metadata_encoding)
          (dft "events" (list Pool_event.encoding) [])
          (opt "last_failed_connection"
-            (tup2 P2p_connection.Id.encoding Time.encoding))
+            (tup2 P2p_connection.Id.encoding Time.System.encoding))
          (opt "last_rejected_connection"
-            (tup2 P2p_connection.Id.encoding Time.encoding))
+            (tup2 P2p_connection.Id.encoding Time.System.encoding))
          (opt "last_established_connection"
-            (tup2 P2p_connection.Id.encoding Time.encoding))
+            (tup2 P2p_connection.Id.encoding Time.System.encoding))
          (opt "last_disconnection"
-            (tup2 P2p_connection.Id.encoding Time.encoding)))
+            (tup2 P2p_connection.Id.encoding Time.System.encoding)))
 
   let peer_id { peer_id ; _ } = peer_id
   let created { created ; _ } = created
@@ -129,15 +129,15 @@ module Info = struct
   let last_rejected_connection s = s.last_rejected_connection
 
   let last_seen s =
-    Time.recent
+    Time.System.recent
       s.last_established_connection
-      (Time.recent s.last_rejected_connection s.last_disconnection)
+      (Time.System.recent s.last_rejected_connection s.last_disconnection)
   let last_miss s =
-    Time.recent
+    Time.System.recent
       s.last_failed_connection
-      (Time.recent s.last_rejected_connection s.last_disconnection)
+      (Time.System.recent s.last_rejected_connection s.last_disconnection)
 
-  let log { events ; watchers ; _ } ?(timestamp = Time.now ()) point kind =
+  let log { events ; watchers ; _ } ?(timestamp = Time.System.now ()) point kind =
     let event = { Pool_event.kind ; timestamp ; point } in
     Ring.add events event ;
     Lwt_watcher.notify watchers event
@@ -176,7 +176,7 @@ let is_disconnected { Info.state ; _ } =
   | Accepted _ | Running _ -> false
 
 let set_accepted
-    ?(timestamp = Time.now ())
+    ?(timestamp = Time.System.now ())
     peer_info current_point cancel =
   assert begin
     match peer_info.Info.state with
@@ -187,7 +187,7 @@ let set_accepted
   Info.log peer_info ~timestamp current_point Accepting_request
 
 let set_running
-    ?(timestamp = Time.now ())
+    ?(timestamp = Time.System.now ())
     peer_info point data conn_metadata =
   assert begin
     match peer_info.Info.state with
@@ -201,7 +201,7 @@ let set_running
   Info.log peer_info ~timestamp point Connection_established
 
 let set_disconnected
-    ?(timestamp = Time.now ()) ?(requested = false) peer_info =
+    ?(timestamp = Time.System.now ()) ?(requested = false) peer_info =
   let current_point, (event : Pool_event.kind) =
     match peer_info.Info.state with
     | Accepted { current_point ; _ } ->

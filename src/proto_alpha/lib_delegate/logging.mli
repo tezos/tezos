@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val timestamp_tag : Time.t Tag.def
+val timestamp_tag : Time.System.t Tag.def
 val valid_ops : int Tag.def
 val op_count : int Tag.def
 val refused_ops : int Tag.def
@@ -31,7 +31,7 @@ val bake_priority_tag : int Tag.def
 val fitness_tag : Fitness.t Tag.def
 val current_slots_tag : int Tag.def
 val future_slots_tag : int Tag.def
-val timespan_tag : int64 Tag.def
+val timespan_tag : Time.System.Span.t Tag.def
 val filename_tag : string Tag.def
 
 val signed_header_tag : MBytes.t Tag.def

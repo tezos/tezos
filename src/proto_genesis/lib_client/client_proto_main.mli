@@ -27,7 +27,7 @@ open Proto_genesis
 
 val bake:
   #Client_context.full ->
-  ?timestamp: Time.t ->
+  ?timestamp: Time.Protocol.t ->
   Shell_services.block ->
   Data.Command.t ->
   Client_keys.sk_uri ->

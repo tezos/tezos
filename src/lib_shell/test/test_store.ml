@@ -39,8 +39,7 @@ let genesis_protocol =
   Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
-let genesis_time =
-  Time.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 (** *)
 
@@ -94,7 +93,7 @@ let lolblock ?(operations = []) header =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
   ( { Block_header.shell =
-        { timestamp = Time.of_seconds (Random.int64 1500L) ;
+        { timestamp = Time.Protocol.of_seconds (Random.int64 1500L) ;
           level = 0l ; (* dummy *)
           proto_level = 0 ; (* dummy *)
           validation_passes = Random.int 32 ;

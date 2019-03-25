@@ -29,7 +29,10 @@ let protocol =
   Protocol_hash.of_b58check_exn
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
-let bake cctxt ?(timestamp = Time.now ()) block command sk =
+let bake cctxt ?timestamp block command sk =
+  let timestamp = match timestamp with
+    | Some t -> t
+    | None -> Time.System.(to_protocol (now ())) in
   let protocol_data = { command ; signature = Signature.zero } in
   Genesis_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~protocol_data
@@ -69,7 +72,7 @@ let timestamp_arg =
     ~placeholder:"date"
     ~doc:"Set the timestamp of the block (and initial time of the chain)"
     (Clic.parameter (fun _ t ->
-         match (Time.of_notation t) with
+         match (Time.System.of_notation_opt t) with
          | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
          | Some t -> return t))
 
@@ -86,8 +89,20 @@ let test_delay_arg =
 
 let commands () =
   let open Clic in
-  [ command ~desc: "Activate a protocol"
-      (args1 timestamp_arg)
+  let args =
+    args1
+      (arg
+         ~long:"timestamp"
+         ~placeholder:"date"
+         ~doc:"Set the timestamp of the block (and initial time of the chain)"
+         (parameter (fun _ t ->
+              match (Time.Protocol.of_notation t) with
+              | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
+              | Some t -> return t))) in
+  [
+
+    command ~desc: "Activate a protocol"
+      args
       (prefixes [ "activate" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "fitness" ]
@@ -133,6 +148,7 @@ let commands () =
         let fitness = fitness_from_int64 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file >>=? fun json ->
         let protocol_parameters = Data_encoding.Binary.to_bytes_exn Data_encoding.json json in
+        let timestamp = Option.map ~f:Time.System.to_protocol timestamp in
         bake cctxt ?timestamp cctxt#block
           (Activate_testchain { protocol = hash ;
                                 fitness ;

@@ -83,7 +83,7 @@ let debug w =
 let check_chain_liveness chain_db hash (header: Block_header.t) =
   let chain_state = Distributed_db.chain_state chain_db in
   match State.Chain.expiration chain_state with
-  | Some eol when Time.(eol <= header.shell.timestamp) ->
+  | Some eol when Time.Protocol.(eol <= header.shell.timestamp) ->
       fail @@ invalid_block hash @@
       Expired_chain { chain_id = State.Chain.id chain_state ;
                       expiration = eol ;

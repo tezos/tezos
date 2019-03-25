@@ -28,7 +28,9 @@
 type error += Parse_error
 type error += Too_many_operations
 type error += Oversized_operation of { size: int ; max: int }
-type error += Future_block_header of { block: Block_hash.t ; block_time : Time.t ; time : Time.t }
+type error += Future_block_header of { block: Block_hash.t ;
+                                       block_time : Time.Protocol.t ;
+                                       time : Time.System.t }
 
 let () =
   (* Parse error *)
@@ -75,11 +77,13 @@ let () =
     ~description:"The block was annotated with a time too far in the future."
     ~pp:(fun ppf (block, block_time, time) ->
         Format.fprintf ppf "Future block header (block: %a, block_time: %a, time: %a)"
-          Block_hash.pp block Time.pp_hum block_time Time.pp_hum time)
+          Block_hash.pp block
+          Time.System.pp_hum (Time.System.of_protocol_exn block_time)
+          Time.System.pp_hum time)
     Data_encoding.(obj3
                      (req "block" Block_hash.encoding)
-                     (req "block_time" Time.encoding)
-                     (req "time" Time.encoding))
+                     (req "block_time" Time.Protocol.encoding)
+                     (req "time" Time.System.encoding))
     (function Future_block_header { block ; block_time ; time } -> Some (block, block_time, time) | _ -> None)
     (fun (block, block_time, time) -> Future_block_header { block ; block_time ; time })
 

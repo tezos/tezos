@@ -44,7 +44,7 @@ type hashed_header = {
 }
 
 type genesis = {
-  time: Time.t ;
+  time: Time.Protocol.t ;
   block: Block_hash.t ;
   protocol: Protocol_hash.t ;
 }
@@ -70,7 +70,7 @@ and chain_state = {
   chain_id: Chain_id.t ;
   genesis: genesis ;
   faked_genesis_hash: Block_hash.t ;
-  expiration: Time.t option ;
+  expiration: Time.Protocol.t option ;
   allow_forked_chain: bool ;
   block_store: Store.Block.store Shared.t ;
   context_index: Context.index Shared.t ;
@@ -364,7 +364,7 @@ let cut_alternate_heads block_store chain_store heads =
 module Chain = struct
 
   type nonrec genesis = genesis = {
-    time: Time.t ;
+    time: Time.Protocol.t ;
     block: Block_hash.t ;
     protocol: Protocol_hash.t ;
   }
@@ -374,7 +374,7 @@ module Chain = struct
       (fun { time ; block ; protocol } -> (time, block, protocol))
       (fun (time, block, protocol) -> { time ; block ; protocol })
       (obj3
-         (req "timestamp" Time.encoding)
+         (req "timestamp" Time.Protocol.encoding)
          (req "block" Block_hash.encoding)
          (req "protocol" Protocol_hash.encoding))
 
@@ -1132,7 +1132,8 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
     Store.Block.Header.store (block_store, genesis_hash) genesis_header >>= fun () ->
     Store.Block.Contents.store (block_store, genesis_hash)
       { Store.Block.message = Some "Genesis" ;
-        max_operations_ttl = 0 ; context = genesis_header.shell.context ;
+        max_operations_ttl = 0 ;
+        context = genesis_header.shell.context ;
         metadata = MBytes.create 0 ;
         last_allowed_fork_level = 0l ;
       } >>= fun () ->

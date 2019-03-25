@@ -23,46 +23,80 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
-include Compare.S with type t := t
+module Protocol : sig
 
-val hash : t -> int
+  (* The out-of-protocol view of in-protocol timestamps. The precision of
+     in-protocol timestamps are only precise to the second.
 
-val min_value : t
-val epoch : t
-val max_value : t
+     Note that the out-of-protocol view does not necessarily match the
+     in-protocol representation.  *)
 
-val add : t -> int64 -> t
-val diff : t -> t -> int64
+  type t
+  val epoch : t
+  include Compare.S with type t := t
 
-val of_seconds : int64 -> t
-val to_seconds : t -> int64
+  val add: t -> int64 -> t
+  val diff: t -> t -> int64
 
-val of_notation : string -> t option
-val of_notation_exn : string -> t
-val to_notation : t -> string
+  val of_notation : string -> t option
+  val of_notation_exn : string -> t
+  val to_notation : t -> string
 
-val now : unit -> t
+  val of_seconds : int64 -> t
+  val to_seconds : t -> int64
 
-val encoding : t Data_encoding.t
-val rfc_encoding : t Data_encoding.t
+  val encoding : t Data_encoding.t
+  val rfc_encoding : t Data_encoding.t
+  val rpc_arg : t RPC_arg.t
 
-val rpc_arg : t RPC_arg.t
+  val pp_hum : Format.formatter -> t -> unit
 
-val pp_hum : Format.formatter -> t -> unit
+end
 
-type 'a timed_data = {
-  data: 'a ;
-  time: t ;
-}
+module System : sig
 
-val make_timed : 'a -> 'a timed_data
+  type t = Ptime.t
+  val now : unit -> t
 
-val timed_encoding : 'a Data_encoding.t -> 'a timed_data Data_encoding.t
+  module Span : sig
+    type t = Ptime.Span.t
+    val sleep : t -> unit Lwt.t
+    val multiply_exn : float -> t -> t
+    val of_seconds_exn : float -> t
+    val rpc_arg : t RPC_arg.t
+    val encoding : t Data_encoding.t
+  end
 
-module Set : Set.S with type elt = t
-module Map : Map.S with type key = t
-module Table : Hashtbl.S with type key = t
+  val of_protocol_opt: Protocol.t -> t option
+  val of_protocol_exn: Protocol.t -> t
+  val to_protocol: t -> Protocol.t (* Truncating *)
 
-val recent :
-  ('a * t) option -> ('a * t) option -> ('a * t) option
+  val of_seconds_opt: int64 -> t option
+  val of_seconds_exn: int64 -> t
+  val to_seconds: t -> int64 (* Truncating *)
+
+  val of_notation_opt : string -> t option
+  val of_notation_exn : string -> t
+  val to_notation : t -> string
+
+  val encoding : t Data_encoding.t
+  val rfc_encoding : t Data_encoding.t
+  val rpc_arg : t RPC_arg.t
+  val pp_hum : Format.formatter -> t -> unit
+
+  type 'a stamped = {
+    data: 'a ;
+    stamp: t ;
+  }
+  val stamped_encoding : 'a Data_encoding.t -> 'a stamped Data_encoding.t
+  val stamp : ?time:t -> 'a -> 'a stamped
+  val recent : ('a * t) option -> ('a * t) option -> ('a * t) option
+
+  val hash: t -> int
+  include Compare.S with type t := t
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+  module Table : Hashtbl.S with type key = t
+
+end
+

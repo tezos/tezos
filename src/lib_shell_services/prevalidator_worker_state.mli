@@ -48,7 +48,7 @@ end
 module Worker_state : sig
   type view =
     { head : Block_hash.t ;
-      timestamp : Time.t ;
+      timestamp : Time.System.t ;
       fetching : Operation_hash.Set.t ;
       pending : Operation_hash.Set.t ;
       applied : Operation_hash.t list ;

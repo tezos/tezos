@@ -147,21 +147,21 @@ module Event = struct
           "@[<v 0>%a@,\
            Pushed: %a, Treated: %a, Completed: %a@]"
           Request.pp view
-          Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
     | Request (view, { pushed ; treated ; completed }, Some errors)  ->
         Format.fprintf ppf
           "@[<v 0>%a@,\
            Pushed: %a, Treated: %a, Failed: %a@,\
            %a@]"
           Request.pp view
-          Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
           (Format.pp_print_list Error_monad.pp) errors
 end
 
 module Worker_state = struct
   type view =
     { head : Block_hash.t ;
-      timestamp : Time.t ;
+      timestamp : Time.System.t ;
       fetching : Operation_hash.Set.t ;
       pending : Operation_hash.Set.t ;
       applied : Operation_hash.t list ;
@@ -176,7 +176,7 @@ module Worker_state = struct
          { head ; timestamp ; fetching ; pending ; applied ; delayed })
       (obj6
          (req "head" Block_hash.encoding)
-         (req "timestamp" Time.encoding)
+         (req "timestamp" Time.System.encoding)
          (req "fetching" Operation_hash.Set.encoding)
          (req "pending" Operation_hash.Set.encoding)
          (req "applied" (list Operation_hash.encoding))
@@ -193,7 +193,7 @@ module Worker_state = struct
        @[<v 2>Delayed: %a@]@]"
       Block_hash.pp
       view.head
-      Time.pp_hum
+      Time.System.pp_hum
       view.timestamp
       (Format.pp_print_list Operation_hash.pp)
       (Operation_hash.Set.elements view.fetching)

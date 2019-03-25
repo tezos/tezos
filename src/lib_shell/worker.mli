@@ -237,7 +237,7 @@ module type T = sig
     type 'a t
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
-    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests : 'a t -> (Time.System.t * Request.view) list
     val pending_requests_length : 'a t -> int
   end
   module type BOUNDED_QUEUE = sig
@@ -286,13 +286,16 @@ module type T = sig
   (** Access the event backlog. *)
   val last_events : _ t -> (Internal_event.level * Event.t list) list
 
+  (** Introspect the message queue, gives the times requests were pushed. *)
+  val pending_requests : _ queue t -> (Time.System.t * Request.view) list
+
   (** Get the running status of a worker. *)
   val status : _ t -> Worker_types.worker_status
 
   (** Get the request being treated by a worker.
       Gives the time the request was pushed, and the time its
       treatment started. *)
-  val current_request : _ t -> (Time.t * Time.t * Request.view) option
+  val current_request : _ t -> (Time.System.t * Time.System.t * Request.view) option
 
   val information : _ t -> Worker_types.worker_information
 

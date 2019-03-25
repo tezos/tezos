@@ -486,6 +486,13 @@ module P2p_reader = struct
     Internal_event.Legacy_logging.Make_semantic
       (struct let name = "node.distributed_db.p2p_reader" end)
 
+
+  let soon () =
+    let now = Time.System.now () in
+    match Ptime.add_span now (Ptime.Span.of_int_s 15) with
+    | Some s -> s
+    | None -> invalid_arg "Distributed_db.handle_msg: end of time"
+
   let handle_msg global_db state msg =
 
     let open Message in
@@ -525,7 +532,8 @@ module P2p_reader = struct
           P2p.disconnect global_db.p2p state.conn >>= fun () ->
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit
-        end else if Time.(add (now ()) 15L < head.shell.timestamp) then begin
+        end else
+        if Time.System.(soon () < of_protocol_exn head.shell.timestamp) then begin
           Peer_metadata.incr meta Future_block ;
           lwt_log_notice Tag.DSL.(fun f ->
               f "Received future block %a from peer %a."
@@ -582,7 +590,7 @@ module P2p_reader = struct
           P2p.disconnect global_db.p2p state.conn >>= fun () ->
           P2p.greylist_peer global_db.p2p state.gid ;
           Lwt.return_unit
-        end else if Time.(add (now ()) 15L < header.shell.timestamp) then begin
+        end else if Time.System.(soon () < of_protocol_exn header.shell.timestamp) then begin
           Peer_metadata.incr meta Future_block ;
           lwt_log_notice Tag.DSL.(fun f ->
               f "Received future block %a from peer %a."

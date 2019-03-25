@@ -31,7 +31,7 @@ type block_info = {
   chain_id: Chain_id.t ;
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
-  timestamp: Time.t ;
+  timestamp: Time.Protocol.t ;
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
   proto_level: int ;

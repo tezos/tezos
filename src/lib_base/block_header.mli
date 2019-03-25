@@ -30,7 +30,7 @@ type shell_header = {
   (** Number of protocol changes since genesis modulo 256. *)
   predecessor: Block_hash.t ;
   (** Hash of the preceding block. *)
-  timestamp: Time.t ;
+  timestamp: Time.Protocol.t ;
   (** Timestamp at which the block is claimed to have been created. *)
   validation_passes: int ; (* uint8 *)
   (** Number of validation passes (also number of lists of operations). *)

@@ -30,11 +30,13 @@ include Internal_event.Legacy_logging.Make_semantic (struct
 open Logging
 
 let sleep_until time =
-  let delay = Time.diff time (Time.now ()) in
-  if delay < 0L then
+  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
+  let time = Time.System.of_protocol_exn time in
+  let delay = Ptime.diff time (Time.System.now ()) in
+  if Ptime.Span.compare delay Ptime.Span.zero < 0 then
     None
   else
-    Some (Lwt_unix.sleep (Int64.to_float delay))
+    Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
 
 let rec wait_for_first_event ~name stream =
   Lwt_stream.get stream >>= function

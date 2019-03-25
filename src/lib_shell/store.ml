@@ -55,7 +55,7 @@ module Chain = struct
     Store_helpers.Make_single_store
       (Indexed_store.Store)
       (struct let name = ["genesis" ; "time"] end)
-      (Store_helpers.Make_value(Time))
+      (Store_helpers.Make_value(Time.Protocol))
 
   module Genesis_protocol =
     Store_helpers.Make_single_store
@@ -73,7 +73,7 @@ module Chain = struct
     Store_helpers.Make_single_store
       (Indexed_store.Store)
       (struct let name = ["expiration"] end)
-      (Store_helpers.Make_value(Time))
+      (Store_helpers.Make_value(Time.Protocol))
 
   module Allow_forked_chain =
     Indexed_store.Make_set (struct let name = ["allow_forked_chain"] end)

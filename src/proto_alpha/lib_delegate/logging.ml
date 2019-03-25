@@ -26,7 +26,7 @@
 open Proto_alpha
 open Alpha_context
 
-let timestamp_tag = Tag.def ~doc:"Timestamp when event occurred" "timestamp" Time.pp_hum
+let timestamp_tag = Tag.def ~doc:"Timestamp when event occurred" "timestamp" Time.System.pp_hum
 let valid_ops = Tag.def ~doc:"Valid Operations" "valid_ops" Format.pp_print_int
 let op_count = Tag.def ~doc:"Number of operations" "op_count" Format.pp_print_int
 let refused_ops = Tag.def ~doc:"Refused Operations" "refused_ops" Format.pp_print_int
@@ -34,7 +34,7 @@ let bake_priority_tag = Tag.def ~doc:"Baking priority" "bake_priority" Format.pp
 let fitness_tag = Tag.def ~doc:"Fitness" "fitness" Fitness.pp
 let current_slots_tag = Tag.def ~doc:"Number of baking slots that can be baked at this time" "current_slots" Format.pp_print_int
 let future_slots_tag = Tag.def ~doc:"Number of baking slots in the foreseeable future but not yet bakeable" "future_slots" Format.pp_print_int
-let timespan_tag = Tag.def ~doc:"Time in seconds" "timespan" (fun fmt i -> Format.fprintf fmt "%Lds" i)
+let timespan_tag = Tag.def ~doc:"Timespan in seconds" "timespan" Ptime.Span.pp
 let filename_tag = Tag.def ~doc:"Filename" "filename" Format.pp_print_text
 
 let signed_header_tag = Tag.def ~doc:"Signed header" "signed_header" MBytes.pp_hex

@@ -108,8 +108,8 @@ let commands version () =
           cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v ; _ } ->
         begin
           if seconds
-          then cctxt#message "%Ld" (Time.to_seconds v)
-          else cctxt#message "%s" (Time.to_notation v)
+          then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
+          else cctxt#message "%s" (Time.Protocol.to_notation v)
         end >>= fun () ->
         return_unit
       end ;

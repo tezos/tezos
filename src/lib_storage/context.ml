@@ -127,7 +127,7 @@ let checkout_exn index key =
 
 let raw_commit ~time ?(message = "") context =
   let info =
-    Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message in
+    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message in
   GitStore.Commit.v
     context.index.repo ~info ~parents:context.parents context.tree
 
@@ -322,7 +322,7 @@ let tree_hash: GitStore.tree -> GitStore.Tree.hash = function
 
 let hash ~time ?(message = "") context =
   let info =
-    Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message
+    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
   in
   let parents = List.map (fun c -> GitStore.Commit.hash c) context.parents in
   let node = match tree_hash context.tree with
@@ -472,6 +472,7 @@ let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
   let branch = get_branch chain_id in
   GitStore.Branch.set ctxt.index.repo branch commit >>= fun () ->
   Lwt.return genesis_header
+
 
 let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)

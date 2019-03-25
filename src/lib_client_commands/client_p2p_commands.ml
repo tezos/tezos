@@ -81,7 +81,7 @@ let commands () =
                   P2p_point.State.pp_digram pi.state
                   P2p_point.Id.pp p
                   P2p_peer.Id.pp peer_id
-                  Time.pp_hum ts
+                  Time.System.pp_hum ts
                   (if pi.trusted then "★" else " ")
             | None ->
                 cctxt#message "  %a  %a %s"
@@ -98,7 +98,8 @@ let commands () =
        @@ addr_parameter
        @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
-         P2p_services.connect cctxt ~timeout:10. (address, port) >>=? fun () ->
+         let timeout = Time.System.Span.of_seconds_exn 10. in
+         P2p_services.connect cctxt ~timeout (address, port) >>=? fun () ->
          cctxt#message "Connection to %a:%d established." P2p_addr.pp address port >>= fun () ->
          return_unit
       ) ;

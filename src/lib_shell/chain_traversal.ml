@@ -43,7 +43,7 @@ let common_ancestor (b1: Block.t) (b2: Block.t) =
   let rec loop (b1: Block.t) (b2: Block.t) =
     if Block.equal b1 b2 then
       Lwt.return b1
-    else if Time.(Block.timestamp b1 <= Block.timestamp b2) then
+    else if Time.Protocol.(Block.timestamp b1 <= Block.timestamp b2) then
       Block.predecessor b2 >>= function
       | None -> assert false
       | Some b2 -> loop b1 b2
@@ -58,7 +58,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
   let compare b1 b2 =
     match Fitness.compare (Block.fitness b1) (Block.fitness b2) with
     | 0 -> begin
-        match Time.compare (Block.timestamp b1) (Block.timestamp b2) with
+        match Time.Protocol.compare (Block.timestamp b1) (Block.timestamp b2) with
         | 0 -> Block.compare b1 b2
         | res -> res
       end
@@ -100,7 +100,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
     match min_date with
     | None -> (fun _ -> true)
     | Some min_date ->
-        (fun b -> Time.(min_date <= Block.timestamp b)) in
+        (fun b -> Time.Protocol.(min_date <= Block.timestamp b)) in
   let rec loop () =
     match pop () with
     | None -> Lwt.return_unit

@@ -63,7 +63,7 @@ val forge_block:
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
-  ?timestamp:Time.t ->
+  ?timestamp:Time.Protocol.t ->
   ?mempool:string ->
   ?context_path:string ->
   ?seed_nonce_hash:Nonce_hash.t ->

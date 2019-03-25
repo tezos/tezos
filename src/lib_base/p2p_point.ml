@@ -233,14 +233,14 @@ module Info = struct
 
   type t = {
     trusted : bool ;
-    greylisted_until : Time.t ;
+    greylisted_until : Time.System.t ;
     state : State.t ;
-    last_failed_connection : Time.t option ;
-    last_rejected_connection : (P2p_peer_id.t * Time.t) option ;
-    last_established_connection : (P2p_peer_id.t * Time.t) option ;
-    last_disconnection : (P2p_peer_id.t * Time.t) option ;
-    last_seen : (P2p_peer_id.t * Time.t) option ;
-    last_miss : Time.t option ;
+    last_failed_connection : Time.System.t option ;
+    last_rejected_connection : (P2p_peer_id.t * Time.System.t) option ;
+    last_established_connection : (P2p_peer_id.t * Time.System.t) option ;
+    last_disconnection : (P2p_peer_id.t * Time.System.t) option ;
+    last_seen : (P2p_peer_id.t * Time.System.t) option ;
+    last_miss : Time.System.t option ;
   }
 
   let encoding =
@@ -266,15 +266,15 @@ module Info = struct
           last_seen ; last_miss })
       (obj10
          (req "trusted" bool)
-         (dft "greylisted_until" Time.encoding Time.epoch)
+         (dft "greylisted_until" Time.System.encoding Ptime.epoch)
          (req "state" State.encoding)
          (opt "p2p_peer_id" P2p_peer_id.encoding)
-         (opt "last_failed_connection" Time.encoding)
-         (opt "last_rejected_connection" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_established_connection" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_disconnection" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_seen" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_miss" Time.encoding))
+         (opt "last_failed_connection" Time.System.encoding)
+         (opt "last_rejected_connection" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_established_connection" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_disconnection" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_seen" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_miss" Time.System.encoding))
 
 end
 
@@ -339,17 +339,7 @@ module Pool_event = struct
         (fun p2p_peer_id -> External_disconnection p2p_peer_id) ;
     ]
 
-  type t = {
-    kind : kind ;
-    timestamp : Time.t ;
-  }
+  type t = kind Time.System.stamped
+  let encoding = Time.System.stamped_encoding kind_encoding
 
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun { kind ; timestamp ; } -> (kind, timestamp))
-      (fun (kind, timestamp) -> { kind ; timestamp ; })
-      (obj2
-         (req "kind" kind_encoding)
-         (req "timestamp" Time.encoding))
 end

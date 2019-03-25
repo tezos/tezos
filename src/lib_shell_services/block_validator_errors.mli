@@ -37,8 +37,8 @@ type block_error =
         originating_block: Block_hash.t }
   | Expired_chain of
       { chain_id: Chain_id.t ;
-        expiration: Time.t ;
-        timestamp: Time.t ;
+        expiration: Time.Protocol.t ;
+        timestamp: Time.Protocol.t ;
       }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of { pass: int; found: int; max: int }

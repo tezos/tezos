@@ -38,7 +38,7 @@ let update_testchain_status ctxt predecessor_header timestamp =
   Context.get_test_chain ctxt >>= function
   | Not_running -> return ctxt
   | Running { expiration ; _ } ->
-      if Time.(expiration <= timestamp) then
+      if Time.Protocol.(expiration <= timestamp) then
         Context.set_test_chain ctxt Not_running >>= fun ctxt ->
         return ctxt
       else
@@ -94,7 +94,7 @@ module Make(Proto : Registered_protocol.T) = struct
        Invalid_level { expected = Int32.succ predecessor_block_header.shell.level ;
                        found = block_header.shell.level }) >>=? fun () ->
     fail_unless
-      Time.(predecessor_block_header.shell.timestamp < block_header.shell.timestamp)
+      Time.Protocol.(predecessor_block_header.shell.timestamp < block_header.shell.timestamp)
       (invalid_block hash Non_increasing_timestamp) >>=? fun () ->
     fail_unless
       Fitness.(predecessor_block_header.shell.fitness < block_header.shell.fitness)

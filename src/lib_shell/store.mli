@@ -50,7 +50,7 @@ module Chain : sig
 
   module Genesis_time : SINGLE_STORE
     with type t := store
-     and type value := Time.t
+     and type value := Time.Protocol.t
 
   module Genesis_protocol : SINGLE_STORE
     with type t := store
@@ -62,7 +62,7 @@ module Chain : sig
 
   module Expiration : SINGLE_STORE
     with type t := store
-     and type value := Time.t
+     and type value := Time.Protocol.t
 
   module Allow_forked_chain : SET_STORE
     with type t := t

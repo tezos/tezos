@@ -97,12 +97,12 @@ module Info = struct
     state : State.t ;
     id_point : P2p_connection.Id.t option ;
     stat : P2p_stat.t ;
-    last_failed_connection : (P2p_connection.Id.t * Time.t) option ;
-    last_rejected_connection : (P2p_connection.Id.t * Time.t) option ;
-    last_established_connection : (P2p_connection.Id.t * Time.t) option ;
-    last_disconnection : (P2p_connection.Id.t * Time.t) option ;
-    last_seen : (P2p_connection.Id.t * Time.t) option ;
-    last_miss : (P2p_connection.Id.t * Time.t) option ;
+    last_failed_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_rejected_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_established_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_disconnection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_seen : (P2p_connection.Id.t * Time.System.t) option ;
+    last_miss : (P2p_connection.Id.t * Time.System.t) option ;
   }
 
   let encoding peer_metadata_encoding conn_metadata_encoding =
@@ -139,12 +139,12 @@ module Info = struct
             (opt "reachable_at" P2p_connection.Id.encoding)
             (req "stat" P2p_stat.encoding))
          (obj6
-            (opt "last_failed_connection" (tup2 P2p_connection.Id.encoding Time.encoding))
-            (opt "last_rejected_connection" (tup2 P2p_connection.Id.encoding Time.encoding))
-            (opt "last_established_connection" (tup2 P2p_connection.Id.encoding Time.encoding))
-            (opt "last_disconnection" (tup2 P2p_connection.Id.encoding Time.encoding))
-            (opt "last_seen" (tup2 P2p_connection.Id.encoding Time.encoding))
-            (opt "last_miss" (tup2 P2p_connection.Id.encoding Time.encoding))))
+            (opt "last_failed_connection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt "last_rejected_connection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt "last_established_connection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt "last_disconnection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt "last_seen" (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt "last_miss" (tup2 P2p_connection.Id.encoding Time.System.encoding))))
 
 end
 
@@ -170,7 +170,7 @@ module Pool_event = struct
 
   type t = {
     kind : kind ;
-    timestamp : Time.t ;
+    timestamp : Time.System.t ;
     point : P2p_connection.Id.t ;
   }
 
@@ -183,7 +183,7 @@ module Pool_event = struct
          { kind ; timestamp ; point = (addr, port) })
       (obj4
          (req "kind" kind_encoding)
-         (req "timestamp" Time.encoding)
+         (req "timestamp" Time.System.encoding)
          (req "addr" P2p_addr.encoding)
          (opt "port" uint16))
 

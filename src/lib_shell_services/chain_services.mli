@@ -59,7 +59,7 @@ module Blocks : sig
     ?chain:chain ->
     ?heads:Block_hash.t list ->
     ?length:int ->
-    ?min_date:Time.t ->
+    ?min_date:Time.Protocol.t ->
     unit -> Block_hash.t list list tzresult Lwt.t
 
   include (module type of Block_services.Empty)
@@ -109,7 +109,7 @@ module S : sig
       ([ `GET ], prefix,
        prefix, < heads : Block_hash.t list;
                  length : int option;
-                 min_date : Time.t option >, unit,
+                 min_date : Time.Protocol.t option >, unit,
        Block_hash.t list list) RPC_service.t
 
   end

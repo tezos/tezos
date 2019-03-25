@@ -19,7 +19,7 @@ module type CONTEXT = sig
     'a Lwt.t
   val set_protocol: t -> Protocol_hash.t -> t Lwt.t
   val fork_test_chain:
-    t -> protocol:Protocol_hash.t -> expiration:Time.t -> t Lwt.t
+    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
 end
 
 module Make (Context : CONTEXT) : sig
@@ -77,25 +77,25 @@ module Make (Context : CONTEXT) : sig
     val begin_partial_application:
       chain_id: Chain_id.t ->
       ancestor_context: context ->
-      predecessor_timestamp: Time.t ->
+      predecessor_timestamp: Time.Protocol.t ->
       predecessor_fitness: Fitness.t ->
       block_header ->
       validation_state tzresult Lwt.t
     val begin_application:
       chain_id: Chain_id.t ->
       predecessor_context: context ->
-      predecessor_timestamp: Time.t ->
+      predecessor_timestamp: Time.Protocol.t ->
       predecessor_fitness: Fitness.t ->
       block_header ->
       validation_state tzresult Lwt.t
     val begin_construction:
       chain_id: Chain_id.t ->
       predecessor_context: context ->
-      predecessor_timestamp: Time.t ->
+      predecessor_timestamp: Time.Protocol.t ->
       predecessor_level: Int32.t ->
       predecessor_fitness: Fitness.t ->
       predecessor: Block_hash.t ->
-      timestamp: Time.t ->
+      timestamp: Time.Protocol.t ->
       ?protocol_data: block_header_data ->
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
@@ -132,7 +132,7 @@ module Make (Context : CONTEXT) : sig
        and type Context.t = Context.t
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
-       and type Time.t = Time.t
+       and type Time.t = Time.Protocol.t
        and type MBytes.t = MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t

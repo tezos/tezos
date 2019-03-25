@@ -50,7 +50,7 @@ type baker_policy =
     a policy, defaults to By_priority 0. *)
 val get_next_baker:
   ?policy:baker_policy ->
-  t -> (public_key_hash * int * Time.t) tzresult Lwt.t
+  t -> (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
 module Forge : sig
 

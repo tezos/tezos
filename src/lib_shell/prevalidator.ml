@@ -44,7 +44,7 @@ module type T = sig
     chain_db : Distributed_db.chain_db ;
     limits : limits ;
     mutable predecessor : State.Block.t ;
-    mutable timestamp : Time.t ;
+    mutable timestamp : Time.System.t ;
     mutable live_blocks : Block_hash.Set.t ;
     mutable live_operations : Operation_hash.Set.t ;
     refused : Operation_hash.t Ring.t ;
@@ -107,7 +107,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     chain_db : Distributed_db.chain_db ;
     limits : limits ;
     mutable predecessor : State.Block.t ;
-    mutable timestamp : Time.t ;
+    mutable timestamp : Time.System.t ;
     mutable live_blocks : Block_hash.Set.t ; (* just a cache *)
     mutable live_operations : Operation_hash.Set.t ; (* just a cache *)
     refused : Operation_hash.t Ring.t ;
@@ -567,14 +567,15 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         ~from_block:pv.predecessor ~to_block:predecessor
         (Preapply_result.operations (validation_result pv))
       >>= fun (pending, new_live_blocks, new_live_operations) ->
-      let timestamp = Time.now () in
+      let timestamp_system = Time.System.now () in
+      let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       debug w "%d operations were not washed by the flush"
         (Operation_hash.Map.cardinal pending) ;
       pv.predecessor <- predecessor ;
       pv.live_blocks <- new_live_blocks ;
       pv.live_operations <- new_live_operations ;
-      pv.timestamp <- timestamp ;
+      pv.timestamp <- timestamp_system ;
       pv.mempool <- { known_valid = [] ; pending = Operation_hash.Set.empty };
       pv.pending <- pending ;
       pv.in_mempool <- Operation_hash.Set.empty ;
@@ -634,7 +635,8 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       Chain.data chain_state >>= fun
         { current_head = predecessor ; current_mempool = mempool ;
           live_blocks ; live_operations ; _ } ->
-      let timestamp = Time.now () in
+      let timestamp_system = Time.System.now () in
+      let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       let fetching =
         List.fold_left
@@ -642,7 +644,8 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           Operation_hash.Set.empty mempool.known_valid in
       let pv =
         { limits ; chain_db ;
-          predecessor ; timestamp ; live_blocks ; live_operations ;
+          predecessor ; timestamp = timestamp_system ;
+          live_blocks ; live_operations ;
           mempool = { known_valid = [] ; pending = Operation_hash.Set.empty };
           refused = Ring.create limits.max_refused_operations ;
           refusals = Operation_hash.Map.empty ;

@@ -68,6 +68,6 @@ val new_head_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 val running_workers: unit -> (Chain_id.t * t) list
 val status: t -> Worker_types.worker_status
 
-val pending_requests : t -> (Time.t * Chain_validator_worker_state.Request.view) list
-val current_request : t -> (Time.t * Time.t * Chain_validator_worker_state.Request.view) option
+val pending_requests : t -> (Time.System.t * Chain_validator_worker_state.Request.view) list
+val current_request : t -> (Time.System.t * Time.System.t * Chain_validator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Chain_validator_worker_state.Event.t list) list

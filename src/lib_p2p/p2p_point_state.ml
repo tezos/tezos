@@ -48,22 +48,22 @@ module Info = struct
 
   type greylisting_config = {
     factor: float ;
-    initial_delay: int ;
-    disconnection_delay: int ;
+    initial_delay: Ptime.Span.t ;
+    disconnection_delay: Ptime.Span.t ;
   }
 
   type 'data t = {
     point : Id.t ;
     mutable trusted : bool ;
     mutable state : 'data state ;
-    mutable last_failed_connection : Time.t option ;
-    mutable last_rejected_connection : (P2p_peer.Id.t * Time.t) option ;
-    mutable last_established_connection : (P2p_peer.Id.t * Time.t) option ;
+    mutable last_failed_connection : Time.System.t option ;
+    mutable last_rejected_connection : (P2p_peer.Id.t * Time.System.t) option ;
+    mutable last_established_connection : (P2p_peer.Id.t * Time.System.t) option ;
     mutable known_public : bool ;
-    mutable last_disconnection : (P2p_peer.Id.t * Time.t) option ;
+    mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option ;
     greylisting : greylisting_config ;
-    mutable greylisting_delay : float ;
-    mutable greylisting_end : Time.t ;
+    mutable greylisting_delay : Ptime.Span.t ;
+    mutable greylisting_end : Time.System.t ;
     events : Pool_event.t Ring.t ;
     watchers : Pool_event.t Lwt_watcher.input ;
   }
@@ -75,8 +75,8 @@ module Info = struct
 
   let default_greylisting_config = {
     factor = 1.2 ;
-    initial_delay = 1 ;
-    disconnection_delay = 60 ;
+    initial_delay = Ptime.Span.of_int_s 1 ;
+    disconnection_delay = Ptime.Span.of_int_s 60 ;
   }
 
   let create
@@ -92,8 +92,8 @@ module Info = struct
     known_public = false ;
     events = Ring.create log_size ;
     greylisting = greylisting_config ;
-    greylisting_delay = 1. ;
-    greylisting_end = Time.epoch ;
+    greylisting_delay = Ptime.Span.of_int_s 1 ;
+    greylisting_end = Ptime.epoch ;
     watchers = Lwt_watcher.create_input () ;
   }
 
@@ -106,26 +106,26 @@ module Info = struct
   let last_failed_connection s = s.last_failed_connection
   let last_rejected_connection s = s.last_rejected_connection
   let known_public s = s.known_public
-  let greylisted ?(now = Time.now ()) s =
-    Time.compare now s.greylisting_end <= 0
+  let greylisted ?(now = Time.System.now ()) s =
+    Time.System.compare now s.greylisting_end <= 0
   let greylisted_until s = s.greylisting_end
 
   let last_seen s =
-    Time.recent s.last_rejected_connection
-      (Time.recent s.last_established_connection s.last_disconnection)
+    Time.System.recent s.last_rejected_connection
+      (Time.System.recent s.last_established_connection s.last_disconnection)
   let last_miss s =
     match
       s.last_failed_connection,
       (Option.map ~f:(fun (_, time) -> time) @@
-       Time.recent s.last_rejected_connection s.last_disconnection) with
+       Time.System.recent s.last_rejected_connection s.last_disconnection) with
     | (None, None) -> None
     | (None, (Some _ as a))
     | (Some _ as a, None) -> a
     | (Some t1 as a1 , (Some t2 as a2)) ->
-        if Time.compare t1 t2 < 0 then a2 else a1
+        if Time.System.compare t1 t2 < 0 then a2 else a1
 
-  let log { events ; watchers ; _ } ?(timestamp = Time.now ()) kind =
-    let event = { Pool_event.kind ; timestamp } in
+  let log { events ; watchers ; _ } ?timestamp kind =
+    let event = Time.System.stamp ?time:timestamp kind in
     Ring.add events event ;
     Lwt_watcher.notify watchers event
 
@@ -157,7 +157,7 @@ let set_requested ?timestamp point_info cancel =
   Info.log point_info ?timestamp Outgoing_request
 
 let set_accepted
-    ?(timestamp = Time.now ())
+    ?(timestamp = Time.System.now ())
     point_info current_peer_id cancel =
   (* log_notice "SET_ACCEPTED %a@." P2p_point.pp point_info.point ; *)
   assert begin
@@ -169,7 +169,7 @@ let set_accepted
   Info.log point_info ~timestamp (Accepting_request current_peer_id)
 
 let set_running
-    ?(timestamp = Time.now ())
+    ?(timestamp = Time.System.now ())
     ~known_private point_info peer_id data  =
   assert begin
     match point_info.Info.state with
@@ -185,14 +185,18 @@ let set_running
 
 let set_greylisted timestamp point_info =
   point_info.Info.greylisting_end <-
-    Time.add
-      timestamp
-      (Int64.of_float point_info.Info.greylisting_delay) ;
+    Option.unopt_exn
+      (Failure "P2p_point_state.set_greylisted: overflow in time")
+      (Ptime.add_span
+         timestamp
+         point_info.Info.greylisting_delay) ;
   point_info.greylisting_delay <-
-    point_info.greylisting_delay *. point_info.greylisting.factor
+    Time.System.Span.multiply_exn
+      point_info.greylisting.factor
+      point_info.greylisting_delay
 
 let set_disconnected
-    ?(timestamp = Time.now ()) ?(requested = false) point_info =
+    ?(timestamp = Time.System.now ()) ?(requested = false) point_info =
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->
@@ -206,10 +210,12 @@ let set_disconnected
         Request_rejected (Some current_peer_id)
     | Running { current_peer_id ; _ } ->
         point_info.greylisting_delay <-
-          float_of_int point_info.greylisting.initial_delay ;
+          point_info.greylisting.initial_delay ;
         point_info.greylisting_end <-
-          Time.add timestamp
-            (Int64.of_int point_info.greylisting.disconnection_delay) ;
+          Option.unopt_exn
+            (Failure "P2p_point_state.set_disconnected: overflow in time")
+            (Ptime.add_span timestamp
+               point_info.greylisting.disconnection_delay) ;
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
         if requested
         then Disconnection current_peer_id

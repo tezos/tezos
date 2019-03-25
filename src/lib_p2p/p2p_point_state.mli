@@ -50,8 +50,8 @@ module Info : sig
 
   type greylisting_config = {
     factor: float ;
-    initial_delay: int ;
-    disconnection_delay: int ;
+    initial_delay: Ptime.Span.t ;
+    disconnection_delay: Ptime.Span.t ;
   }
 
   val create :
@@ -72,16 +72,16 @@ module Info : sig
   val unset_trusted : 'conn point_info -> unit
 
   val last_failed_connection :
-    'conn point_info -> Time.t option
+    'conn point_info -> Time.System.t option
   val last_rejected_connection :
-    'conn point_info -> (P2p_peer.Id.t * Time.t) option
+    'conn point_info -> (P2p_peer.Id.t * Time.System.t) option
   val last_established_connection :
-    'conn point_info -> (P2p_peer.Id.t * Time.t) option
+    'conn point_info -> (P2p_peer.Id.t * Time.System.t) option
   val last_disconnection :
-    'conn point_info -> (P2p_peer.Id.t * Time.t) option
+    'conn point_info -> (P2p_peer.Id.t * Time.System.t) option
 
   val last_seen :
-    'conn point_info -> (P2p_peer.Id.t * Time.t) option
+    'conn point_info -> (P2p_peer.Id.t * Time.System.t) option
   (** [last_seen pi] is the most recent of:
 
       * last established connection
@@ -90,7 +90,7 @@ module Info : sig
   *)
 
   val last_miss :
-    'conn point_info -> Time.t option
+    'conn point_info -> Time.System.t option
   (** [last_miss pi] is the most recent of:
 
       * last failed connection
@@ -99,14 +99,14 @@ module Info : sig
   *)
 
   val greylisted :
-    ?now:Time.t -> 'conn point_info -> bool
+    ?now:Time.System.t -> 'conn point_info -> bool
 
-  val greylisted_until : 'conn point_info -> Time.t
+  val greylisted_until : 'conn point_info -> Time.System.t
 
   val point : 'conn point_info -> Id.t
 
   val log_incoming_rejection :
-    ?timestamp:Time.t -> 'conn point_info -> P2p_peer.Id.t -> unit
+    ?timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
 
   val fold :
     'conn t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
@@ -120,18 +120,18 @@ val get : 'conn Info.t -> 'conn t
 val is_disconnected : 'conn Info.t -> bool
 
 val set_requested :
-  ?timestamp:Time.t ->
+  ?timestamp:Time.System.t ->
   'conn Info.t -> Lwt_canceler.t -> unit
 
 val set_accepted :
-  ?timestamp:Time.t ->
+  ?timestamp:Time.System.t ->
   'conn Info.t -> P2p_peer.Id.t -> Lwt_canceler.t -> unit
 
 val set_running :
-  ?timestamp:Time.t ->
+  ?timestamp:Time.System.t ->
   known_private: bool ->
   'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
 
 val set_disconnected :
-  ?timestamp:Time.t -> ?requested:bool -> 'conn Info.t -> unit
+  ?timestamp:Time.System.t -> ?requested:bool -> 'conn Info.t -> unit
 

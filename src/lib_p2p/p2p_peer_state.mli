@@ -48,7 +48,7 @@ module Info : sig
   val compare : ('conn, 'peer_meta, 'conn_meta) t -> ('conn, 'peer_meta, 'conn_meta) t -> int
 
   val create :
-    ?created:Time.t ->
+    ?created:Time.System.t ->
     ?trusted:bool ->
     peer_metadata:'peer_meta ->
     Id.t -> ('conn, 'peer_meta, 'conn_meta) peer_info
@@ -57,7 +57,7 @@ module Info : sig
 
   val peer_id : ('conn, 'peer_meta, 'conn_meta) peer_info -> Id.t
 
-  val created : ('conn, 'peer_meta, 'conn_meta) peer_info -> Time.t
+  val created : ('conn, 'peer_meta, 'conn_meta) peer_info -> Time.System.t
   val peer_metadata : ('conn, 'peer_meta, 'conn_meta) peer_info -> 'peer_meta
   val set_peer_metadata : ('conn, 'peer_meta, 'conn_meta) peer_info -> 'peer_meta -> unit
 
@@ -66,16 +66,16 @@ module Info : sig
   val unset_trusted : ('conn, 'peer_meta, 'conn_meta) peer_info -> unit
 
   val last_failed_connection :
-    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.System.t) option
   val last_rejected_connection :
-    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.System.t) option
   val last_established_connection :
-    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.System.t) option
   val last_disconnection :
-    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.System.t) option
 
   val last_seen :
-    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.System.t) option
   (** [last_seen gi] is the most recent of:
 
       * last established connection
@@ -84,7 +84,7 @@ module Info : sig
   *)
 
   val last_miss :
-    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.t) option
+    ('conn, 'peer_meta, 'conn_meta) peer_info -> (P2p_connection.Id.t * Time.System.t) option
   (** [last_miss gi] is the most recent of:
 
       * last failed connection
@@ -93,7 +93,7 @@ module Info : sig
   *)
 
   val log_incoming_rejection :
-    ?timestamp:Time.t ->
+    ?timestamp:Time.System.t ->
     ('conn, 'peer_meta, 'conn_meta) peer_info -> P2p_connection.Id.t -> unit
 
   module File : sig
@@ -118,14 +118,14 @@ val get : ('conn, 'peer_meta, 'conn_meta) Info.t -> ('conn, 'conn_meta) state
 val is_disconnected : ('conn, 'peer_meta, 'conn_meta) Info.t -> bool
 
 val set_accepted :
-  ?timestamp:Time.t ->
+  ?timestamp:Time.System.t ->
   ('conn, 'peer_meta, 'conn_meta) Info.t -> P2p_connection.Id.t -> Lwt_canceler.t -> unit
 
 val set_running :
-  ?timestamp:Time.t ->
+  ?timestamp:Time.System.t ->
   ('conn, 'peer_meta, 'conn_meta) Info.t -> P2p_connection.Id.t -> 'conn -> 'conn_meta -> unit
 
 val set_disconnected :
-  ?timestamp:Time.t ->
+  ?timestamp:Time.System.t ->
   ?requested:bool ->
   ('conn, 'peer_meta, 'conn_meta) Info.t -> unit

@@ -35,7 +35,7 @@ let genesis_protocol =
   Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
-let genesis_time = Time.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 let state_genesis_block =
   {
@@ -49,7 +49,7 @@ let chain_id = Chain_id.of_block_hash genesis_hash
 module Proto = (val Registered_protocol.get_exn genesis_protocol)
 
 let incr_timestamp timestamp =
-  Time.add timestamp (Int64.add 1L (Random.int64 10L))
+  Time.Protocol.add timestamp (Int64.add 1L (Random.int64 10L))
 
 let incr_fitness fitness =
   let new_fitness =

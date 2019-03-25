@@ -34,8 +34,8 @@ type bounds = {
 }
 
 type config = {
-  maintenance_idle_time: float ;
-  greylist_timeout: int ;
+  maintenance_idle_time: Ptime.Span.t ;
+  greylist_timeout: Ptime.Span.t ;
   private_mode: bool ;
 }
 
@@ -59,16 +59,16 @@ type 'meta t = {
     Non-trusted points are also ignored if option --private-mode is set. *)
 let connectable st start_time expected seen_points =
   let Pool pool = st.pool in
-  let now = Time.now () in
+  let now = Time.System.now () in
   let module Bounded_point_info =
     List.Bounded(struct
-      type t = (Time.t option * P2p_point.Id.t)
+      type t = (Time.System.t option * P2p_point.Id.t)
       let compare (t1, _) (t2, _) =
         match t1, t2 with
         | None, None -> 0
         | None, Some _ -> 1
         | Some _, None -> -1
-        | Some t1, Some t2 -> Time.compare t2 t1
+        | Some t1, Some t2 -> Time.System.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
   let seen_points =
@@ -89,7 +89,7 @@ let connectable st start_time expected seen_points =
           match P2p_point_state.get pi with
           | Disconnected -> begin
               match P2p_point_state.Info.last_miss pi with
-              | Some last when Time.(start_time < last)
+              | Some last when Time.System.(start_time < last)
                             || P2p_point_state.Info.greylisted ~now pi ->
                   seen_points
               | last ->
@@ -106,7 +106,7 @@ let connectable st start_time expected seen_points =
     than [max_to_contact]. But, if after trying once all disconnected
     peers, it returns [false]. *)
 let rec try_to_contact
-    st ?(start_time = Time.now ()) ~seen_points
+    st ?(start_time = Time.System.now ()) ~seen_points
     min_to_contact max_to_contact =
   let Pool pool = st.pool in
   if min_to_contact <= 0 then
@@ -138,7 +138,9 @@ let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
   let older_than =
-    Time.(add (now ()) (Int64.of_int (- st.config.greylist_timeout)))
+    Option.unopt_exn
+      (Failure "P2p_maintenance.maintain: time overflow")
+      (Ptime.add_span (Time.System.now ()) (Ptime.Span.neg st.config.greylist_timeout))
   in
   P2p_pool.gc_greylist pool ~older_than ;
   if n_connected < st.bounds.min_threshold then
@@ -202,7 +204,7 @@ let rec worker_loop st =
   begin
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        Lwt_unix.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
+        Time.System.Span.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool ;

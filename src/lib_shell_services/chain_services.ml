@@ -88,7 +88,7 @@ module S = struct
       |+ opt_field "min_date"
         ~descr: "When `min_date` is provided, heads with a \
                  timestamp before `min_date` are filtered out"
-        Time.rpc_arg (fun x -> x#min_date)
+        Time.Protocol.rpc_arg (fun x -> x#min_date)
       |> seal
 
     let path = RPC_path.(path / "blocks")
