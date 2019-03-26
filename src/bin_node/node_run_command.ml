@@ -73,7 +73,7 @@ let find_log_rules default =
   | Some rules, Some _ ->
       warn "Both environment variables TEZOS_LOG and LWT_LOG \
             defined, using TEZOS_LOG." ;
-      "environment varible TEZOS_LOG", Some rules
+      "environment variable TEZOS_LOG", Some rules
 
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
