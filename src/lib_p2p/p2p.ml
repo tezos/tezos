@@ -73,10 +73,10 @@ type config = {
 
 type limits = {
 
-  connection_timeout : Ptime.Span.t ;
-  authentication_timeout : Ptime.Span.t ;
-  greylist_timeout : Ptime.Span.t ;
-  maintenance_idle_time : Ptime.Span.t ;
+  connection_timeout : Time.System.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
+  greylist_timeout : Time.System.Span.t ;
+  maintenance_idle_time : Time.System.Span.t ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -100,7 +100,7 @@ type limits = {
   max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
 
-  swap_linger : Ptime.Span.t ;
+  swap_linger : Time.System.Span.t ;
 
   binary_chunks_size : int option ;
 }

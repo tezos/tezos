@@ -110,16 +110,16 @@ type config = {
 (** Network capacities *)
 type limits = {
 
-  connection_timeout : Ptime.Span.t ;
+  connection_timeout : Time.System.Span.t ;
   (** Maximum time allowed to the establishment of a connection. *)
 
-  authentication_timeout : Ptime.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
-  greylist_timeout : Ptime.Span.t ;
+  greylist_timeout : Time.System.Span.t ;
   (** GC delay for the grelists tables, in seconds. *)
 
-  maintenance_idle_time: Ptime.Span.t ;
+  maintenance_idle_time: Time.System.Span.t ;
   (** How long to wait at most, in seconds, before running a maintenance loop. *)
 
   min_connections : int ;
@@ -161,7 +161,7 @@ type limits = {
   max_known_points : (int * int) option ;
   (** Optional limitation of internal hashtables (max, target) *)
 
-  swap_linger : Ptime.Span.t ;
+  swap_linger : Time.System.Span.t ;
   (** Peer swapping does not occur more than once during a timespan of
       [swap_linger] seconds. *)
 

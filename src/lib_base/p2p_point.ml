@@ -266,7 +266,7 @@ module Info = struct
           last_seen ; last_miss })
       (obj10
          (req "trusted" bool)
-         (dft "greylisted_until" Time.System.encoding Ptime.epoch)
+         (dft "greylisted_until" Time.System.encoding Time.System.epoch)
          (req "state" State.encoding)
          (opt "p2p_peer_id" P2p_peer_id.encoding)
          (opt "last_failed_connection" Time.System.encoding)

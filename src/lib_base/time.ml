@@ -98,6 +98,7 @@ end
 module System = struct
 
   type t = Ptime.t
+  let epoch = Ptime.epoch
   let now () = Ptime_clock.now ()
 
   module Span = struct
