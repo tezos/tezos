@@ -801,6 +801,10 @@ let baking_commands group = Clic.[
                       | `Ledger_account { curve; path ; _ }
                         when curve = ledger_curve
                           && Bip32_path.tezos_root @ path = ledger_path ->
+                          cctxt#message
+                            "@[<v 0>Authorized baking URI: %a@]"
+                            Ledger_uri.pp ledger_uri
+                          >>= fun () ->
                           return_some ()
                       | `Ledger_account { curve; path ; _ } ->
                           failwith
