@@ -49,11 +49,11 @@ let () =
   register_error_kind
     `Permanent
     ~id:"main.run.port_already_in_use"
-    ~title:"Cannot start sode: RPC port already in use"
-    ~description:"An other tezos node is probably running on the same RPC port."
+    ~title:"Cannot start node: RPC port already in use"
+    ~description:"Another tezos node is probably running on the same RPC port."
     ~pp:begin fun ppf addrlist ->
       Format.fprintf ppf
-        "An other tezos node is probably running on one of these addresses (%a). \
+        "Another tezos node is probably running on one of these addresses (%a). \
          Please choose another RPC port."
         (Format.pp_print_list P2p_point.Id.pp) addrlist
     end
@@ -102,7 +102,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
             Lwt_utils_unix.Json.read_file file >>= function
             | Error err ->
                 lwt_warn
-                  "Can't parse sandbox parameters: %s" file >>= fun () ->
+                  "Cannot parse sandbox parameters: %s" file >>= fun () ->
                 lwt_debug "%a" pp_print_error err >>= fun () ->
                 Lwt.return_none
             | Ok json ->
