@@ -25,9 +25,7 @@
 
 type limits =
   { backlog_size : int ;
-    backlog_level : Internal_event.level ;
-    zombie_lifetime : float ;
-    zombie_memory : float }
+    backlog_level : Internal_event.level ; }
 
 type worker_status =
   | Launching of Time.t

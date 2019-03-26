@@ -166,8 +166,6 @@ let default_block_validator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Debug ;
-    zombie_lifetime = 3600. ;
-    zombie_memory = 1800. ;
   }
 }
 let default_prevalidator_limits = {
@@ -176,8 +174,6 @@ let default_prevalidator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-    zombie_lifetime = 600. ;
-    zombie_memory = 120. ;
   }
 }
 let default_peer_validator_limits = {
@@ -188,8 +184,6 @@ let default_peer_validator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-    zombie_lifetime = 600. ;
-    zombie_memory = 120. ;
   }
 }
 let default_chain_validator_limits = {
@@ -197,8 +191,6 @@ let default_chain_validator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-    zombie_lifetime = 600. ;
-    zombie_memory = 120. ;
   }
 }
 

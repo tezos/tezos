@@ -357,21 +357,17 @@ let rpc : rpc Data_encoding.t =
 
 let worker_limits_encoding
     default_size
-    default_level
-    default_zombie_lifetime
-    default_zombie_memory =
+    default_level =
   let open Data_encoding in
   conv
-    (fun { Worker_types.backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory } ->
-       (backlog_size, backlog_level, zombie_lifetime, zombie_memory))
-    (fun (backlog_size, backlog_level, zombie_lifetime, zombie_memory) ->
-       { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
-    (obj4
+    (fun { Worker_types.backlog_size ; backlog_level ;} ->
+       (backlog_size, backlog_level))
+    (fun (backlog_size, backlog_level) ->
+       { backlog_size ; backlog_level })
+    (obj2
        (dft "worker_backlog_size" uint16 default_size)
        (dft "worker_backlog_level"
-          Internal_event.Level.encoding default_level)
-       (dft "worker_zombie_lifetime" float default_zombie_lifetime)
-       (dft "worker_zombie_memory" float default_zombie_memory))
+          Internal_event.Level.encoding default_level))
 
 let timeout_encoding =
   Data_encoding.ranged_float 0. 500.
@@ -389,9 +385,7 @@ let block_validator_limits_encoding =
              default_shell.block_validator_limits.protocol_timeout))
        (worker_limits_encoding
           default_shell.block_validator_limits.worker_limits.backlog_size
-          default_shell.block_validator_limits.worker_limits.backlog_level
-          default_shell.block_validator_limits.worker_limits.zombie_lifetime
-          default_shell.block_validator_limits.worker_limits.zombie_memory))
+          default_shell.block_validator_limits.worker_limits.backlog_level))
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
@@ -409,8 +403,7 @@ let prevalidator_limits_encoding =
        (worker_limits_encoding
           default_shell.prevalidator_limits.worker_limits.backlog_size
           default_shell.prevalidator_limits.worker_limits.backlog_level
-          default_shell.prevalidator_limits.worker_limits.zombie_lifetime
-          default_shell.prevalidator_limits.worker_limits.zombie_memory))
+       ))
 
 let peer_validator_limits_encoding =
   let open Data_encoding in
@@ -433,8 +426,7 @@ let peer_validator_limits_encoding =
        (worker_limits_encoding
           default_limits.worker_limits.backlog_size
           default_limits.worker_limits.backlog_level
-          default_limits.worker_limits.zombie_lifetime
-          default_limits.worker_limits.zombie_memory))
+       ))
 
 let chain_validator_limits_encoding =
   let open Data_encoding in
@@ -453,9 +445,7 @@ let chain_validator_limits_encoding =
              default_shell.chain_validator_limits.bootstrap_threshold))
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
-          default_shell.chain_validator_limits.worker_limits.backlog_level
-          default_shell.chain_validator_limits.worker_limits.zombie_lifetime
-          default_shell.chain_validator_limits.worker_limits.zombie_memory))
+          default_shell.chain_validator_limits.worker_limits.backlog_level))
 
 let shell =
   let open Data_encoding in

@@ -304,7 +304,6 @@ module Make
     buffer_kind : 'kind buffer_kind ;
     mutable last_id : int ;
     instances : (Name.t, 'kind t) Hashtbl.t ;
-    zombies : (int, 'kind t) Hashtbl.t
   }
 
   let queue_item ?u r =
@@ -441,8 +440,7 @@ module Make
   let create_table buffer_kind =
     { buffer_kind ;
       last_id = 0 ;
-      instances = Hashtbl.create 10 ;
-      zombies = Hashtbl.create 10 }
+      instances = Hashtbl.create 10 ; }
 
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
@@ -458,13 +456,9 @@ module Make
       Hashtbl.remove w.table.instances w.name ;
       Handlers.on_close w >>= fun () ->
       w.state <- None ;
-      Hashtbl.add w.table.zombies w.id w ;
       Lwt.ignore_result
-        (Lwt_unix.sleep w.limits.zombie_memory >>= fun () ->
-         List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
-         Lwt_unix.sleep (w.limits.zombie_lifetime -. w.limits.zombie_memory) >>= fun () ->
-         Hashtbl.remove w.table.zombies w.id ;
-         Lwt.return_unit) ;
+        ( List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
+          Lwt.return_unit) ;
       Lwt.return_unit in
     let rec loop () =
       begin
@@ -571,13 +565,13 @@ module Make
                 event_log ; timeout ;
                 current_request = None ;
                 status = Launching (Time.now ())} in
+      Hashtbl.add table.instances name w ;
       begin
         if id_name = base_name then
           Logger.lwt_log_notice "Worker started"
         else
           Logger.lwt_log_notice "Worker started for %s" name_s
       end >>= fun () ->
-      Hashtbl.add table.instances name w ;
       Handlers.on_launch w name parameters >>=? fun state ->
       w.status <- Running (Time.now ()) ;
       w.state <- Some state ;

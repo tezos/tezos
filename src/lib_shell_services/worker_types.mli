@@ -28,11 +28,7 @@ type limits =
   { backlog_size : int
   (** Number of event stored in the backlog for each debug level. *) ;
     backlog_level : Internal_event.level
-  (** Stores events at least as important as this value. *) ;
-    zombie_lifetime : float
-  (** How long dead workers are kept in the introspection table. *) ;
-    zombie_memory : float
-    (** How long zombie workers' logs are kept. *) }
+  (** Stores events at least as important as this value. *) ; }
 
 (** The running status of an individual worker. *)
 type worker_status =
