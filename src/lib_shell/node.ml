@@ -174,6 +174,41 @@ let may_update_checkpoint chain_state checkpoint =
       Chain.set_head chain_state new_head >>= fun _old_head ->
       State.Chain.set_checkpoint chain_state checkpoint
 
+let store_known_protocols state =
+  Lwt_list.iter_s
+    (fun protocol_hash ->
+       State.Protocol.known state protocol_hash >>= function
+       | true ->
+           lwt_log_notice Tag.DSL.(fun f ->
+               f "Protocol store : %a is already in store"
+               -% a Protocol_hash.Logging.tag protocol_hash
+               -% t event "Writing protocol to store"
+             )
+       | false ->
+           State.Protocol.store state
+             (Registered_protocol.get_embedded_sources_exn protocol_hash) >>=
+           function
+           | Some hash ->
+               if not (Protocol_hash.equal hash protocol_hash) then
+                 lwt_log_notice Tag.DSL.(fun f ->
+                     f "Protocol store : %a is not fetchable (incorrect hash)"
+                     -% a Protocol_hash.Logging.tag protocol_hash
+                     -% t event "Writing protocol to store"
+                   )
+               else
+                 lwt_log_notice Tag.DSL.(fun f ->
+                     f "Protocol store : %a is fetchable"
+                     -% a Protocol_hash.Logging.tag protocol_hash
+                     -% t event "Writing protocol to store"
+                   )
+           | None ->
+               lwt_log_notice Tag.DSL.(fun f ->
+                   f "Protocol store : %a sources are not found"
+                   -% a Protocol_hash.Logging.tag protocol_hash
+                   -% t event "Writing protocol to store"
+                 )
+    ) (Registered_protocol.list_embedded ())
+
 let create
     ?(sandboxed = false)
     { genesis ; store_root ; context_root ;
@@ -194,6 +229,7 @@ let create
     genesis >>=? fun (state, mainchain_state, context_index) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
+  store_known_protocols state >>= fun () ->
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
