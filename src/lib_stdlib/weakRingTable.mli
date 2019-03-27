@@ -34,23 +34,34 @@ module Make (K: Hashtbl.HashedType): sig
       counting the number of elements even though only the last binding is ever
       accessible. *)
   type 'a t
+  type key
 
-  (** [create n] is a table with at most [n] elements except when it has more. *)
   val create: int -> 'a t
+  (** [create n] is a table with at most [n] elements except when it has more. *)
 
+  val add: 'a t -> key -> 'a -> unit
   (** [add t k v] adds a mapping from key [k] to value [v] in the table.
       NOTE: when n values are bound to the same key, it may count as up to n
       elements.
       However, NOTE: when n values are bound to the same key, only the last
       binding can be found with [find_opt] or traversed with [fold]. *)
-  val add: 'a t -> K.t -> 'a -> unit
 
+  val add_and_return_erased: 'a t -> key -> 'a -> key option
+
+  val iter: (key -> 'a -> unit) -> 'a t -> unit
+
+  val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
   (** [fold f t acc] folds over the bindings in [t] starting with [acc]. *)
-  val fold: (K.t -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
+
+  val find_opt: 'a t -> key -> 'a option
   (** [find_opt t k] is [Some v] if [k] is bound to [v] in [t] and [None]
       otherwise. A key [k] is bound to a value [v] in [t] if [add t k v] has been
       called and not too many other bindings have been added since then. *)
-  val find_opt: 'a t -> K.t -> 'a option
+
+  (** NOTE: hashes are not removed from the ring. *)
+  val remove: 'a t -> key -> unit
+
+  val length: 'a t -> int
 
 end

@@ -25,8 +25,19 @@
 
 module Make(M: Hashtbl.HashedType) = struct
 
-  module Table = Ephemeron.K1.Make(M)
-  module Ring = Ring.MakeTable(M)
+  module Table = Ephemeron.K1.Make(
+    struct
+      type t = int
+      let hash a = a
+      let equal = (=)
+    end)
+  module Ring = Ring.MakeTable(
+    struct
+      type t = int * M.t
+      let hash (i,_) = i
+      let equal = (=)
+    end)
+  type key = M.t
 
   type 'a t = {
     table : 'a Table.t ;
@@ -36,13 +47,41 @@ module Make(M: Hashtbl.HashedType) = struct
   let create n = { table = Table.create n ; ring = Ring.create n }
 
   let add { ring ; table } k v =
-    Ring.add ring k ;
-    Table.replace table k v
+    let i = M.hash k in
+    Ring.add ring (i,k) ;
+    Table.replace table i v
+
+  let add_and_return_erased { ring ; table } k v =
+    let i = M.hash k in
+    let erased =
+      Option.map ~f:snd (Ring.add_and_return_erased ring (i, k)) in
+    Table.replace table i v ;
+    erased
 
   let find_opt { table ; _ } k =
-    Table.find_opt table k
+    let i = M.hash k in
+    Table.find_opt table i
 
-  let fold f { table ; _ } acc =
-    Table.fold f table acc
+  let fold f { table ; ring } acc =
+    let elts = Ring.elements ring in
+    List.fold_left
+      (fun acc (i, k) ->
+         match Table.find_opt table i with
+         | None -> acc
+         | Some elt -> f k elt acc) acc elts
+
+  let iter f {table ; ring } =
+    let elts = Ring.elements ring in
+    List.iter
+      (fun (i, k) ->
+         match Table.find_opt table i with
+         | None -> ()
+         | Some elt -> f k elt ) elts
+
+  let remove t k =
+    let i = M.hash k in
+    Table.remove t.table i
+
+  let length { table ; _ } = Table.length table
 
 end
