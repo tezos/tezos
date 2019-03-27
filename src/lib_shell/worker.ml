@@ -103,7 +103,6 @@ module type T = sig
   type 'a queue and bounded and infinite
   type dropbox
 
-
   (** Supported kinds of internal buffers. *)
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
@@ -253,6 +252,7 @@ module type T = sig
       After they are killed, workers are kept in the table
       for a number of seconds given in the {!Worker_types.limits}. *)
   val list : 'a table -> (Name.t * 'a t) list
+  val find_opt : 'a table -> Name.t -> 'a t option
 end
 
 module Make
@@ -288,7 +288,6 @@ module Make
     | Queue_buffer : (Time.t * message) Lwt_pipe.t -> infinite queue buffer
     | Bounded_buffer : (Time.t * message) Lwt_pipe.t -> bounded queue buffer
     | Dropbox_buffer : (Time.t * message) Lwt_dropbox.t -> dropbox buffer
-
   and 'kind t = {
     limits : Worker_types.limits ;
     timeout : float option ;
@@ -688,6 +687,9 @@ module Make
     Hashtbl.fold
       (fun n w acc -> (n, w) :: acc)
       instances []
+
+  let find_opt { instances ; _ } =
+    Hashtbl.find_opt instances
 
   let protect { canceler ; _ } ?on_error f =
     protect ?on_error ~canceler f

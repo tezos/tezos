@@ -301,6 +301,8 @@ module type T = sig
       After they are killed, workers are kept in the table
       for a number of seconds given in the {!Worker_types.limits}. *)
   val list : 'a table -> (Name.t * 'a t) list
+  val find_opt : 'a table -> Name.t -> 'a t option
+
 end
 
 
