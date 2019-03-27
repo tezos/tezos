@@ -96,6 +96,7 @@ let export ?(export_rolling=false) data_dir filename block =
     | None -> Node_config_file.default_data_dir
     | Some dir -> dir
   in
+  Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.block in
