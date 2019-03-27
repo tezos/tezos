@@ -245,6 +245,8 @@ module type T = sig
       treatment started. *)
   val current_request : _ t -> (Time.t * Time.t * Request.view) option
 
+  val information : _ t -> Worker_types.worker_information
+
   (** Introspect the state of a worker. *)
   val view : _ t -> Types.view
 
@@ -679,6 +681,15 @@ module Make
   let status { status ; _ } = status
 
   let current_request { current_request ; _ } = current_request
+
+  let information (type a) (w : a t) =
+    { Worker_types.instances_number = Hashtbl.length w.table.instances ;
+      wstatus = w.status ;
+      queue_length = match w.buffer with
+        | Queue_buffer pipe ->  Lwt_pipe.length pipe
+        | Bounded_buffer pipe ->  Lwt_pipe.length pipe
+        | Dropbox_buffer _ -> 1
+    }
 
   let view w =
     Types.view (state w) w.parameters

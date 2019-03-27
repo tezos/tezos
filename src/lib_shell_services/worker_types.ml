@@ -76,6 +76,26 @@ let worker_status_encoding error_encoding =
         (function Closed (t0, t, Some errs) -> Some ((), t0, t, errs) | _ -> None)
         (fun ((), t0, t, errs) -> Closed (t0, t, Some errs )) ]
 
+type worker_information = {
+  instances_number : int ;
+  wstatus : worker_status ;
+  queue_length : int ;
+}
+
+let worker_information_encoding error_encoding =
+  Data_encoding.(
+    conv
+      (fun { instances_number ; wstatus ; queue_length } ->
+         (instances_number, wstatus, queue_length))
+      (fun (instances_number, wstatus, queue_length) ->
+         { instances_number ; wstatus ; queue_length })
+      (obj3
+         (req "instances" int31)
+         (req "status" (worker_status_encoding error_encoding))
+         (req "queue_length" int31)
+      )
+  )
+
 type request_status =
   { pushed : Time.t ;
     treated : Time.t ;

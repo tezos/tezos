@@ -294,6 +294,8 @@ module type T = sig
       treatment started. *)
   val current_request : _ t -> (Time.t * Time.t * Request.view) option
 
+  val information : _ t -> Worker_types.worker_information
+
   (** Introspect the state of a worker. *)
   val view : _ t -> Types.view
 

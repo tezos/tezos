@@ -40,6 +40,15 @@ type worker_status =
 (** Worker status serializer for RPCs. *)
 val worker_status_encoding : error list Data_encoding.t -> worker_status Data_encoding.t
 
+type worker_information = {
+  instances_number : int ;
+  wstatus: worker_status ;
+  queue_length : int ;
+}
+
+val worker_information_encoding :
+  error list Data_encoding.t -> worker_information Data_encoding.t
+
 (** The runnning status of an individual request. *)
 type request_status =
   { pushed : Time.t ;
