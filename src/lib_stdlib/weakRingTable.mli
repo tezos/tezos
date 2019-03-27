@@ -22,17 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-module Make (K: Hashtbl.HashedType): sig
-
-  (** A bounded table which optimistically cheats on the bound and sometimes
-      counts wrong.
-      Specifically, the table retains a bounded number of elements. It will also
-      retain more if given more than that, but it will always drop back to the
-      bound if the garbage collector intervenes.
-      In addition, repeated bindings on the same key use several slots when
-      counting the number of elements even though only the last binding is ever
-      accessible. *)
+module type S =
+sig
   type 'a t
   type key
 
@@ -65,3 +56,11 @@ module Make (K: Hashtbl.HashedType): sig
   val length: 'a t -> int
 
 end
+
+
+module Make (K: Hashtbl.HashedType): S with type key = K.t
+(** A bounded table which optimistically cheats on the bound and sometimes
+    counts wrong.
+    Specifically, the table retains a bounded number of elements. It will also
+    retain more if given more than that, but it will always drop back to the
+    bound if the garbage collector intervenes. *)

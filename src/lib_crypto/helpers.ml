@@ -197,6 +197,23 @@ module MakeIterator(H : sig
         Data_encoding.(list (tup2 H.encoding arg_encoding))
   end
 
+  module WeakRingTable = struct
+    include WeakRingTable.Make(struct
+        type t = H.t
+        let hash = H.hash
+        let equal = H.equal
+      end)
+    let encoding arg_encoding =
+      Data_encoding.conv
+        (fun h -> fold (fun k v l -> (k, v) :: l) h [])
+        (fun l ->
+           let h = create (List.length l) in
+           List.iter (fun (k,v) -> add h k v) l ;
+           h)
+        Data_encoding.(list (tup2 H.encoding arg_encoding))
+  end
+
+
 end
 
 module Make(H : sig

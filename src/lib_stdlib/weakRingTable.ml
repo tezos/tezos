@@ -22,6 +22,28 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+module type S =
+sig
+  type 'a t
+  type key
+  val create: int -> 'a t
+
+  val add: 'a t -> key -> 'a -> unit
+
+  val add_and_return_erased: 'a t -> key -> 'a -> key option
+
+  val iter: (key -> 'a -> unit) -> 'a t -> unit
+
+  val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  val find_opt: 'a t -> key -> 'a option
+
+  val remove: 'a t -> key -> unit
+
+  val length : 'a t -> int
+end
+
+
 
 module Make(M: Hashtbl.HashedType) = struct
 
