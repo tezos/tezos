@@ -56,7 +56,7 @@ module Ptree_sig = struct
     val strictly_shorter_mask : mask -> mask -> bool
 
     val key_prefix : key -> prefix
-    (* Full lenght prefix *)
+    (* Full length prefix *)
     val prefix_key : prefix -> mask -> key
     (* Some key matching the prefix with the given mask *)
 
