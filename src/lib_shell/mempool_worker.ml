@@ -579,7 +579,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
   (* Exporting functions *)
 
   let validate t parsed_op =
-    Worker.push_request_and_wait t (Request.Validate parsed_op)
+    Worker.Queue.push_request_and_wait t (Request.Validate parsed_op)
 
   (* atomic parse + memoization *)
   let parse raw_op =

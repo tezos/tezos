@@ -125,7 +125,7 @@ let notify_new_block w block =
          with Not_found -> ()) ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
-  Worker.push_request_now w (Validated block)
+  Worker.Queue.push_request_now w (Validated block)
 
 let may_toggle_bootstrapped_chain w =
   let nv = Worker.state w in
@@ -613,7 +613,7 @@ let status = Worker.status
 
 let running_workers () = Worker.list table
 
-let pending_requests t = Worker.pending_requests t
+let pending_requests t = Worker.Queue.pending_requests t
 
 let current_request t = Worker.current_request t
 

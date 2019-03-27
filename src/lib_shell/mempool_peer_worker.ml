@@ -381,7 +381,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
   (* See interface file for documentation *)
 
   let validate t os =
-    Worker.push_request_and_wait t (Request.Batch os)
+    Worker.Queue.push_request_and_wait t (Request.Batch os)
     >>=? fun (_: output) -> return_unit
 
   let create limits peer_id mempool_worker =
@@ -402,7 +402,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
              recycled
              input)
         recycled
-        (Worker.pending_requests w)
+        (Worker.Queue.pending_requests w)
     in
     let recycled =
       match Worker.current_request w with

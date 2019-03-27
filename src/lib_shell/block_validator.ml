@@ -248,7 +248,7 @@ let validate w
             found = computed_hash ;
           }) >>=? fun () ->
       check_chain_liveness chain_db hash header >>=? fun () ->
-      Worker.push_request_and_wait w
+      Worker.Queue.push_request_and_wait w
         (Request_validation
            { chain_db ; notify_new_block ; canceler ;
              peer ; hash ; header ; operations }) >>=? fun result ->
@@ -265,7 +265,7 @@ let running_worker () =
   | (_, single) :: _ -> single
   | [] -> raise Not_found
 
-let pending_requests t = Worker.pending_requests t
+let pending_requests t = Worker.Queue.pending_requests t
 
 let current_request t = Worker.current_request t
 

@@ -403,11 +403,11 @@ let notify_branch w locator =
   (* sender and receiver are inverted here because they are from
      the point of view of the node sending the locator *)
   let seed = {Block_locator.sender_id=pv.peer_id; receiver_id=sender_id } in
-  Worker.drop_request w (New_branch (hash, locator, seed))
+  Worker.Dropbox.put_request w (New_branch (hash, locator, seed))
 
 let notify_head w header =
   let hash = Block_header.hash header in
-  Worker.drop_request w (New_head (hash, header))
+  Worker.Dropbox.put_request w (New_head (hash, header))
 
 let shutdown w =
   Worker.shutdown w

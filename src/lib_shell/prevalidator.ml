@@ -287,7 +287,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         pv.advertisement <- `Pending mempool ;
         Lwt.async (fun () ->
             Lwt_unix.sleep 0.01 >>= fun () ->
-            Worker.push_request_now w Advertise ;
+            Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
 
   let is_endorsement ( op : Prevalidation.operation ) =
@@ -409,7 +409,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       ~timeout:pv.limits.operation_timeout
       pv.chain_db ?peer oph () >>= function
     | Ok op ->
-        Worker.push_request_now w (Arrived (oph, op)) ;
+        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
         Lwt.return_unit
     | Error [ Distributed_db.Operation.Canceled _ ] ->
         debug w
@@ -755,12 +755,12 @@ let shutdown (t:t) =
 let flush (t:t) head =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.push_request_and_wait w (Request.Flush head)
+  Prevalidator.Worker.Queue.push_request_and_wait w (Request.Flush head)
 
 let notify_operations (t:t) peer mempool =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.push_request w (Request.Notify (peer, mempool))
+  Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
 
 let operations (t:t) =
   let module Prevalidator: T = (val t) in
@@ -794,7 +794,7 @@ let fitness (t:t) =
 let inject_operation (t:t) op =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.push_request_and_wait w (Inject op)
+  Prevalidator.Worker.Queue.push_request_and_wait w (Inject op)
 
 let status (t:t) =
   let module Prevalidator: T = (val t) in
@@ -809,7 +809,7 @@ let running_workers () =
 let pending_requests (t:t) =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.pending_requests w
+  Prevalidator.Worker.Queue.pending_requests w
 
 let current_request (t:t) =
   let module Prevalidator: T = (val t) in
