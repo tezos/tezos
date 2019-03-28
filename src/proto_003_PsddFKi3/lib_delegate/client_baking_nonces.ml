@@ -77,9 +77,9 @@ let get_block_level_opt cctxt ~chain ~block =
           -% a errs_tag errs) >>= fun () ->
       Lwt.return_none
 
-let filter_outdated_nonces cctxt ?constants location nonces =
+let filter_outdated_nonces cctxt ?constants ~chain location nonces =
   begin match constants with
-    | None -> Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0)
+    | None -> Alpha_services.Constants.all cctxt (chain, `Head 0)
     | Some constants -> return constants
   end >>=? fun { Constants.parametric = { blocks_per_cycle }} ->
   let chain = Client_baking_files.chain location in

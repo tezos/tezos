@@ -146,6 +146,7 @@ module Baker = struct
       ?minimal_nanotez_per_byte
       ?await_endorsements
       ?max_priority
+      ~chain
       ~context_path
       delegates
       block_stream >>=? fun () ->

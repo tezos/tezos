@@ -1017,11 +1017,10 @@ let build_block
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake (cctxt : #Proto_alpha.full) state =
+let bake (cctxt : #Proto_alpha.full) ~chain state =
   begin match state.best_slot with
     | None -> assert false (* unreachable *)
     | Some slot -> return slot end >>=? fun slot ->
-  let chain = cctxt#chain in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
 
@@ -1187,7 +1186,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain ~blo
                    - A revelation was not included yet in the cycle beggining.
                    So, it is safe to only filter outdated_nonces there *)
                 Client_baking_nonces.filter_outdated_nonces
-                  cctxt ~constants nonces_location nonces >>=? fun live_nonces ->
+                  cctxt ~constants ~chain nonces_location nonces >>=? fun live_nonces ->
                 Client_baking_nonces.save cctxt nonces_location live_nonces >>=? fun () ->
                 return_unit
   end
@@ -1202,15 +1201,16 @@ let create
     ?minimal_nanotez_per_byte
     ?await_endorsements
     ?max_priority
+    ~chain
     ~context_path
     delegates
     block_stream =
   let state_maker bi =
-    Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0) >>=? fun constants ->
+    Alpha_services.Constants.all cctxt (chain, `Head 0) >>=? fun constants ->
     Client_baking_simulator.load_context ~context_path >>= fun index ->
     Client_baking_simulator.check_context_consistency
       index bi.Client_baking_blocks.context >>=? fun () ->
-    Client_baking_files.resolve_location cctxt ~chain:cctxt#chain `Nonce >>=? fun nonces_location ->
+    Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     let state = create_state
         ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
         ?await_endorsements
@@ -1220,7 +1220,7 @@ let create
 
   let event_k cctxt state new_head =
     reveal_potential_nonces cctxt state.constants
-      ~chain:cctxt#chain ~block:(`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
+      ~chain ~block:(`Hash (new_head.Client_baking_blocks.hash, 0)) >>= fun _ignore_nonce_err ->
     compute_best_slot_on_current_level ?max_priority cctxt state new_head >>=? fun slot ->
     state.best_slot <- slot ;
     return_unit
@@ -1238,7 +1238,7 @@ let create
   in
 
   let timeout_k cctxt state () =
-    bake cctxt state >>=? fun () ->
+    bake cctxt ~chain state >>=? fun () ->
     (* Stopping the timeout and waiting for the next block *)
     state.best_slot <- None ;
     return_unit

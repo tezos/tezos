@@ -101,6 +101,7 @@ val create:
   ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
   ?max_priority: int ->
+  chain: Chain_services.chain ->
   context_path: string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
