@@ -10,7 +10,7 @@ license: "ISC"
 dev-repo: "git+https://github.com/vbmithr/ocaml-bip39.git"
 bug-reports: "https://github.com/vbmithr/ocaml-bip39/issues"
 tags: []
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
 depends: [
   "dune" {build & >= "1.7"}
   "base" {build & >= "v0.10.0"}

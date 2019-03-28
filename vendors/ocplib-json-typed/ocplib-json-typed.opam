@@ -9,7 +9,7 @@ bug-reports: "https://github.com/ocamlpro/ocplib-json-typed/issues"
 license: "LGPLv3 w/ linking exception"
 dev-repo: "git+https://github.com/ocamlpro/ocplib-json-typed.git"
 
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
 run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
   "ocaml" {>= "4.3.0"}

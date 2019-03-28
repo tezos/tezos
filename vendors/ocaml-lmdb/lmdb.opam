@@ -8,7 +8,7 @@ synopsis: "Simple OCaml binding to Lightning Memory-Mapped Database from Symas"
 homepage: "https://github.com/vbmithr/ocaml-lmdb"
 bug-reports: "https://github.com/vbmithr/ocaml-lmdb/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-lmdb"
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
 depends: [
   "dune" {build & >= "1.7"}
   "rresult" {>= "0.5.0"}
