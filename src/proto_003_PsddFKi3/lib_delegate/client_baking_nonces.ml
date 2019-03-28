@@ -65,17 +65,17 @@ let add nonces hash nonce =
 let remove nonces hash =
   Block_hash.Map.remove hash nonces
 
-let get_block_level cctxt ~chain ~block =
-  Shell_services.Blocks.Header.shell_header
-    cctxt ~chain ~block () >>= function
-  | Ok { level } -> return level
-  | Error errs as err ->
-      lwt_log_error Tag.DSL.(fun f ->
-          f "@[<v 2>Cannot retrieve block %a header associated to nonce:@ @[%a@]@]@."
+let get_block_level_opt cctxt ~chain ~block =
+  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>= function
+  | Ok { level } -> Lwt.return_some level
+  | Error errs ->
+      lwt_warn Tag.DSL.(fun f ->
+          f "@[<v 2>Cannot retrieve block %a header associated to \
+             nonce:@ @[%a@]@]@."
           -% t event "cannot_retrieve_block_header"
           -% a Logging.block_tag block
           -% a errs_tag errs) >>= fun () ->
-      Lwt.return err
+      Lwt.return_none
 
 let filter_outdated_nonces cctxt ?constants location nonces =
   begin match constants with
@@ -83,21 +83,27 @@ let filter_outdated_nonces cctxt ?constants location nonces =
     | Some constants -> return constants
   end >>=? fun { Constants.parametric = { blocks_per_cycle }} ->
   let chain = Client_baking_files.chain location in
-  get_block_level cctxt ~chain ~block:(`Head 0) >>=? fun current_level ->
-  let current_cycle = Int32.(div current_level blocks_per_cycle) in
-  let is_older_than_5_cycles block_level =
-    let block_cycle = Int32.(div block_level blocks_per_cycle) in
-    Int32.sub current_cycle block_cycle > 5l in
-  Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
-      acc >>=? fun acc ->
-      get_block_level cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
-      | Ok level ->
-          if is_older_than_5_cycles level then
-            return (remove acc hash)
-          else
-            return acc
-      | Error _ -> return acc)
-    nonces (return nonces)
+  get_block_level_opt cctxt ~chain ~block:(`Head 0) >>= function
+  | None ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "Cannot fetch chain's head level. Aborting nonces filtering."
+          -% t event "cannot_retrieve_head_level") >>= fun () ->
+      return empty
+  | Some current_level ->
+      let current_cycle = Int32.(div current_level blocks_per_cycle) in
+      let is_older_than_5_cycles block_level =
+        let block_cycle = Int32.(div block_level blocks_per_cycle) in
+        Int32.sub current_cycle block_cycle > 5l in
+      Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
+          acc >>=? fun acc ->
+          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
+          | Some level ->
+              if is_older_than_5_cycles level then
+                return (remove acc hash)
+              else
+                return acc
+          | None -> return (remove acc hash)
+        ) nonces (return nonces)
 
 let get_unrevealed_nonces cctxt location nonces =
   let chain = Client_baking_files.chain location in
@@ -108,8 +114,8 @@ let get_unrevealed_nonces cctxt location nonces =
       match find_opt nonces hash with
       | None -> return_none
       | Some nonce ->
-          begin get_block_level cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
-            | Ok level -> begin
+          begin get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
+            | Some level -> begin
                 Lwt.return
                   (Alpha_environment.wrap_error (Raw_level.of_int32 level)) >>=? fun level ->
                 Alpha_services.Nonce.get cctxt (chain, `Head 0) level >>=? function
@@ -128,8 +134,7 @@ let get_unrevealed_nonces cctxt location nonces =
                         -% a Logging.level_tag level)
                     >>= fun () -> return_none
                 | Forgotten -> return_none
-                | Revealed _ -> return_none
-              end
-            | Error _ -> return_none
+                | Revealed _ -> return_none end
+            | None -> return_none
           end)
     blocks
