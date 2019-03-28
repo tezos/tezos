@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +28,8 @@ let () =
   Alcotest.run "tezos-state" [
     "store", Test_store.tests ;
     "state", Test_state.tests ;
-    "store checkpoint", Test_store_checkpoint.tests;
-    "state checkpoint", Test_state_checkpoint.tests
+    "store checkpoint", Test_store_checkpoint.tests ;
+    "state checkpoint", Test_state_checkpoint.tests ;
+    "pipeline-order", Test_pipeline.Order.tests ;
+    "pipeline-many-passes", Test_pipeline.Many_passes.tests ;
   ]
