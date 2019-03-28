@@ -125,6 +125,11 @@ module Chain_data : sig
     with type t := store
      and type value := Int32.t * Block_hash.t
 
+  module Protocol_hash : MAP_STORE
+    with type t = store
+     and type key = int
+     and type value = Protocol_hash.t
+
 end
 
 
@@ -211,7 +216,6 @@ module Protocol : sig
   module RawContents : SINGLE_STORE
     with type t = store * Protocol_hash.t
      and type value := MBytes.t
-
 end
 
 (** {2 Temporary test chain forking block store} *****************************)
