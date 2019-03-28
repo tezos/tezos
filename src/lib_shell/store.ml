@@ -335,6 +335,21 @@ module Chain_data = struct
            let open Data_encoding in
            tup2 int32 Block_hash.encoding
        end))
+
+  module Protocol_index =
+    Store_helpers.Make_indexed_substore
+      (Store_helpers.Make_substore
+         (Chain.Indexed_store.Store)
+         (struct let name = ["protocol" ; "level"] end))
+      (Store_helpers.Integer_index)
+
+  module Protocol_hash =
+    Protocol_index.Make_map
+      (struct let name = ["hash"] end)
+      (Store_helpers.Make_value(struct
+         type t = Protocol_hash.t
+         let encoding = Protocol_hash.encoding
+       end))
 end
 
 
@@ -370,6 +385,21 @@ module Protocol = struct
       let pstr = Protocol_hash.prefix_path str in
       Indexed_store.resolve_index s pstr
     end
+
+  module Protocol_index =
+    Store_helpers.Make_indexed_substore
+      (Store_helpers.Make_substore
+         (Raw_store)
+         (struct let name = ["protocol" ; "level"] end))
+      (Store_helpers.Integer_index)
+
+  module Hash =
+    Protocol_index.Make_map
+      (struct let name = ["hash"] end)
+      (Store_helpers.Make_value(struct
+         type t = Protocol_hash.t
+         let encoding = Protocol_hash.encoding
+       end))
 
 end
 
