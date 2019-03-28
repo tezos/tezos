@@ -233,7 +233,7 @@ module type T = sig
     val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
   end
   module type QUEUE = sig
-    (** With [Queue]s, you can push requests in the queue *)
+    (** With [QUEUE]s, you can push requests in the queue *)
     type 'a t
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
@@ -241,7 +241,7 @@ module type T = sig
     val pending_requests_length : 'a t -> int
   end
   module type BOUNDED_QUEUE = sig
-    (** With [Queue]s, you can push requests in the queue tentatively *)
+    (** With [BOUNDED_QUEUE]s, you can push requests in the queue tentatively *)
     type t
     val try_push_request_now : t -> 'a Request.t -> bool
   end
