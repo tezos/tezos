@@ -41,10 +41,13 @@ val add: t -> Block_hash.t -> Nonce.t -> t
 
 val remove: t -> Block_hash.t -> t
 
-(** [filter_outdated_nonces] removes nonces older than 5 cycles in the nonce file *)
+(** [filter_outdated_nonces] filters nonces older than 5 cycles in the
+    nonce file or nonces associated to blocks that cannot be retrieved
+*)
 val filter_outdated_nonces:
   #Proto_alpha.full ->
   ?constants: Constants.t ->
+  chain: Chain_services.chain ->
   [ `Nonce ] Client_baking_files.location ->
   t ->
   t tzresult Lwt.t

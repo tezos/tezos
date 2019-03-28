@@ -149,8 +149,7 @@ let reveal_nonces (cctxt : #Proto_alpha.full) ~chain ~block () =
     load cctxt nonces_location >>=? fun nonces ->
     get_unrevealed_nonces cctxt nonces_location nonces >>=? fun nonces_to_reveal ->
     do_reveal cctxt ~chain ~block nonces_to_reveal >>=? fun () ->
-    filter_outdated_nonces
-      cctxt nonces_location nonces >>=? fun nonces ->
+    filter_outdated_nonces cctxt ~chain nonces_location nonces >>=? fun nonces ->
     save cctxt nonces_location nonces >>=? fun () ->
     return_unit
   end
