@@ -419,7 +419,7 @@ module Make
       let pipe_length (type a) (q : a buffer ) = match q with
         | Queue_buffer queue -> Lwt_pipe.length queue
         | Bounded_buffer queue -> Lwt_pipe.length queue
-        | _ -> 1
+        | Dropbox_buffer _ -> 1
       in pipe_length w.buffer
 
   end
@@ -429,7 +429,7 @@ module Make
       | _, Message (_, Some u) ->
           let name = Format.asprintf "%a" Name.pp w.name in
           Lwt.wakeup_later u (Error [ Closed {base=base_name; name} ])
-      | _ -> () in
+      | _, Message (_, None) -> () in
     let close_queue message_queue =
       let messages = Lwt_pipe.pop_all_now message_queue in
       List.iter wakeup messages ;
@@ -515,7 +515,7 @@ module Make
     let do_close errs =
       let t0 = match w.status with
         | Running t0 -> t0
-        | _ -> assert false in
+        | Launching _ | Closing _ | Closed _ -> assert false in
       w.status <- Closing (t0, Time.now ()) ;
       close w ;
       Lwt_canceler.cancel w.canceler >>= fun () ->
