@@ -522,11 +522,11 @@ module Pruned_block = struct
          (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
       )
 
-  let to_bytes x =
-    Data_encoding.Binary.to_bytes_exn encoding x
+  let to_bytes =
+    Data_encoding.Binary.to_bytes_exn encoding
 
-  let of_bytes x =
-    Data_encoding.Binary.of_bytes encoding x
+  let of_bytes =
+    Data_encoding.Binary.of_bytes encoding
 
 end
 
@@ -554,11 +554,11 @@ module Block_data = struct
             (list (list (dynamic_size Operation.encoding))))
       )
 
-  let to_bytes x =
-    Data_encoding.Binary.to_bytes_exn encoding x
+  let to_bytes =
+    Data_encoding.Binary.to_bytes_exn encoding
 
-  let of_bytes x =
-    Data_encoding.Binary.of_bytes encoding x
+  let of_bytes =
+    Data_encoding.Binary.of_bytes encoding
 
   let empty = {
     block_header =
@@ -576,6 +576,79 @@ module Block_data = struct
         } };
     operations = [[]] ;
   }
+
+end
+
+module Protocol_data = struct
+
+  type info = {
+    author : string ;
+    message : string ;
+    timestamp : Time.t ;
+  }
+
+  let info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {author ; message ; timestamp} ->
+         (author, message, timestamp))
+      (fun (author, message, timestamp) ->
+         {author ; message ; timestamp} )
+      (obj3
+         (req "author" string)
+         (req "message" string)
+         (req "timestamp" Time.encoding))
+
+  type data = {
+    info : info ;
+    protocol_hash : Protocol_hash.t ;
+    test_chain_status : Test_chain_status.t ;
+    data_key : Context_hash.t ;
+    parents : Context_hash.t list ;
+  }
+
+  let data_encoding =
+    let open Data_encoding in
+    conv
+      (fun { info ; protocol_hash ; test_chain_status ; data_key ; parents } ->
+         (info, protocol_hash, test_chain_status, data_key, parents))
+      (fun (info, protocol_hash, test_chain_status, data_key, parents) ->
+         { info ; protocol_hash ; test_chain_status ; data_key ; parents })
+      (obj5
+         (req "info" info_encoding)
+         (req "protocol_hash" Protocol_hash.encoding)
+         (req "test_chain_status" Test_chain_status.encoding)
+         (req "data_key" Context_hash.encoding)
+         (req "parents" (list Context_hash.encoding)))
+
+  type t = (Int32.t * data)
+
+  let encoding =
+    let open Data_encoding in
+    tup2
+      int32
+      data_encoding
+
+  let empty =
+    let info = {
+      author = "" ;
+      message = "" ;
+      timestamp = Time.now ()
+    } in
+    let data = {
+      info ;
+      protocol_hash = Protocol_hash.zero ;
+      test_chain_status = Test_chain_status.Not_running ;
+      data_key = Context_hash.zero ;
+      parents = [ Context_hash.zero ] ;
+    } in
+    (0l, data)
+
+  let to_bytes =
+    Data_encoding.Binary.to_bytes_exn encoding
+
+  let of_bytes =
+    Data_encoding.Binary.of_bytes encoding
 
 end
 
@@ -673,11 +746,11 @@ module Dumpable_context = struct
         GitStore.Tree.add_tree tree key sub_tree
         >>= Lwt.return_some
 
-
   module Commit_hash = Context_hash
   module Block_header = Block_header
   module Block_data = Block_data
   module Pruned_block = Pruned_block
+  module Protocol_data = Protocol_data
 end
 module Context_dumper = Context_dump.Make(Dumpable_context)
 

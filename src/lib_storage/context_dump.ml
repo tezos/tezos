@@ -52,6 +52,12 @@ module type Dump_interface = sig
     val of_bytes : MBytes.t -> t option
   end
 
+  module Protocol_data : sig
+    type t
+    val to_bytes : t -> MBytes.t
+    val of_bytes : MBytes.t -> t option
+  end
+
   module Commit_hash : sig
     type t
     val to_bytes : t -> MBytes.t
@@ -100,8 +106,12 @@ module type S = sig
   type block_header
   type block_data
   type pruned_block
+  type protocol_data
 
-  val dump_contexts_fd : index -> (block_header * block_data * pruned_block list) list -> fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+  val dump_contexts_fd :
+    index ->
+    (block_header * block_data * pruned_block list * protocol_data list) list ->
+    fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 end
 
 type error += Writing_error of string
@@ -247,6 +257,11 @@ let () = register_error_kind `Permanent
    For a snapshot to be valid, there should be Proot entries for at least a number of blocks
    preceding each Root according to the Root's operation ttl.
 
+ * Loot: 'l' (protocol_data: mbytes)
+   Adds the protocol data to the snapshots. It contains a pair (level * data) for each
+   transition blocks of the exported block list. For a snapshot to be valid, there should be
+   Loot entries.
+
  * End: 'e'
    This must be the end of the file.
 
@@ -289,7 +304,7 @@ module Make (I:Dump_interface)
 
   let context_dump_magic = "V1Tezos-Context-dump"
 
-  type command_type = Root | Proot | Directory | Blob | End | Meta
+  type command_type = Root | Directory | Blob | Meta | Proot | Loot | End
 
   let rec read_string rbuf ~len =
     let fd, buf, ofs, total = !rbuf in
@@ -318,7 +333,13 @@ module Make (I:Dump_interface)
   let set_command buf c =
     Buffer.add_string buf
       ( match c with
-        | Root -> "r" | Directory -> "d" | Blob -> "b" | End -> "e" | Meta -> "m" | Proot -> "p")
+        | Root -> "r"
+        | Directory -> "d"
+        | Blob -> "b"
+        | Meta -> "m"
+        | Proot -> "p"
+        | Loot -> "l"
+        | End -> "e" )
   let get_command rbuf =
     Lwt.try_bind
       (fun () -> read_string rbuf ~len:1)
@@ -326,9 +347,10 @@ module Make (I:Dump_interface)
         | "r" -> return Root
         | "d" -> return Directory
         | "b" -> return Blob
-        | "e" -> return End
         | "m" -> return Meta
         | "p" -> return Proot
+        | "l" -> return Loot
+        | "e" -> return End
         | opcode -> fail @@ Bad_read ("wrong opcode: " ^ opcode)
       end
       begin function
@@ -342,12 +364,13 @@ module Make (I:Dump_interface)
         | `Blob -> Blob )
   let get_hash_type rbuf =
     get_command rbuf >>=? function
-    | Proot -> fail @@ Bad_read ("can't have a pruned block here")
     | Root -> fail @@ Bad_read ("can't reference commit here")
     | Directory -> return `Node
     | Blob -> return `Blob
-    | End -> fail @@ Bad_read ("unexpected end of file")
     | Meta -> fail @@ Bad_read ("can't reference meta here")
+    | Proot -> fail @@ Bad_read ("can't have a pruned block here")
+    | Loot -> fail @@ Bad_read ("can't have protocol data here")
+    | End -> fail @@ Bad_read ("unexpected end of file")
 
 
   let set_int64 buf i =
@@ -577,7 +600,7 @@ module Make (I:Dump_interface)
     Lwt.catch begin fun () ->
       magic_set () >>= fun () ->
       Error_monad.iter_s
-        (fun (bh,meta,pruned) ->
+        (fun (bh,meta,pruned,proto_data) ->
            I.get_context idx bh >>= function
            | None -> fail @@ Context_not_found (I.Block_header.to_bytes bh)
            | Some ctxt ->
@@ -586,6 +609,7 @@ module Make (I:Dump_interface)
                Tezos_stdlib.Utils.display_progress_end ();
                I.context_parents ctxt >>= fun parents ->
                set_meta buf meta_tbl (I.Block_data.to_bytes meta) >>= fun meta_h ->
+               (* Dump pruned blocks *)
                Lwt_list.fold_left_s (fun cpt pruned ->
                    Tezos_stdlib.Utils.display_progress
                      ~refresh_rate:(cpt, 1_000)
@@ -595,7 +619,14 @@ module Make (I:Dump_interface)
                    let mbhash = I.Pruned_block.to_bytes pruned in
                    set_mbytes buf mbhash ;
                    maybe_flush () >>= fun () ->
-                   Lwt.return (cpt + 1)) 0 pruned >>= fun _ ->
+                   Lwt.return (cpt + 1)) 0 pruned >>= fun _cpt ->
+               (* Dump protocol data *)
+               Lwt_list.iter_s (fun proto ->
+                   set_command buf Loot ;
+                   let mbhash = I.Protocol_data.to_bytes proto in
+                   set_mbytes buf mbhash ;
+                   maybe_flush ()
+                 ) proto_data >>= fun () ->
                set_root buf bh (I.context_info ctxt) parents meta_h ;
                return_unit
         )
