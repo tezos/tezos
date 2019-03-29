@@ -199,10 +199,12 @@ let export ?(export_rolling=false) data_dir filename block =
           block_header
           export_limit >>=? fun old_pruned_blocks_rev ->
 
+        let protocol_data = [ Context.Protocol_data.empty ] in
+
         let block_data =
           ({block_header = block_header ;
             operations } : Context.Block_data.t ) in
-        return (pred_block_header, block_data, List.rev old_pruned_blocks_rev)
+        return (pred_block_header, block_data, List.rev old_pruned_blocks_rev, protocol_data)
   end
   >>=? fun data_to_dump ->
   Store.close store;

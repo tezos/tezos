@@ -142,8 +142,39 @@ module Block_data : sig
   val encoding : t Data_encoding.t
 end
 
-val dump_contexts : index -> (Block_header.t * Block_data.t * Pruned_block.t list) list -> filename:string ->
+module Protocol_data : sig
+
+  type t = Int32.t * data
+
+  and info = {
+    author : string ;
+    message : string ;
+    timestamp : Time.t ;
+  }
+
+  and data = {
+    info : info ;
+    protocol_hash : Protocol_hash.t ;
+    test_chain_status : Test_chain_status.t ;
+    data_key : Context_hash.t ;
+    parents : Context_hash.t list ;
+  }
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+  val empty : t
+  val encoding : t Data_encoding.t
+
+end
+
+val dump_contexts :
+  index ->
+  (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
+  filename:string ->
   unit tzresult Lwt.t
 
-val dump_contexts_fd : index -> (Block_header.t * Block_data.t * Pruned_block.t list) list -> fd:Lwt_unix.file_descr ->
+val dump_contexts_fd :
+  index ->
+  (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
+  fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
