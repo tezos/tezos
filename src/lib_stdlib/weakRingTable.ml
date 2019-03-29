@@ -27,19 +27,12 @@ sig
   type 'a t
   type key
   val create: int -> 'a t
-
   val add: 'a t -> key -> 'a -> unit
-
   val add_and_return_erased: 'a t -> key -> 'a -> key option
-
   val iter: (key -> 'a -> unit) -> 'a t -> unit
-
   val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-
   val find_opt: 'a t -> key -> 'a option
-
   val remove: 'a t -> key -> unit
-
   val length : 'a t -> int
 end
 
@@ -60,6 +53,12 @@ module Make(M: Hashtbl.HashedType) = struct
       let equal = (=)
     end)
   type key = M.t
+
+  module Visit_tracking = Set.Make(
+    struct
+      type t = int
+      let compare = Pervasives.compare
+    end)
 
   type 'a t = {
     table : 'a Table.t ;
@@ -86,19 +85,20 @@ module Make(M: Hashtbl.HashedType) = struct
 
   let fold f { table ; ring } acc =
     let elts = Ring.elements ring in
-    List.fold_left
-      (fun acc (i, k) ->
-         match Table.find_opt table i with
-         | None -> acc
-         | Some elt -> f k elt acc) acc elts
+    let (res, _) =
+      List.fold_left
+        (fun (acc, visited) (i, k) ->
+           if Visit_tracking.mem i visited then
+             (acc, visited)
+           else
+             match Table.find_opt table i with
+             | None -> (acc, visited)
+             | Some elt -> (f k elt acc, Visit_tracking.add i visited))
+        (acc, Visit_tracking.empty)
+        elts in
+    res
 
-  let iter f {table ; ring } =
-    let elts = Ring.elements ring in
-    List.iter
-      (fun (i, k) ->
-         match Table.find_opt table i with
-         | None -> ()
-         | Some elt -> f k elt ) elts
+  let iter f t = fold (fun k v () -> f k v) t ()
 
   let remove t k =
     let i = M.hash k in

@@ -42,18 +42,23 @@ sig
   val iter: (key -> 'a -> unit) -> 'a t -> unit
 
   val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-  (** [fold f t acc] folds over the bindings in [t] starting with [acc]. *)
-
+  (** [fold f t acc] folds the function [f] and value [acc] through the recently
+      added elements of [t]. It never folds over more elements than the size
+      bound of the table, even if the table temporarily holds more elements. *)
 
   val find_opt: 'a t -> key -> 'a option
   (** [find_opt t k] is [Some v] if [k] is bound to [v] in [t] and [None]
       otherwise. A key [k] is bound to a value [v] in [t] if [add t k v] has been
       called and not too many other bindings have been added since then. *)
 
-  (** NOTE: hashes are not removed from the ring. *)
   val remove: 'a t -> key -> unit
+  (** [remove t k] removes the binding from [key] to the associated element in
+      [t]. Note that you may still be able to find the element using [find_opt]
+      for some time. *)
 
   val length: 'a t -> int
+  (** [length t] is the number of elements currently in [t], including those
+      that may be garbage collected. *)
 
 end
 
