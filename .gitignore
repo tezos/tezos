@@ -11,6 +11,10 @@ __pycache__
 /docs/_build
 /docs/api/tezos-client.html
 /docs/api/tezos-admin-client.html
+/docs/api/tezos-signer.html
+/docs/api/tezos-accuser-alpha.html
+/docs/api/tezos-baker-alpha.html
+/docs/api/tezos-endorser-alpha.html
 
 /tezos-node
 /tezos-protocol-compiler
