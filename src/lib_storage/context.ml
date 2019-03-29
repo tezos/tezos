@@ -522,11 +522,11 @@ module Pruned_block = struct
          (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
       )
 
-  let to_bytes x =
-    Data_encoding.Binary.to_bytes_exn encoding x
+  let to_bytes =
+    Data_encoding.Binary.to_bytes_exn encoding
 
-  let of_bytes x =
-    Data_encoding.Binary.of_bytes encoding x
+  let of_bytes =
+    Data_encoding.Binary.of_bytes encoding
 
 end
 
