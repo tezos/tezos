@@ -52,6 +52,12 @@ module type Dump_interface = sig
     val of_bytes : MBytes.t -> t option
   end
 
+  module Protocol_data : sig
+    type t
+    val to_bytes : t -> MBytes.t
+    val of_bytes : MBytes.t -> t option
+  end
+
   module Commit_hash : sig
     type t
     val to_bytes : t -> MBytes.t
@@ -100,11 +106,14 @@ module type S = sig
   type block_header
   type block_data
   type pruned_block
+  type protocol_data
 
   val dump_contexts_fd :
-    index -> (block_header * block_data * pruned_block list) list -> fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+    index ->
+    (block_header * block_data * pruned_block list * protocol_data list) list ->
+    fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-    (block_header * block_data * pruned_block list) list tzresult Lwt.t
+    (block_header * block_data * pruned_block list * protocol_data list) list tzresult Lwt.t
 end
 
 module Make (I:Dump_interface) : S
@@ -113,3 +122,4 @@ module Make (I:Dump_interface) : S
    and type block_header := I.Block_header.t
    and type block_data := I.Block_data.t
    and type pruned_block := I.Pruned_block.t
+   and type protocol_data := I.Protocol_data.t
