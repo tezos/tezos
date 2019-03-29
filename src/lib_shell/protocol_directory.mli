@@ -24,4 +24,4 @@
 (*****************************************************************************)
 
 val build_rpc_directory:
-  State.t -> unit RPC_directory.t
+  Block_validator.t -> State.t -> unit RPC_directory.t

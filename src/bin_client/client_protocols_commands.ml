@@ -80,4 +80,17 @@ let commands () =
          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
          return_unit
       ) ;
+
+    command ~group ~desc: "Fetch some protocols from the network."
+      no_options
+      (prefixes [ "fetch" ; "protocol" ]
+       @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
+       @@ stop
+      )
+      (fun () hash (cctxt : #Client_context.full) ->
+         Shell_services.Protocol.fetch cctxt hash >>=? fun hash ->
+         cctxt#message "Fetched protocol %s"
+           (Protocol_hash.to_short_b58check hash) >>= fun () ->
+         return_unit
+      )
   ]
