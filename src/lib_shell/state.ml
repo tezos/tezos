@@ -73,6 +73,9 @@ and chain_state = {
   chain_data: chain_data_state Shared.t ;
   block_rpc_directories:
     block RPC_directory.t Protocol_hash.Map.t Protocol_hash.Table.t  ;
+  header_rpc_directories:
+    (chain_state * Block_hash.t * Block_header.t)
+      RPC_directory.t Protocol_hash.Map.t Protocol_hash.Table.t  ;
 }
 
 and chain_data_state = {
@@ -490,6 +493,7 @@ module Chain = struct
       context_index = Shared.create context_index ;
       block_watcher = Lwt_watcher.create_input () ;
       block_rpc_directories = Protocol_hash.Table.create 7 ;
+      header_rpc_directories = Protocol_hash.Table.create 7 ;
     } in
     Lwt.return chain_state
 
@@ -874,6 +878,7 @@ module Block = struct
 
   let hash { hash ; _ } = hash
   let header { header ; _ } = header
+
   let header_of_hash chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
       Store.Block.Header.read_opt (store, hash)
@@ -1292,6 +1297,42 @@ module Block = struct
       (Protocol_hash.Map.add next_protocol dir map) ;
     Lwt.return_unit
 
+  let get_header_rpc_directory chain_state header =
+    Shared.use chain_state.block_store begin fun block_store ->
+      Store.Block.Header.read_opt
+        (block_store, header.Block_header.shell.predecessor) >>= function
+      | None -> Lwt.return_none (* genesis or caboose *)
+      | Some pred when Block_header.equal pred header -> Lwt.return_none (* genesis *)
+      | Some pred ->
+          Chain.get_level_indexed_protocol chain_state header >>= fun protocol ->
+          match
+            Protocol_hash.Table.find_opt
+              chain_state.header_rpc_directories protocol
+          with
+          | None -> Lwt.return_none
+          | Some map ->
+              Chain.get_level_indexed_protocol chain_state pred >>= fun next_protocol ->
+              Lwt.return (Protocol_hash.Map.find_opt next_protocol map)
+    end
+
+  let set_header_rpc_directory chain_state header dir =
+    Shared.use chain_state.block_store begin fun block_store ->
+      Store.Block.Header.read_opt
+        (block_store, header.Block_header.shell.predecessor) >>= function
+      | None -> assert false
+      | Some pred ->
+          (* Header.read_exn chain_state h.header.shell.predecessor >>= fun pred -> *)
+          Chain.get_level_indexed_protocol chain_state header >>= fun next_protocol ->
+          Chain.get_level_indexed_protocol chain_state pred >>= fun protocol ->
+          let map =
+            Option.unopt ~default:Protocol_hash.Map.empty
+              (Protocol_hash.Table.find_opt chain_state.header_rpc_directories protocol)
+          in
+          Protocol_hash.Table.replace
+            chain_state.header_rpc_directories protocol
+            (Protocol_hash.Map.add next_protocol dir map) ;
+          Lwt.return_unit
+    end
 end
 
 let watcher (state : global_state) =

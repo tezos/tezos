@@ -237,6 +237,11 @@ module Block : sig
   val get_rpc_directory: t -> t RPC_directory.t option Lwt.t
   val set_rpc_directory: t -> t RPC_directory.t -> unit Lwt.t
 
+  val get_header_rpc_directory: Chain.t -> Block_header.t ->
+    (Chain.t * Block_hash.t * Block_header.t) RPC_directory.t option Lwt.t
+  val set_header_rpc_directory: Chain.t -> Block_header.t ->
+    (Chain.t * Block_hash.t * Block_header.t) RPC_directory.t -> unit Lwt.t
+
 end
 
 val read_block:
