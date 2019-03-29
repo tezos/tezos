@@ -88,6 +88,15 @@ module type PROTO = sig
     (operation_data * operation_receipt) Data_encoding.t
 end
 
+type protocols = {
+  current_protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
+}
+
+val protocols:
+  #RPC_context.simple -> ?chain:chain -> ?block:block ->
+  unit -> protocols tzresult Lwt.t
+
 module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
   val path: (unit, chain_prefix * block) RPC_path.t
@@ -302,6 +311,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
        prefix, unit, unit,
        block_metadata) RPC_service.t
 
+    val protocols:
+      ([ `GET ], prefix,
+       prefix, unit, unit,
+       protocols) RPC_service.t
+
     module Header : sig
 
       val shell_header:
@@ -441,12 +455,3 @@ end
 
 module Fake_protocol : PROTO
 module Empty : (module type of Make(Fake_protocol)(Fake_protocol))
-
-type protocols = {
-  current_protocol: Protocol_hash.t ;
-  next_protocol: Protocol_hash.t ;
-}
-
-val protocols:
-  #RPC_context.simple -> ?chain:chain -> ?block:block ->
-  unit -> protocols tzresult Lwt.t

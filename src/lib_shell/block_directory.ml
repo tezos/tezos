@@ -45,7 +45,7 @@ let rec read_partial_context context path depth =
 
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
 
-  let dir : (Chain_id.t * Block_hash.t * Block_header.t) RPC_directory.t ref =
+  let dir : (State.Chain.t * Block_hash.t * Block_header.t) RPC_directory.t ref =
     ref RPC_directory.empty in
 
   let register0 s f =
@@ -62,12 +62,12 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
 
   (* block header *)
 
-  register0 S.header begin fun (chain_id, hash, header) () () ->
+  register0 S.header begin fun (chain_state, hash, header) () () ->
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_data_encoding
         header.protocol_data in
-    return { Block_services.hash ; chain_id ;
+    return { Block_services.hash ; chain_id = State.Chain.id chain_state ;
              shell = header.shell ; protocol_data }
   end ;
   register0 S.raw_header begin fun (_, _, header) () () ->
@@ -90,6 +90,24 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
 
   register0 S.Helpers.Forge.block_header begin fun _block () header ->
     return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
+  end ;
+
+  register0 S.protocols begin fun (chain_state, _, header) () () ->
+    State.Block.header_of_hash chain_state header.shell.predecessor >>= function
+    | None ->
+        State.Chain.get_level_indexed_protocol chain_state header >>= fun next_protocol_hash ->
+        return {
+          Tezos_shell_services.Block_services.current_protocol = next_protocol_hash ;
+          next_protocol = next_protocol_hash ;
+        }
+
+    | Some pred_header ->
+        State.Chain.get_level_indexed_protocol chain_state pred_header >>= fun protocol_hash ->
+        State.Chain.get_level_indexed_protocol chain_state header >>= fun next_protocol_hash ->
+        return {
+          Tezos_shell_services.Block_services.current_protocol = protocol_hash ;
+          next_protocol = next_protocol_hash ;
+        }
   end ;
 
   !dir
@@ -316,10 +334,10 @@ let build_raw_rpc_directory
   merge
     (RPC_directory.map
        (fun block ->
-          let chain_id = State.Block.chain_id block in
+          let chain_state = State.Block.chain_state  block in
           let hash = State.Block.hash block in
           let header = State.Block.header block in
-          Lwt.return (chain_id, hash, header))
+          Lwt.return (chain_state, hash, header))
        (build_raw_header_rpc_directory (module Proto))) ;
 
   merge
