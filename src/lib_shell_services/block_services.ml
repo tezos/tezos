@@ -429,10 +429,10 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
     let protocols =
       (* same endpoint than 'metadata' *)
       RPC_service.get_service
-        ~description:".. unexported ..."
+        ~description:"Current and next protocol."
         ~query: RPC_query.empty
         ~output: raw_protocol_encoding
-        RPC_path.(path / "metadata")
+        RPC_path.(path / "protocols")
 
     module Header = struct
 

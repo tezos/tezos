@@ -420,6 +420,18 @@ module Chain = struct
       Lwt.return chain_data.test_chain
     end
 
+  let get_level_indexed_protocol chain_state header =
+    let chain_id = chain_state.chain_id in
+    let protocol_level = header.Block_header.shell.proto_level in
+    let global_state = chain_state.global_state in
+    Shared.use global_state.global_data begin fun global_data ->
+      let global_store = global_data.global_store in
+      let chain_store = Store.Chain.get global_store chain_id in
+      Store.Chain.Protocol_hash.read_opt chain_store protocol_level >>= function
+      | None -> assert false
+      | Some p -> Lwt.return p
+    end
+
   let update_level_indexed_protocol_store chain_state chain_id level protocol_hash =
     let global_state = chain_state.global_state in
     Shared.use global_state.global_data begin fun global_data ->
@@ -855,6 +867,12 @@ module Block = struct
 
   let hash { hash } = hash
   let header { header } = header
+  let header_of_hash chain_state hash =
+    Shared.use chain_state.block_store begin fun store ->
+      Store.Block.Header.read_opt (store, hash)
+    end
+
+
   let metadata b =
     Shared.use b.chain_state.block_store begin fun store ->
       Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
