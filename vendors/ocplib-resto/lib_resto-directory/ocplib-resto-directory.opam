@@ -11,6 +11,9 @@ synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
+install: [
+  [ "dune" "install" "-p" name "-j" jobs ]
+]
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
