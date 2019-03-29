@@ -70,12 +70,14 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
     return { Block_services.hash ; chain_id = State.Chain.id chain_state ;
              shell = header.shell ; protocol_data }
   end ;
+
   register0 S.raw_header begin fun (_, _, header) () () ->
     return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
   end ;
   register0 S.Header.shell_header begin fun (_, _, header) () () ->
     return header.shell
   end ;
+
   register0 S.Header.protocol_data begin fun (_, _, header) () () ->
     return
       (Data_encoding.Binary.of_bytes_exn
@@ -92,18 +94,18 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
     return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)
   end ;
 
-  register0 S.protocols begin fun (chain_state, _, header) () () ->
+  (* protocols *)
+
+  register0 S.protocols begin fun (chain_state, _hash, header)  () () ->
+    State.Chain.get_level_indexed_protocol chain_state header >>= fun next_protocol_hash ->
     State.Block.header_of_hash chain_state header.shell.predecessor >>= function
     | None ->
-        State.Chain.get_level_indexed_protocol chain_state header >>= fun next_protocol_hash ->
         return {
           Tezos_shell_services.Block_services.current_protocol = next_protocol_hash ;
           next_protocol = next_protocol_hash ;
         }
-
     | Some pred_header ->
         State.Chain.get_level_indexed_protocol chain_state pred_header >>= fun protocol_hash ->
-        State.Chain.get_level_indexed_protocol chain_state header >>= fun next_protocol_hash ->
         return {
           Tezos_shell_services.Block_services.current_protocol = protocol_hash ;
           next_protocol = next_protocol_hash ;
@@ -378,22 +380,38 @@ let get_directory block =
               State.Block.set_rpc_directory block dir >>= fun () ->
               Lwt.return dir
 
+let get_header_directory chain_state header =
+  State.Block.header_of_hash chain_state header.Block_header.shell.predecessor >>= function
+  | None ->
+      let dir = build_raw_header_rpc_directory (module Block_services.Fake_protocol)
+      in Lwt.return dir
+  | Some pred ->
+      State.Chain.get_level_indexed_protocol
+        chain_state pred >>= fun protocol_hash ->
+      let (module Proto) = get_protocol protocol_hash in
+      State.Block.get_header_rpc_directory chain_state header >>= function
+      | Some dir ->
+          Lwt.return dir
+      | None ->
+          let dir = build_raw_header_rpc_directory (module Proto) in
+          State.Block.set_header_rpc_directory chain_state header dir >>= fun () ->
+          Lwt.return dir
+
 let get_block chain_state = function
   | `Genesis ->
       Chain.genesis chain_state >>= begin function
         | Some b -> Lwt.return_some b
-        | None -> Lwt.fail Not_found
+        | None -> Lwt.return_none
       end
   | `Head n ->
       Chain.head chain_state >>= fun head ->
       if n < 0 then
-        Lwt.fail Not_found
+        Lwt.return_none
       else if n = 0 then
         Lwt.return_some head
       else
         State.Block.read_predecessor
-          chain_state ~pred:n ~below_save_point:true
-          (State.Block.hash head)
+          chain_state ~pred:n ~below_save_point:true (State.Block.hash head)
   | `Alias (_, n) | `Hash (_, n) as b ->
       begin match b with
         | `Alias (`Checkpoint, _) ->
@@ -415,11 +433,10 @@ let get_block chain_state = function
         let target =
           Int32.(to_int (sub head_level (sub block_level (of_int n)))) in
         if target < 0 then
-          Lwt.fail Not_found
+          Lwt.return_none
         else
           State.Block.read_predecessor
-            chain_state ~pred:target ~below_save_point:true
-            (State.Block.hash head)
+            chain_state ~pred:target ~below_save_point:true (State.Block.hash head)
       else
         State.Block.read_predecessor
           chain_state ~pred:n ~below_save_point:true hash
@@ -430,16 +447,22 @@ let get_block chain_state = function
         Lwt.fail Not_found
       else
         State.Block.read_predecessor
-          chain_state ~pred:target ~below_save_point:true
-          (State.Block.hash head)
-
-
-let fake_rpc_directory =
-  build_raw_header_rpc_directory (module Block_services.Fake_protocol)
+          chain_state ~pred:target ~below_save_point:true (State.Block.hash head)
 
 let build_rpc_directory chain_state block =
   get_block chain_state block >>= function
-  | Some block ->
-      get_directory block >>= fun dir ->
-      Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)
-  | None -> Lwt.fail Not_found
+  | None ->
+      Lwt.fail Not_found
+  | Some b ->
+      State.Chain.save_point chain_state >>= fun (level_save_point, _) ->
+      let level_b = State.Block.level b in
+      if (level_b >= level_save_point) then begin
+        get_directory b >>= fun dir ->
+        Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)
+      end
+      else begin
+        let header = State.Block.header b in
+        let hash = State.Block.hash b in
+        get_header_directory chain_state header >>= fun dir ->
+        Lwt.return (RPC_directory.map (fun _ -> Lwt.return (chain_state, hash, header)) dir)
+      end
