@@ -153,17 +153,29 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
       return proto
 
 let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
+  let protocol_level = State.Block.protocol_level block in
+  let chain_state = State.Block.chain_state block in
   State.Block.context block >>= fun context ->
   let protocol =
     Context.get_protocol context >>= fun protocol_hash ->
-    fetch_and_compile_protocol pv ?peer ?timeout protocol_hash >>=? fun _ ->
+    fetch_and_compile_protocol pv ?peer ?timeout protocol_hash >>=? fun _p ->
+    let chain_id = State.Chain.id chain_state in
+    State.Chain.update_level_indexed_protocol_store
+      chain_state chain_id protocol_level protocol_hash
+    >>= fun () ->
     return_unit
   and test_protocol =
     Context.get_test_chain context >>= function
     | Not_running -> return_unit
     | Forking { protocol }
     | Running { protocol } ->
-        fetch_and_compile_protocol pv ?peer ?timeout protocol  >>=? fun _ ->
+        fetch_and_compile_protocol pv ?peer ?timeout protocol >>=? fun _ ->
+        begin State.Chain.test chain_state >>= function
+          | None -> Lwt.return_unit
+          | Some chain_id ->
+              State.Chain.update_level_indexed_protocol_store
+                chain_state chain_id protocol_level protocol
+        end >>= fun () ->
         return_unit in
   protocol >>=? fun () ->
   test_protocol >>=? fun () ->
