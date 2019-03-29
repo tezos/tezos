@@ -230,29 +230,38 @@ let test_dump { idx; genesis; block2; block3b; _ } =
   Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir2 ->
     let dumpfile = base_dir2 // "dump" in
     let ctxt_hashes = [genesis;block2;block3b;] in
+    let empty_block_header context =
+      Block_header.{
+        protocol_data = MBytes.empty;
+        shell = {
+          level = 0l;
+          proto_level = 0;
+          predecessor = Block_hash.zero;
+          timestamp = Time.epoch;
+          validation_passes = 0;
+          operations_hash = Operation_list_list_hash.zero;
+          fitness = [];
+          context;
+        } } in
+    let empty_pruned_block = ({
+        block_header = empty_block_header Context_hash.zero ;
+        operations = [] ;
+        operation_hashes = [] ;
+      } : Context.Pruned_block.t) in
     let bhs =
       List.map
         (fun context ->
-           Block_header.{
-             protocol_data = MBytes.empty;
-             shell = {
-               level = 0l;
-               proto_level = 0;
-               predecessor = Block_hash.zero;
-               timestamp = Time.epoch;
-               validation_passes = 0;
-               operations_hash = Operation_list_list_hash.zero;
-               fitness = [];
-               context;
-             } },
-           Context.Block_data.empty )
+           empty_block_header context,
+           Context.Block_data.empty,
+           [ empty_pruned_block ],
+           [ Context.Protocol_data.empty ])
         ctxt_hashes
     in
-    Context.dump_contexts idx (List.map (fun (a, b) -> (a, b, [])) bhs) ~filename:dumpfile >>=? fun () ->
+    Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
     Context.restore_contexts idx2 ~filename:dumpfile >>=? fun l ->
-    let l = List.map (fun (bh,_, _) -> bh.Block_header.shell.context) l in
+    let l = List.map (fun (bh,_, _,_) -> bh.Block_header.shell.context) l in
     Assert.equal_context_hash_list ~msg:__LOC__ ctxt_hashes l ;
     return ()
   end

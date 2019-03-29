@@ -167,7 +167,7 @@ let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
 
 let compute_export_limit
-    block_store _chain_data_store
+    block_store chain_data_store
     block_header export_rolling =
   let block_hash = Block_header.hash block_header in
   Store.Block.Contents.read_opt
@@ -580,93 +580,95 @@ let import ?(reconstruct = false) data_dir filename block =
        restore_contexts context_index ~filename >>=? fun restored_data ->
 
        (* Process data imported from snapshot *)
-       Error_monad.iter_s begin fun ((predecessor_block_header : Block_header.t), meta, old_blocks) ->
-         let ({ block_header ; operations } :
-                Block_data.t) = meta in
-         let block_hash = Block_header.hash block_header in
-         (* Checks that the block hash imported by the snapshot is the expected one *)
-         begin
-           match block with
-           | Some str ->
-               let bh = Block_hash.of_b58check_exn str in
-               fail_unless
-                 (Block_hash.equal bh block_hash)
-                 (Inconsistent_imported_block (bh,block_hash))
-           | None ->
-               lwt_log_notice "You should consider using the --block <block_hash> \
-                               argument to check that the block imported using the \
-                               snapshot is the one you expect." >>= fun () -> return ()
-         end >>=? fun () ->
-         Store.Block.Contents.known (block_store, block_hash) >>= fun known ->
-         if known then
-           (* should not happen as the data-dir must be empty *)
-           assert false
-         else
+       Error_monad.iter_s
+         begin fun ((predecessor_block_header : Block_header.t),
+                    meta, old_blocks, _protocol_data) ->
+           let ({ block_header ; operations } :
+                  Block_data.t) = meta in
+           let block_hash = Block_header.hash block_header in
+           (* Checks that the block hash imported by the snapshot is the expected one *)
            begin
-             lwt_log_notice "Importing block %a"
-               Block_hash.pp (Block_header.hash block_header) >>= fun () ->
-             (* To validate block_header we need … *)
-             (* … its predecessor context … *)
-             let pred_context_hash = predecessor_block_header.shell.context in
-             checkout_exn
-               context_index
-               pred_context_hash >>= fun predecessor_context ->
+             match block with
+             | Some str ->
+                 let bh = Block_hash.of_b58check_exn str in
+                 fail_unless
+                   (Block_hash.equal bh block_hash)
+                   (Inconsistent_imported_block (bh,block_hash))
+             | None ->
+                 lwt_log_notice "You should consider using the --block <block_hash> \
+                                 argument to check that the block imported using the \
+                                 snapshot is the one you expect." >>= fun () -> return ()
+           end >>=? fun () ->
+           Store.Block.Contents.known (block_store, block_hash) >>= fun known ->
+           if known then
+             (* should not happen as the data-dir must be empty *)
+             assert false
+           else
+             begin
+               lwt_log_notice "Importing block %a"
+                 Block_hash.pp (Block_header.hash block_header) >>= fun () ->
+               (* To validate block_header we need … *)
+               (* … its predecessor context … *)
+               let pred_context_hash = predecessor_block_header.shell.context in
+               checkout_exn
+                 context_index
+                 pred_context_hash >>= fun predecessor_context ->
 
-             (* … we can now call apply … *)
-             Tezos_validation.Block_validation.apply
-               chain_id
-               ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
-               ~predecessor_block_header:predecessor_block_header
-               ~predecessor_context
-               ~block_header
-               operations >>=? fun block_validation_result ->
+               (* … we can now call apply … *)
+               Tezos_validation.Block_validation.apply
+                 chain_id
+                 ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
+                 ~predecessor_block_header:predecessor_block_header
+                 ~predecessor_context
+                 ~block_header
+                 operations >>=? fun block_validation_result ->
 
-             check_context_hash_consistency
-               block_validation_result
-               block_header >>=? fun () ->
+               check_context_hash_consistency
+                 block_validation_result
+                 block_header >>=? fun () ->
 
-             (* … we check the history and compute the predecessor tables …*)
-             let old_blocks = List.rev_map (fun pruned_block ->
-                 let hash = Block_header.hash pruned_block.Pruned_block.block_header in
-                 (hash, pruned_block))
-                 old_blocks in
-             let history = Array.of_list old_blocks in
+               (* … we check the history and compute the predecessor tables …*)
+               let old_blocks = List.rev_map (fun pruned_block ->
+                   let hash = Block_header.hash pruned_block.Pruned_block.block_header in
+                   (hash, pruned_block))
+                   old_blocks in
+               let history = Array.of_list old_blocks in
 
-             lwt_log_notice "Checking history consistency" >>= fun () ->
-             check_history_consistency block_header history ;
+               lwt_log_notice "Checking history consistency" >>= fun () ->
+               check_history_consistency block_header history ;
 
-             (* … we set the history mode to full if it looks like a full snapshot … *)
-             set_history_mode store history >>= fun () ->
+               (* … we set the history mode to full if it looks like a full snapshot … *)
+               set_history_mode store history >>= fun () ->
 
-             (* … and we write data in store.*)
-             store_pruned_blocks store block_store chain_data history >>= fun () ->
+               (* … and we write data in store.*)
+               store_pruned_blocks store block_store chain_data history >>= fun () ->
 
-             (* Everything is ok. We can store the new hea d*)
-             store_new_head
-               chain_state
-               chain_data
-               block_header
-               operations
-               block_validation_result >>=? fun () ->
+               (* Everything is ok. We can store the new hea d*)
+               store_new_head
+                 chain_state
+                 chain_data
+                 block_header
+                 operations
+                 block_validation_result >>=? fun () ->
 
-             (* Update history mode flags *)
-             update_checkpoint chain_state block_header >>= fun new_checkpoint ->
-             update_savepoint chain_data new_checkpoint >>= fun () ->
-             let oldest_header = (snd history.(0)).block_header in
-             update_caboose chain_data block_header oldest_header
-               block_validation_result.validation_result.max_operations_ttl >>= fun () ->
+               (* Update history mode flags *)
+               update_checkpoint chain_state block_header >>= fun new_checkpoint ->
+               update_savepoint chain_data new_checkpoint >>= fun () ->
+               let oldest_header = (snd history.(0)).block_header in
+               update_caboose chain_data block_header oldest_header
+                 block_validation_result.validation_result.max_operations_ttl >>= fun () ->
 
-             (* Reconstruct all the contexts if requested *)
-             match reconstruct with
-             | true ->
-                 if is_full_snapshot history then
-                   reconstruct_contexts store context_index chain_id block_store history
-                 else
-                   fail Wrong_reconstrcut_mode
-             | false ->
-                 return_unit
-           end
-       end
+               (* Reconstruct all the contexts if requested *)
+               match reconstruct with
+               | true ->
+                   if is_full_snapshot history then
+                     reconstruct_contexts store context_index chain_id block_store history
+                   else
+                     fail Wrong_reconstrcut_mode
+               | false ->
+                   return_unit
+             end
+         end
          restored_data >>=? fun () ->
        return @@ Store.close store)
     (function

@@ -114,7 +114,7 @@ module type S = sig
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-    (block_header * block_data * pruned_block list) list tzresult Lwt.t
+    (block_header * block_data * pruned_block list * protocol_data list) list tzresult Lwt.t
 
 end
 
@@ -719,8 +719,9 @@ module Make (I:Dump_interface)
       get_command rbuf >>=?
       function
       | Root ->
+          Printf.eprintf "Reading Root\n%!";
           finalize_root ctxt >>=? fun (bh, meta) ->
-          loop (I.make_context index) ((bh, meta, []) :: acc) (succ cpt)
+          loop (I.make_context index) ((bh, meta, [], []) :: acc) (succ cpt)
       | Directory ->
           get_dir rbuf >>=?
           fun ( hash, path, keys ) -> add_dir ctxt hash path keys >>=?
@@ -729,16 +730,19 @@ module Make (I:Dump_interface)
           get_blob rbuf >>=?
           fun ( hash, path, blob ) -> add_blob ctxt path hash blob >>=?
           fun tree -> loop (I.update_context ctxt tree) acc (succ cpt)
-      | End ->
-          Tezos_stdlib.Utils.display_progress_end ();
-          return acc
       | Meta -> get_meta rbuf meta_tbl >>=? fun () -> loop ctxt acc (succ cpt)
       | Proot ->
           Tezos_stdlib.Utils.display_progress_end ();
           loop_pruned [] 0 >>=? fun pruned ->
           Tezos_stdlib.Utils.display_progress_end ();
+          loop_proto_data [] 0 >>=? fun proto_data ->
           finalize_root ctxt >>=? fun (bh, meta) ->
-          loop (I.make_context index) ((bh, meta, pruned) :: acc) (succ cpt)
+          loop (I.make_context index) ((bh, meta, pruned, proto_data) :: acc) (succ cpt)
+      | Loot ->
+          fail @@ Bad_read "No pruned blocks found"
+      | End ->
+          Tezos_stdlib.Utils.display_progress_end ();
+          return acc
     and loop_pruned acc cpt =
       Tezos_stdlib.Utils.display_progress
         ~refresh_rate:(cpt, 1_000)
@@ -750,9 +754,20 @@ module Make (I:Dump_interface)
       | Some block ->
           get_command rbuf >>=? function
           | Proot -> loop_pruned (block :: acc) (succ cpt)
-          | Root -> return (List.rev (block :: acc))
+          | Loot -> return (List.rev (block :: acc))
+          | Root -> fail @@ Bad_read "No protocol data found"
           | _ ->
               fail @@ Bad_read "invalid command in the middle of block history"
+    and loop_proto_data acc cpt =
+      get_mbytes rbuf >>= fun bytes ->
+      match I.Protocol_data.of_bytes bytes with
+      | None -> fail @@ Bad_read "wrong protocol data"
+      | Some proto ->
+          get_command rbuf >>=? function
+          | Loot -> loop_proto_data (proto :: acc) cpt
+          | Root -> return (List.rev (proto :: acc))
+          | _ ->
+              fail @@ Bad_read "invalid commund in the middle of protocol history"
     in
 
     (* Execution *)
@@ -765,8 +780,8 @@ module Make (I:Dump_interface)
         | Assert_failure (s,l,c) ->
             fail @@ Bad_read (Printf.sprintf "Bad assert at %s %d %d" s l c)
         | exc ->
-            let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
-            fail (Bad_read msg)
+            Format.kasprintf (fun x -> fail (Bad_read x))
+              "unknown error: %a" Error_monad.pp_exn exc
       )
 
     >>=? fun l ->
