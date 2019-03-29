@@ -420,6 +420,20 @@ module Chain = struct
       Lwt.return chain_data.test_chain
     end
 
+  let update_level_indexed_protocol_store chain_state chain_id level protocol_hash =
+    let global_state = chain_state.global_state in
+    Shared.use global_state.global_data begin fun global_data ->
+      let global_store = global_data.global_store in
+      let chain_store = Store.Chain.get global_store chain_id in
+      Store.Chain.Protocol_hash.read_opt chain_store level >>= begin function
+        | Some h ->
+            assert Protocol_hash.(h = protocol_hash);
+            Lwt.return_unit
+        | None ->
+            Store.Chain.Protocol_hash.store chain_store level protocol_hash
+      end
+    end
+
   let allocate
       ~genesis
       ~faked_genesis_hash
@@ -480,6 +494,7 @@ module Chain = struct
     Store.Chain_data.Checkpoint.store chain_data_store genesis_header >>= fun () ->
     Store.Chain_data.Save_point.store chain_data_store save_point >>= fun () ->
     Store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
+    Store.Chain.Protocol_hash.store chain_store 0 genesis.protocol >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -1160,6 +1175,9 @@ module Block = struct
   let protocol_hash block =
     context block >>= fun context ->
     Context.get_protocol context
+
+  let protocol_level block =
+    block.header.shell.proto_level
 
   let test_chain block =
     context block >>= fun context ->
