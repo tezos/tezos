@@ -125,7 +125,7 @@ let load_pruned_blocks block_store block_header export_limit =
       return acc
     else
       let pbh = bh.shell.predecessor in
-      Store.Block.Header.read (block_store, pbh) >>=? fun pbhd ->
+      Store.Block.Contents.read (block_store, pbh) >>=? fun { header = pbhd } ->
       Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
       Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
       let pruned_block = ({
@@ -169,20 +169,19 @@ let export ?(export_rolling=false) data_dir filename block =
   end >>=? fun block_hash ->
   Context.init ~readonly:true context_root
   >>= fun context_index ->
-  Store.Block.Header.read_opt (block_store, block_hash) >>=
+  Store.Block.Contents.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
         fail @@ Wrong_block_export (block_hash, Cannot_be_found)
-    | Some block_header ->
+    | Some { header = block_header } ->
         lwt_log_notice "Dumping: %a"
           Block_hash.pp block_hash >>= fun () ->
 
         (* Get block precessor's block header*)
         Store.Block.Predecessors.read
           (block_store, block_hash) 0 >>=? fun pred_block_hash ->
-        Store.Block.Header.read
-          (block_store, pred_block_hash) >>=? fun pred_block_header ->
-
+        Store.Block.Contents.read
+          (block_store, pred_block_hash) >>=? fun { header = pred_block_header } ->
         (* Get operation list*)
         let validations_passes = block_header.shell.validation_passes in
         Error_monad.map_s
