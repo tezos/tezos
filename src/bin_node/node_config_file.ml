@@ -51,7 +51,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  disable_testchain : bool ;
+  enable_testchain : bool ;
 }
 
 and rpc = {
@@ -107,7 +107,7 @@ let default_p2p = {
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
-  disable_testchain = false ;
+  enable_testchain = false ;
 }
 
 let default_rpc = {
@@ -256,16 +256,16 @@ let p2p =
   conv
     (fun { expected_pow ; bootstrap_peers ;
            listen_addr ; discovery_addr ; private_mode ;
-           limits ; disable_mempool ; disable_testchain } ->
+           limits ; disable_mempool ; enable_testchain } ->
       (expected_pow, bootstrap_peers,
        listen_addr, discovery_addr, private_mode, limits,
-       disable_mempool, disable_testchain))
+       disable_mempool, enable_testchain))
     (fun (expected_pow, bootstrap_peers,
           listen_addr, discovery_addr, private_mode, limits,
-          disable_mempool, disable_testchain) ->
+          disable_mempool, enable_testchain) ->
       { expected_pow ; bootstrap_peers ;
         listen_addr ; discovery_addr ; private_mode ; limits ;
-        disable_mempool ; disable_testchain })
+        disable_mempool ; enable_testchain })
     (obj8
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
@@ -306,13 +306,14 @@ let p2p =
                          It can be used to decrease the memory and \
                          computation footprints of the node."
           bool false)
-       (dft "disable_testchain"
-          ~description: "If set to [true], the node will not spawn a testchain during \
-                         the protocol's testing voting period. \
-                         Default value is [false]. It may be used used to decrease the \
-                         node storage usage and computation by droping the validation \
-                         of the test network blocks."
-          bool false)
+       (dft "enable_testchain"
+          ~description: "If set to [true], the node will spawn a \
+                         testchain during the protocol's testing \
+                         voting period. Default value is [false]. It \
+                         is disabled to decrease the node storage \
+                         usage and computation by droping the \
+                         validation of the test network blocks."
+          bool true)
     )
 
 let rpc : rpc Data_encoding.t =
@@ -526,7 +527,7 @@ let update
     ?rpc_listen_addr
     ?(private_mode = false)
     ?(disable_mempool = false)
-    ?(disable_testchain = false)
+    ?(enable_testchain = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
@@ -580,7 +581,7 @@ let update
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
-    disable_testchain = cfg.p2p.disable_testchain || disable_testchain ;
+    enable_testchain = cfg.p2p.enable_testchain || enable_testchain ;
   }
   and rpc : rpc = {
     listen_addr =
