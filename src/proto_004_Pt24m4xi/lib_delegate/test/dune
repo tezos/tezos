@@ -6,7 +6,7 @@
             tezos-rpc-http
             tezos-shell-services
             tezos-client-base
-            tezos-client-000-Ps9mPmXa
+            tezos-client-genesis
             tezos-client-004-Pt24m4xi
             tezos-baking-004-Pt24m4xi
             tezos-client-base-unix

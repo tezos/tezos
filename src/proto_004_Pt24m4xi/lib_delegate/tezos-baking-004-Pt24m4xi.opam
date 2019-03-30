@@ -13,11 +13,11 @@ depends: [
   "tezos-protocol-environment"
   "tezos-shell-services"
   "tezos-client-base"
-  "tezos-client-002-PsYLVpVv"
+  "tezos-client-alpha"
   "tezos-client-004-Pt24m4xi"
   "tezos-client-commands"
   "tezos-node" { with-test }
-  "tezos-client-000-Ps9mPmXa" { with-test }
+  "tezos-client-genesis" { with-test }
   "tezos-client-base-unix" { with-test }
   "alcotest-lwt" { with-test }
 ]

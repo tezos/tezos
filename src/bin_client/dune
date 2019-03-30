@@ -13,6 +13,9 @@
             tezos-client-base-unix
             tezos-client-alpha-commands.registration
             tezos-baking-alpha-commands.registration
+            tezos-client-004-Pt24m4xi
+            tezos-client-004-Pt24m4xi-commands.registration
+            tezos-baking-004-Pt24m4xi-commands.registration
             tezos-signer-backends)
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
