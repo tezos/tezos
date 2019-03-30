@@ -1,0 +1,14 @@
+storage unit ;
+parameter (pair nat nat) ;
+code { CAR ; UNPAIR ;
+       DUP ;
+       PUSH nat 1 ;
+       IFCMPGE
+         { DROP ; DROP ; UNIT ; NIL operation ; PAIR }
+         { PUSH nat 1 ; SWAP ; SUB @parameter ; ISNAT ;
+           IF_NONE
+             { DROP ; UNIT ; NIL operation ; PAIR }
+             { DUP ; DIP { PUSH nat 1 ; ADD ; MUL @storage } ; PAIR ;
+               DIP { SELF; PUSH tez "0" } ;
+               TRANSFER_TOKENS ; NIL operation ; SWAP ; CONS ;
+               UNIT ; SWAP ; PAIR } } }
