@@ -13,8 +13,10 @@
             tezos-embedded-protocol-001-PtCJ7pwo
             tezos-embedded-protocol-002-PsYLVpVv
             tezos-embedded-protocol-003-PsddFKi3
+            tezos-embedded-protocol-004-Pt24m4xi
             tezos-mempool-002-PsYLVpVv
             tezos-mempool-003-PsddFKi3
+            tezos-mempool-004-Pt24m4xi
             cmdliner
             tls)
  (flags (:standard -w -9+27-30-32-40@8

@@ -13,10 +13,13 @@
             tezos-client-001-PtCJ7pwo
             tezos-client-002-PsYLVpVv
             tezos-client-003-PsddFKi3
+            tezos-client-004-Pt24m4xi
             tezos-client-001-PtCJ7pwo-commands.registration
             tezos-client-002-PsYLVpVv-commands.registration
             tezos-client-003-PsddFKi3-commands.registration
             tezos-baking-003-PsddFKi3-commands.registration
+            tezos-client-004-Pt24m4xi-commands.registration
+            tezos-baking-004-Pt24m4xi-commands.registration
             tezos-signer-backends)
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
