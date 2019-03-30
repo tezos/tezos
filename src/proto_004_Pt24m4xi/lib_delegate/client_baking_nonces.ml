@@ -117,24 +117,76 @@ let get_unrevealed_nonces cctxt location nonces =
           begin get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
             | Some level -> begin
                 Lwt.return
-                  (Alpha_environment.wrap_error (Raw_level.of_int32 level)) >>=? fun level ->
-                Alpha_services.Nonce.get cctxt (chain, `Head 0) level >>=? function
-                | Missing nonce_hash
-                  when Nonce.check_hash nonce nonce_hash ->
-                    lwt_log_notice Tag.DSL.(fun f ->
-                        f "Found nonce to reveal for %a (level: %a)"
-                        -% t event "found_nonce"
-                        -% a Block_hash.Logging.tag hash
-                        -% a Logging.level_tag level) >>= fun () ->
-                    return_some (level, nonce)
-                | Missing _nonce_hash ->
-                    lwt_log_error Tag.DSL.(fun f ->
-                        f "Incoherent nonce for level %a"
-                        -% t event "bad_nonce"
-                        -% a Logging.level_tag level)
-                    >>= fun () -> return_none
-                | Forgotten -> return_none
-                | Revealed _ -> return_none end
+                  (Alpha_environment.wrap_error (Raw_level.of_int32 level)) >>=? fun raw_level ->
+                Chain_services.Blocks.protocols
+                  cctxt ~chain ~block:(`Hash (hash, 0)) () >>=? fun { next_protocol } ->
+                if Protocol_hash.equal next_protocol Tezos_client_004_Pt24m4xi.Proto_alpha.hash then
+                  Alpha_services.Nonce.get
+                    cctxt (chain, (`Head 0)) raw_level >>=? function
+                  | Missing nonce_hash
+                    when Nonce.check_hash nonce nonce_hash ->
+                      lwt_log_notice Tag.DSL.(fun f ->
+                          f "Found nonce to reveal for %a (level: %a)"
+                          -% t event "found_nonce"
+                          -% a Block_hash.Logging.tag hash
+                          -% a Logging.level_tag raw_level)
+                      >>= fun () ->
+                      return_some (raw_level, nonce)
+                  | Missing _nonce_hash ->
+                      lwt_log_error Tag.DSL.(fun f ->
+                          f "Incoherent nonce for level %a"
+                          -% t event "bad_nonce"
+                          -% a Logging.level_tag raw_level)
+                      >>= fun () -> return_none
+                  | Forgotten -> return_none
+                  | Revealed _ -> return_none
+                else if Protocol_hash.equal next_protocol Tezos_client_003_PsddFKi3.Proto_alpha.hash then
+                  Lwt.return (
+                    Tezos_client_003_PsddFKi3.Proto_alpha.Alpha_environment.wrap_error
+                      (Tezos_client_003_PsddFKi3.Proto_alpha.Alpha_context.Raw_level.of_int32 level)) >>=? fun raw_level_alpha ->
+                  Tezos_client_003_PsddFKi3.Proto_alpha.Alpha_services.Nonce.get
+                    cctxt (chain, (`Head 0)) raw_level_alpha >>=? function
+                  | Missing nonce_hash ->
+                      let nonce_hash_alpha =
+                        let bytes =
+                          Data_encoding.Binary.to_bytes
+                            Tezos_client_003_PsddFKi3.Proto_alpha.Nonce_hash.encoding
+                            nonce_hash in
+                        match bytes with
+                        | None -> None
+                        | Some bytes -> Data_encoding.Binary.of_bytes Nonce_hash.encoding bytes in
+                      begin match nonce_hash_alpha with
+                        | None ->
+                            lwt_log_error Tag.DSL.(fun f ->
+                                f "Could not convert nonce for block %a from proto 002 to proto 003"
+                                -% t event "inconvertible_nonce"
+                                -% a Block_hash.Logging.tag hash)
+                            >>= fun () -> return_none
+                        | Some nonce_hash_alpha ->
+                            if Nonce.check_hash nonce nonce_hash_alpha then
+                              lwt_log_notice Tag.DSL.(fun f ->
+                                  f "Found nonce to reveal for %a (level: %a)"
+                                  -% t event "found_nonce"
+                                  -% a Block_hash.Logging.tag hash
+                                  -% a Logging.level_tag raw_level)
+                              >>= fun () ->
+                              return_some (raw_level, nonce)
+                            else
+                              lwt_log_error Tag.DSL.(fun f ->
+                                  f "Incoherent nonce for level %a"
+                                  -% t event "bad_nonce"
+                                  -% a Logging.level_tag raw_level)
+                              >>= fun () -> return_none
+                      end
+                  | Forgotten -> return_none
+                  | Revealed _ -> return_none
+                else
+                  lwt_log_error Tag.DSL.(fun f ->
+                      f "Unexpected protocol when revealing nonce for block %a"
+                      -% t event "nonce_from_an_unexpected_protocol"
+                      -% a Block_hash.Logging.tag hash) >>= fun () ->
+                  return_none
+              end
             | None -> return_none
           end)
     blocks
