@@ -56,11 +56,20 @@ let no_write_context ?(chain = `Main) ?(block = `Head 0) config : #Client_contex
   method chain = chain
   method block = block
   method confirmations = None
-  method password_filename = None
   method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
     Format.kasprintf (fun _ -> return "")
   method prompt_password : type a. (a, MBytes.t tzresult) Client_context.lwt_format -> a =
     Format.kasprintf (fun _ -> return (MBytes.of_string ""))
+  method load_passwords = None
+  method read_file path =
+    Lwt.catch
+      (fun () ->
+         Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+         return content)
+      (fun exn ->
+         failwith
+           "cannot read file (%s)" (Printexc.to_string exn))
+  method sleep = Lwt_unix.sleep
 end
 
 let sandbox_parameters =

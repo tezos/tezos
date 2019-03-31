@@ -30,7 +30,23 @@ include Internal_event.Legacy_logging.Make_semantic
 
 class unix_wallet ~base_dir ~password_filename : wallet = object (self)
 
-  method password_filename = password_filename
+  method load_passwords = match password_filename with
+    | None -> None
+    | Some filename -> 
+        Some (fun () ->
+            if Sys.file_exists filename then begin
+              Lwt_io.lines_of_file filename
+            end else 
+              Lwt_stream.of_list [])
+
+  method read_file path =
+    Lwt.catch
+      (fun () ->
+         Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+         return content)
+      (fun exn ->
+         failwith
+           "cannot read file (%s)" (Printexc.to_string exn))
 
   method private filename alias_name =
     Filename.concat
@@ -127,12 +143,17 @@ class unix_logger ~base_dir =
     inherit Client_context.simple_printer log
   end
 
+class unix_ui = object
+  method sleep = Lwt_unix.sleep
+end
+
 class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename ~rpc_config : Client_context.full =
   object
     inherit unix_logger ~base_dir
     inherit unix_prompter
     inherit unix_wallet ~base_dir ~password_filename
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
+    inherit unix_ui
     method chain = chain
     method block = block
     method confirmations = confirmations

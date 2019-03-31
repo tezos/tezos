@@ -38,7 +38,7 @@ let in_block operation_hash operations =
 let wait_for_bootstrapped (ctxt : #Client_context.full) =
   let display = ref false in
   Lwt.async begin fun () ->
-    Lwt_unix.sleep 0.3 >>= fun () ->
+    ctxt#sleep 0.3 >>= fun () ->
     if not !display then
       ctxt#answer "Waiting for the node to be bootstrapped before injection..." >>= fun () ->
       display := true ;

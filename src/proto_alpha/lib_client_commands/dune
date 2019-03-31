@@ -7,6 +7,7 @@
             tezos-protocol-environment
             tezos-shell-services
             tezos-client-base
+            tezos-client-base-unix
             tezos-client-alpha
             tezos-client-commands
             tezos-rpc)
@@ -16,6 +17,7 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
+                   -open Tezos_client_base_unix
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
                    -open Tezos_rpc)))
