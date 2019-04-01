@@ -806,6 +806,40 @@ let load_protocol_data index pruned_blocks =
   Lwt_list.map_s
     (get_protocol_data_from_pruned_block index) transition_pruned_blocks
 
+(* Mock some GitStore types, so we can build our own Merkle tree. *)
+
+module Mock : sig
+
+  val node : GitStore.Repo.t -> P.Node.key -> GitStore.node
+
+  val commit : GitStore.repo -> Hack.key -> P.Commit.value -> GitStore.commit
+
+end = struct
+
+  [@@@ocaml.warning "-37"]
+
+  type commit = { r: GitStore.Repo.t ; h: Context_hash.t; v: P.Commit.value }
+
+  type empty
+
+  type u =
+    | Map : empty -> u
+    | Key : GitStore.Repo.t * P.Node.key -> u
+    | Both: empty * empty * empty -> u
+
+  and node = {mutable v : u}
+
+  let node repo key =
+    let t : u = Key (repo, key) in
+    let node : node = {v = t} in
+    (Obj.magic node : GitStore.node)
+
+  let commit r h v =
+    let c : commit = {r ; h ; v} in
+    (Obj.magic c : GitStore.commit)
+
+end
+
 let validate_context_hash_consistency_and_commit
     ~data_hash
     ~expected_context_hash
@@ -815,9 +849,11 @@ let validate_context_hash_consistency_and_commit
     ~message
     ~author
     ~parents
+    ~index
   =
   let protocol_value = Protocol_hash.to_bytes protocol_hash in
-  let test_chain_value = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding test_chain in
+  let test_chain_value = Data_encoding.Binary.to_bytes_exn
+      Test_chain_status.encoding test_chain in
   let tree = GitStore.Tree.empty in
   GitStore.Tree.add tree current_protocol_key protocol_value >>= fun tree ->
   GitStore.Tree.add tree current_test_chain_key test_chain_value >>= fun tree ->
@@ -830,7 +866,16 @@ let validate_context_hash_consistency_and_commit
   let commit = P.Commit.Val.v ~parents ~node ~info in
   let computed_context_hash = P.Commit.Key.digest P.Commit.Val.t commit in
   if Context_hash.equal expected_context_hash computed_context_hash then
-    Lwt.return_true
+    let mock_parents = List.map (fun h -> Mock.commit index.repo h commit) parents in
+    let ctxt = {index ; tree = GitStore.Tree.empty ; parents = mock_parents} in
+    set_test_chain ctxt test_chain >>= fun ctxt ->
+    set_protocol ctxt protocol_hash >>= fun ctxt ->
+    let data_t = `Node (Mock.node index.repo data_hash) in
+    GitStore.Tree.add_tree ctxt.tree current_data_key data_t >>= fun new_tree ->
+    GitStore.Commit.v ctxt.index.repo ~info ~parents:ctxt.parents new_tree
+    >>= fun commit ->
+    let ctxt_h = GitStore.Commit.hash commit in
+    Lwt.return (Context_hash.equal ctxt_h expected_context_hash)
   else
     Lwt.return_false
 
