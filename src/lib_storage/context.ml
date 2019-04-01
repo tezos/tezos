@@ -106,6 +106,7 @@ type t = context
 
 let current_protocol_key = ["protocol"]
 let current_test_chain_key = ["test_chain"]
+let current_data_key = ["data"]
 
 let exists index key =
   GitStore.Commit.of_hash index.repo key >>= function
@@ -752,6 +753,62 @@ module Dumpable_context = struct
   module Pruned_block = Pruned_block
   module Protocol_data = Protocol_data
 end
+
+(* Protocol data *)
+
+let data_node_hash index context =
+  GitStore.Tree.get_tree context.tree current_data_key >>= fun dt ->
+  GitStore.Tree.hash index.repo dt >>= fun dt_hash ->
+  match dt_hash with `Node x -> Lwt.return x | _ -> assert false
+
+let get_transition_block_headers pruned_blocks =
+  let rec aux hs x bs = match bs with
+    | [] ->
+        x :: hs
+    | b :: bs ->
+        let xl = x.Pruned_block.block_header.shell.proto_level in
+        let bl = b.Pruned_block.block_header.shell.proto_level in
+        if not (xl = bl) then
+          aux (x :: hs) b bs
+        else
+          aux hs b bs
+  in match pruned_blocks with
+  | [] -> assert false
+  | x :: xs -> aux [] x xs
+
+let get_protocol_data_from_pruned_block index pruned_block =
+  checkout_exn index pruned_block.Pruned_block.block_header.Block_header.shell.context
+  >>= fun context ->
+  let level = pruned_block.block_header.shell.level in
+  let irmin_info = Dumpable_context.context_info context in
+  let date = Irmin.Info.date irmin_info in
+  let author = Irmin.Info.author irmin_info in
+  let message = Irmin.Info.message irmin_info in
+  let info = {
+    Protocol_data.timestamp = Time.of_seconds date ;
+    author ;
+    message ;
+  } in
+  Dumpable_context.context_parents context >>= fun parents ->
+  get_protocol context >>= fun protocol_hash ->
+  get_test_chain context >>= fun test_chain_status ->
+  data_node_hash index context >>= fun data_key ->
+  Lwt.return (level , {
+      Protocol_data.parents ;
+      protocol_hash ;
+      test_chain_status ;
+      data_key ;
+      info ;
+    })
+
+let load_protocol_data index pruned_blocks =
+  let transition_pruned_blocks =
+    get_transition_block_headers pruned_blocks in
+  Lwt_list.map_s
+    (get_protocol_data_from_pruned_block index) transition_pruned_blocks
+
+(* Context dumper *)
+
 module Context_dumper = Context_dump.Make(Dumpable_context)
 
 include Context_dumper (* provides functions dump_contexts and restore_contexts *)

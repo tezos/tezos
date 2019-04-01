@@ -167,6 +167,8 @@ let export ?(export_rolling=false) data_dir filename block =
             Block_hash.pp last_checkpoint_hash >>= fun () ->
           return last_checkpoint_hash
   end >>=? fun block_hash ->
+  Context.init ~readonly:true context_root
+  >>= fun context_index ->
   Store.Block.Header.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
@@ -199,17 +201,18 @@ let export ?(export_rolling=false) data_dir filename block =
           block_header
           export_limit >>=? fun old_pruned_blocks_rev ->
 
-        let protocol_data = [ Context.Protocol_data.empty ] in
+        let old_pruned_blocks = List.rev old_pruned_blocks_rev in
+
+        Context.load_protocol_data context_index old_pruned_blocks >>= fun protocol_data ->
 
         let block_data =
           ({block_header = block_header ;
             operations } : Context.Block_data.t ) in
-        return (pred_block_header, block_data, List.rev old_pruned_blocks_rev, protocol_data)
+
+        return (pred_block_header, block_data, old_pruned_blocks, protocol_data)
   end
   >>=? fun data_to_dump ->
   Store.close store;
-  Context.init ~readonly:true context_root
-  >>= fun context_index ->
   Context.dump_contexts
     context_index
     [ data_to_dump ]
