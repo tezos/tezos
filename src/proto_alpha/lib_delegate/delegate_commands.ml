@@ -117,6 +117,40 @@ let delegate_commands () =
        @@ stop)
       (fun () delegate cctxt ->
          endorse_block cctxt ~chain:cctxt#chain delegate) ;
+    command ~group ~desc: "Clear the nonces file by removing the \
+                           nonces which blocks cannot be found on the \
+                           chain."
+      no_options
+      (prefixes [ "filter" ; "orphan" ; "nonces" ]
+       @@ stop)
+      (fun () (cctxt : #Proto_alpha.full) ->
+         cctxt#with_lock begin fun () ->
+           let chain = cctxt#chain in
+           Client_baking_files.resolve_location
+             cctxt ~chain `Nonce >>=? fun nonces_location ->
+           let open Client_baking_nonces in
+           (* Filtering orphan nonces *)
+           load cctxt nonces_location >>=? fun nonces ->
+           get_outdated_nonces cctxt ~chain nonces >>=? fun (orphans, _) ->
+           if Block_hash.Map.cardinal orphans = 0 then begin
+             cctxt#message "No orphan nonces found." >>= fun () ->
+             return_unit
+           end else
+             let filtered_nonces = Client_baking_nonces.remove_all nonces orphans in
+             save cctxt nonces_location filtered_nonces >>=? fun () ->
+             (* "Backup-ing" orphan nonces *)
+             let orphan_nonces_file = "orphan_nonce" in
+             cctxt#load orphan_nonces_file ~default:empty encoding >>=? fun orphan_nonces ->
+             let orphan_nonces = add_all orphan_nonces orphans in
+             cctxt#write orphan_nonces_file orphan_nonces encoding >>=? fun () ->
+             (* Don't forget the 's'. *)
+             let orphan_nonces_file = orphan_nonces_file ^ "s" in
+             cctxt#message "Successfully filtered %d orphan \
+                            nonces and moved them to '$TEZOS_CLIENT/%s'."
+               (Block_hash.Map.cardinal orphans) orphan_nonces_file >>= fun () ->
+             return_unit
+         end
+      )
   ]
 
 let init_signal () =
