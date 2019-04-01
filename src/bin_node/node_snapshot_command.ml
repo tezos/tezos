@@ -513,7 +513,6 @@ let reconstruct_contexts
             let block_hash, pb = history.(level) in
             Store.Block.Header.read
               (block_store, block_hash) >>=? fun block_header ->
-            let max_operations_ttl = (max_int - 1) in
             let operations = List.rev (List.map snd pb.operations) in
             let predecessor_block_hash = pb.block_header.shell.predecessor in
             Store.Block.Header.read
@@ -523,7 +522,7 @@ let reconstruct_contexts
 
             Tezos_validation.Block_validation.apply
               chain_id
-              ~max_operations_ttl
+              ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
               ~predecessor_block_header:pred_block_header
               ~predecessor_context:pred_context
               ~block_header
@@ -616,7 +615,7 @@ let import ?(reconstruct = false) data_dir filename block =
              (* … we can now call apply … *)
              Tezos_validation.Block_validation.apply
                chain_id
-               ~max_operations_ttl:(max_int-1)
+               ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
                ~predecessor_block_header:predecessor_block_header
                ~predecessor_context
                ~block_header
