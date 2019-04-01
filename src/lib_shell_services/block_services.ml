@@ -427,7 +427,6 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         RPC_path.(path / "metadata")
 
     let protocols =
-      (* same endpoint than 'metadata' *)
       RPC_service.get_service
         ~description:"Current and next protocol."
         ~query: RPC_query.empty
