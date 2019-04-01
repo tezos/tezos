@@ -27,7 +27,6 @@
 open Genesis_chain
 open Node_logging
 
-
 type wrong_block_export_error =
   | Pruned
   | Too_few_predecessors
@@ -179,9 +178,15 @@ let compute_export_limit
   let max_op_ttl = block_content.max_operations_ttl in
   begin
     if not export_rolling then
-      return 1l
-    else
-      return (Int32.(sub block_header.Block_header.shell.level (of_int max_op_ttl)))
+      Store.Chain_data.Caboose.read chain_data_store >>=? fun (caboose_level,_) ->
+      return caboose_level
+    else begin
+      let limit = Int32.(sub block_header.Block_header.shell.level (of_int max_op_ttl)) in
+      (* fail when the limit exceed the genesis or the genesis is included in the export limit *)
+      fail_when (limit <= 0l)
+        (Wrong_block_export (block_hash, Too_few_predecessors)) >>=? fun () ->
+      return limit
+    end
   end >>=? fun export_limit ->
   (* never include genesis *)
   return (max 1l export_limit)
@@ -231,7 +236,7 @@ let export ?(export_rolling=false) data_dir filename block =
     | Archive | Full -> return_unit
     | Rolling ->
         if export_rolling then return_unit else
-          fail @@ Wrong_snapshot_export (history_mode, History_mode.Rolling)
+          fail @@ Wrong_snapshot_export (history_mode, History_mode.Full)
   end >>=? fun () ->
   begin
     match block with
