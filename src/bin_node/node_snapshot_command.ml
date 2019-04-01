@@ -229,16 +229,18 @@ let export ?(export_rolling=false) data_dir filename block =
   begin
     match block with
     | Some block_hash ->
-        Lwt.return (Block_hash.of_b58check_exn block_hash)
+        return (Block_hash.of_b58check_exn block_hash)
     | None ->
-        Store.Chain_data.Current_head.read_opt chain_data_store >|=
-        Option.unopt_assert ~loc:__POS__ >>= fun head ->
-        Store.Block.Predecessors.read_opt (block_store, head) 6  >|=
-        Option.unopt_assert ~loc:__POS__ >>= fun sixteenth_pred ->
-        lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (64th predecessor from the current head)"
-          Block_hash.pp sixteenth_pred >>= fun () ->
-        Lwt.return sixteenth_pred
-  end >>= fun block_hash ->
+        Store.Chain_data.Checkpoint.read_opt chain_data_store >|=
+        Option.unopt_assert ~loc:__POS__ >>= fun last_checkpoint ->
+        if last_checkpoint.shell.level = 0l then
+          fail @@ Wrong_block_export (genesis.block, Too_few_predecessors)
+        else
+          return @@ Block_header.hash last_checkpoint >>=? fun last_checkpoint_hash ->
+          lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (last checkpoint)"
+            Block_hash.pp last_checkpoint_hash >>= fun () ->
+          return last_checkpoint_hash
+  end >>=? fun block_hash ->
   Store.Block.Header.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
