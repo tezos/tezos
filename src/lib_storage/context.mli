@@ -167,6 +167,9 @@ module Protocol_data : sig
 
 end
 
+val load_protocol_data : index -> Pruned_block.t list ->
+  Protocol_data.t list Lwt.t
+
 val dump_contexts :
   index ->
   (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
