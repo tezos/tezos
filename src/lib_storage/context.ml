@@ -100,6 +100,7 @@ and context = {
   parents: GitStore.Commit.t list ;
   tree: GitStore.tree ;
 }
+
 type t = context
 
 (*-- Version Access and Update -----------------------------------------------*)
@@ -725,7 +726,6 @@ module Dumpable_context = struct
         GitStore.Tree.add_tree tree key sub_tree >>=
         Lwt.return_some
 
-
   let add_mbytes index tree key bytes =
     GitStore.Tree.hash index.repo (`Contents (bytes, ())) >>= fun _ignored  ->
     GitStore.Tree.add tree key bytes
@@ -805,6 +805,34 @@ let load_protocol_data index pruned_blocks =
     get_transition_block_headers pruned_blocks in
   Lwt_list.map_s
     (get_protocol_data_from_pruned_block index) transition_pruned_blocks
+
+let validate_context_hash_consistency_and_commit
+    ~data_hash
+    ~expected_context_hash
+    ~timestamp
+    ~test_chain
+    ~protocol_hash
+    ~message
+    ~author
+    ~parents
+  =
+  let protocol_value = Protocol_hash.to_bytes protocol_hash in
+  let test_chain_value = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding test_chain in
+  let tree = GitStore.Tree.empty in
+  GitStore.Tree.add tree current_protocol_key protocol_value >>= fun tree ->
+  GitStore.Tree.add tree current_test_chain_key test_chain_value >>= fun tree ->
+  let info = Irmin.Info.v ~date:(Time.to_seconds timestamp) ~author message in
+  let o_tree = Hack.cast (match tree with `Node n -> n | _ -> assert false) in
+  let map = match o_tree with Map m -> m | _ -> assert false in
+  let data_tree = Hack.Key data_hash in
+  let new_map = Hack.Map (Hack.StepMap.add "data" (`Node data_tree) map) in
+  let node = Hack.hash_node new_map in
+  let commit = P.Commit.Val.v ~parents ~node ~info in
+  let computed_context_hash = P.Commit.Key.digest P.Commit.Val.t commit in
+  if Context_hash.equal expected_context_hash computed_context_hash then
+    Lwt.return_true
+  else
+    Lwt.return_false
 
 (* Context dumper *)
 
