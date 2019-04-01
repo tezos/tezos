@@ -75,6 +75,7 @@ type error += Wrong_block_export of Block_hash.t * wrong_block_export_error
 type error += Inconsistent_imported_block of Block_hash.t * Block_hash.t
 type error += Snapshot_import_failure of string
 type error += Wrong_reconstrcut_mode
+type error += Wrong_protocol_hash of Protocol_hash.t
 
 let () =
   register_error_kind
@@ -147,7 +148,19 @@ let () =
           "Contexts reconstruction is available with full mode snapshots only.")
     Data_encoding.empty
     (function Wrong_reconstrcut_mode -> Some () | _ -> None)
-    (fun () -> Wrong_reconstrcut_mode)
+    (fun () -> Wrong_reconstrcut_mode) ;
+  register_error_kind
+    `Permanent
+    ~id:"Wrong_protocol_hash"
+    ~title:"Wrong protocol hash"
+    ~description:"Wrong protocol hash"
+    ~pp:(fun ppf p ->
+        Format.fprintf ppf
+          "Wrong protocol hash (%a) found in snapshot. Snapshot is corrupted."
+          Protocol_hash.pp p)
+    Data_encoding.(obj1 (req "protocol_hash" Protocol_hash.encoding))
+    (function Wrong_protocol_hash p -> Some p | _ -> None)
+    (fun p -> Wrong_protocol_hash p)
 
 let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
@@ -241,6 +254,8 @@ let export ?(export_rolling=false) data_dir filename block =
             Block_hash.pp last_checkpoint_hash >>= fun () ->
           return last_checkpoint_hash
   end >>=? fun block_hash ->
+  Context.init ~readonly:true context_root
+  >>= fun context_index ->
   Store.Block.Header.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
@@ -273,17 +288,18 @@ let export ?(export_rolling=false) data_dir filename block =
           block_header
           export_limit >>=? fun old_pruned_blocks_rev ->
 
-        let protocol_data = [ Context.Protocol_data.empty ] in
+        let old_pruned_blocks = List.rev old_pruned_blocks_rev in
+
+        Context.load_protocol_data context_index old_pruned_blocks >>= fun protocol_data ->
 
         let block_data =
           ({block_header = block_header ;
             operations } : Context.Block_data.t ) in
-        return (pred_block_header, block_data, List.rev old_pruned_blocks_rev, protocol_data)
+
+        return (pred_block_header, block_data, old_pruned_blocks, protocol_data)
   end
   >>=? fun data_to_dump ->
   Store.close store;
-  Context.init ~readonly:true context_root
-  >>= fun context_index ->
   Context.dump_contexts
     context_index
     [ data_to_dump ]
@@ -530,6 +546,45 @@ let reconstruct_contexts
   return_unit
 
 
+let import_protocol_data store pruned_blocks (level, protocol_data) =
+  (* Retreive the original context hash of the block. *)
+  let block_header =
+    let pruned_block = snd @@ pruned_blocks.(Int32.to_int level - 1) in
+    pruned_block.Context.Pruned_block.block_header
+  in
+  let expected_context_hash = block_header.shell.context in
+  (* Retreive the input info. *)
+  let info = protocol_data.Context.Protocol_data.info in
+  let test_chain = protocol_data.test_chain_status in
+  let data_hash = protocol_data.data_key in
+  let parents = protocol_data.parents in
+  let protocol_hash = protocol_data.protocol_hash in
+  (* Validate the context hash consistency, and so the protocol data. *)
+  Context.validate_context_hash_consistency_and_commit
+    ~author:info.author
+    ~timestamp:info.timestamp
+    ~message:info.message
+    ~data_hash
+    ~parents
+    ~expected_context_hash
+    ~test_chain
+    ~protocol_hash
+  >>= function
+  | true ->
+      let protocol_level = block_header.shell.proto_level in
+      Store.Chain.Protocol_hash.store store protocol_level protocol_hash >>= fun () ->
+      return_unit
+  | false ->
+      fail (Wrong_protocol_hash protocol_hash)
+
+let import_protocol_data_list store pruned_blocks protocol_data =
+  let rec aux = function
+    | [] -> return_unit
+    | (level, protocol_data) :: xs ->
+        import_protocol_data store pruned_blocks (level, protocol_data) >>=? fun () ->
+        aux xs
+  in aux protocol_data
+
 let import ?(reconstruct = false) data_dir filename block =
   let data_dir =
     match data_dir with
@@ -568,7 +623,7 @@ let import ?(reconstruct = false) data_dir filename block =
        (* Process data imported from snapshot *)
        Error_monad.iter_s
          begin fun ((predecessor_block_header : Block_header.t),
-                    meta, old_blocks, _protocol_data) ->
+                    meta, old_blocks, protocol_data) ->
            let ({ block_header ; operations } :
                   Block_data.t) = meta in
            let block_hash = Block_header.hash block_header in
@@ -625,6 +680,9 @@ let import ?(reconstruct = false) data_dir filename block =
 
                (* … we set the history mode to full if it looks like a full snapshot … *)
                set_history_mode store history >>= fun () ->
+
+               (* … and we import protocol data...*)
+               import_protocol_data_list chain_store history protocol_data >>=? fun () ->
 
                (* … and we write data in store.*)
                store_pruned_blocks store block_store chain_data history >>= fun () ->
