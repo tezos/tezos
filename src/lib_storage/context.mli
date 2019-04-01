@@ -193,3 +193,14 @@ val dump_contexts_fd :
 
 val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
   (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list tzresult Lwt.t
+
+val validate_context_hash_consistency_and_commit :
+  data_hash:Context_hash.t ->
+  expected_context_hash:Context_hash.t ->
+  timestamp:Time.t ->
+  test_chain:Test_chain_status.t ->
+  protocol_hash:Protocol_hash.t ->
+  message:string ->
+  author:string ->
+  parents:Context_hash.t list ->
+  bool Lwt.t

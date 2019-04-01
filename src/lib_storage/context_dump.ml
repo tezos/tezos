@@ -303,8 +303,7 @@ let () = register_error_kind `Permanent
 *)
 
 
-module Make (I:Dump_interface)
-= struct
+module Make (I:Dump_interface) = struct
 
   let context_dump_magic = "V1Tezos-Context-dump"
 
@@ -528,7 +527,6 @@ module Make (I:Dump_interface)
     then ( Hashtbl.add tbl h b; return () )
     else fail @@ Bad_read "wrong meta hash"
 
-
   (* Dumping *)
 
   let dump_contexts_fd idx blocks ~fd =
@@ -629,7 +627,7 @@ module Make (I:Dump_interface)
                    set_command buf Loot ;
                    let mbhash = I.Protocol_data.to_bytes proto in
                    set_mbytes buf mbhash ;
-                   maybe_flush ()
+                   maybe_flush () ;
                  ) proto_data >>= fun () ->
                set_root buf bh (I.context_info ctxt) parents meta_h ;
                return_unit
