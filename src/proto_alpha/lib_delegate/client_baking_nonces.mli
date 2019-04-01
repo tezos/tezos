@@ -25,7 +25,9 @@
 
 open Proto_alpha.Alpha_context
 
-type t
+type t = Nonce.t Block_hash.Map.t
+
+val encoding: t Data_encoding.t
 
 val empty: t
 
@@ -39,15 +41,26 @@ val find_opt: t -> Block_hash.t -> Nonce.t option
 
 val add: t -> Block_hash.t -> Nonce.t -> t
 
+val add_all: t -> t -> t
+
 val remove: t -> Block_hash.t -> t
 
+val remove_all: t -> t -> t
+
+(** [get_outdated_nonces] returns the nonces that cannot be associated
+    to blocks (orphans) and the nonces that are older than 5 cycles. *)
+val get_outdated_nonces:
+  #Proto_alpha.full ->
+  ?constants:Constants.t ->
+  chain:Block_services.chain ->
+  t ->
+  (t * t) tzresult Lwt.t
+
 (** [filter_outdated_nonces] filters nonces older than 5 cycles in the
-    nonce file or nonces associated to blocks that cannot be retrieved
-*)
+    nonce file. *)
 val filter_outdated_nonces:
   #Proto_alpha.full ->
   ?constants: Constants.t ->
-  chain: Chain_services.chain ->
   [ `Nonce ] Client_baking_files.location ->
   t ->
   t tzresult Lwt.t

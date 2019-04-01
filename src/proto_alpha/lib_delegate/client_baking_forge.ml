@@ -1186,7 +1186,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain ~blo
                    - A revelation was not included yet in the cycle beggining.
                    So, it is safe to only filter outdated_nonces there *)
                 Client_baking_nonces.filter_outdated_nonces
-                  cctxt ~constants ~chain nonces_location nonces >>=? fun live_nonces ->
+                  cctxt ~constants nonces_location nonces >>=? fun live_nonces ->
                 Client_baking_nonces.save cctxt nonces_location live_nonces >>=? fun () ->
                 return_unit
   end

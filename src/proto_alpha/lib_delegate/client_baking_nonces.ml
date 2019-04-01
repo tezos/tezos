@@ -62,8 +62,18 @@ let find_opt nonces hash =
 let add nonces hash nonce =
   Block_hash.Map.add hash nonce nonces
 
+let add_all nonces nonces_to_add =
+  Block_hash.Map.fold (fun hash nonce acc ->
+      add acc hash nonce
+    ) nonces_to_add nonces
+
 let remove nonces hash =
   Block_hash.Map.remove hash nonces
+
+let remove_all nonces nonces_to_remove =
+  Block_hash.Map.fold (fun hash _ acc ->
+      remove acc hash
+    ) nonces_to_remove nonces
 
 let get_block_level_opt cctxt ~chain ~block =
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>= function
@@ -77,33 +87,50 @@ let get_block_level_opt cctxt ~chain ~block =
           -% a errs_tag errs) >>= fun () ->
       Lwt.return_none
 
-let filter_outdated_nonces cctxt ?constants ~chain location nonces =
+let get_outdated_nonces cctxt ?constants ~chain nonces =
   begin match constants with
     | None -> Alpha_services.Constants.all cctxt (chain, `Head 0)
     | Some constants -> return constants
   end >>=? fun { Constants.parametric = { blocks_per_cycle }} ->
-  let chain = Client_baking_files.chain location in
   get_block_level_opt cctxt ~chain ~block:(`Head 0) >>= function
   | None ->
       lwt_log_error Tag.DSL.(fun f ->
           f "Cannot fetch chain's head level. Aborting nonces filtering."
           -% t event "cannot_retrieve_head_level") >>= fun () ->
-      return empty
+      return (empty, empty)
   | Some current_level ->
       let current_cycle = Int32.(div current_level blocks_per_cycle) in
       let is_older_than_5_cycles block_level =
         let block_cycle = Int32.(div block_level blocks_per_cycle) in
         Int32.sub current_cycle block_cycle > 5l in
-      Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
-          acc >>=? fun acc ->
+      Block_hash.Map.fold (fun hash nonce acc ->
+          acc >>=? fun (orphans, outdated) ->
           get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
           | Some level ->
               if is_older_than_5_cycles level then
-                return (remove acc hash)
+                return (orphans, (add outdated hash nonce))
               else
-                return acc
-          | None -> return (remove acc hash)
-        ) nonces (return nonces)
+                acc
+          | None -> return ((add orphans hash nonce), outdated)
+        ) nonces (return (empty, empty))
+
+let filter_outdated_nonces cctxt ?constants location nonces =
+  let chain = Client_baking_files.chain location in
+  get_outdated_nonces cctxt ?constants ~chain nonces >>=? fun (orphans, outdated_nonces) ->
+  begin if Block_hash.Map.cardinal orphans >= 50 then
+      lwt_warn Tag.DSL.(fun f ->
+          f "Found too many nonces associated to blocks unknown by the \
+             node in '$TEZOS_CLIENT/%s'. After checking that these \
+             blocks were never included in the chain (e.g. via a block \
+             explorer), consider using `tezos-client filter orphan \
+             nonces` to clear them."
+          -% s Logging.filename_tag (Client_baking_files.filename location ^ "s")
+          -% t event "too_many_orphans") >>= fun () ->
+      Lwt.return_unit
+    else
+      Lwt.return_unit
+  end >>= fun () ->
+  return (remove_all nonces outdated_nonces)
 
 let get_unrevealed_nonces cctxt location nonces =
   let chain = Client_baking_files.chain location in

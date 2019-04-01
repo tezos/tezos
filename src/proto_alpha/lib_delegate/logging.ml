@@ -35,6 +35,7 @@ let fitness_tag = Tag.def ~doc:"Fitness" "fitness" Fitness.pp
 let current_slots_tag = Tag.def ~doc:"Number of baking slots that can be baked at this time" "current_slots" Format.pp_print_int
 let future_slots_tag = Tag.def ~doc:"Number of baking slots in the foreseeable future but not yet bakeable" "future_slots" Format.pp_print_int
 let timespan_tag = Tag.def ~doc:"Time in seconds" "timespan" (fun fmt i -> Format.fprintf fmt "%Lds" i)
+let filename_tag = Tag.def ~doc:"Filename" "filename" Format.pp_print_text
 
 let signed_header_tag = Tag.def ~doc:"Signed header" "signed_header" MBytes.pp_hex
 let signed_operation_tag = Tag.def ~doc:"Signed operation" "signed_operation" MBytes.pp_hex
