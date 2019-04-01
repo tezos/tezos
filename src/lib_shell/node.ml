@@ -190,19 +190,19 @@ let store_known_protocols state =
            function
            | Some hash ->
                if not (Protocol_hash.equal hash protocol_hash) then
-                 lwt_log_notice Tag.DSL.(fun f ->
+                 lwt_log_info Tag.DSL.(fun f ->
                      f "Protocol store : %a is not fetchable (incorrect hash)"
                      -% a Protocol_hash.Logging.tag protocol_hash
                      -% t event "Writing protocol to store"
                    )
                else
-                 lwt_log_notice Tag.DSL.(fun f ->
+                 lwt_log_info Tag.DSL.(fun f ->
                      f "Protocol store : %a is fetchable"
                      -% a Protocol_hash.Logging.tag protocol_hash
                      -% t event "Writing protocol to store"
                    )
            | None ->
-               lwt_log_notice Tag.DSL.(fun f ->
+               lwt_log_info Tag.DSL.(fun f ->
                    f "Protocol store : %a sources are not found"
                    -% a Protocol_hash.Logging.tag protocol_hash
                    -% t event "Writing protocol to store"
