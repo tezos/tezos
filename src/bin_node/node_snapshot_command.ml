@@ -27,8 +27,51 @@
 open Genesis_chain
 open Node_logging
 
+type wrong_block_export_error =
+  | Pruned
+  | Too_few_predecessors
+  | Cannot_be_found
+
+let pp_wrong_block_export_error ppf = function
+  | Pruned ->
+      Format.fprintf ppf
+        "is pruned"
+  | Too_few_predecessors ->
+      Format.fprintf ppf
+        "has not enough predecessors"
+  | Cannot_be_found ->
+      Format.fprintf ppf
+        "cannot be found"
+
+let wrong_block_export_error_encoding =
+  let open Data_encoding in
+  union
+    [
+      case (Tag 0)
+        ~title:"Pruned"
+        (obj1
+           (req "error" (constant "Pruned")))
+        (function Pruned -> Some ()
+                | _ -> None)
+        (fun () -> Pruned) ;
+      case (Tag 1)
+        ~title:"Too_few_predecessors"
+        (obj1
+           (req "error" (constant "too_few_predecessors")))
+        (function Too_few_predecessors -> Some ()
+                | _ -> None)
+        (fun () -> Too_few_predecessors) ;
+      case (Tag 2)
+        ~title:"Connot_be_found"
+        (obj1
+           (req "error" (constant "Cannot_be_found")))
+        (function Cannot_be_found -> Some ()
+                | _ -> None)
+        (fun () -> Cannot_be_found) ;
+    ]
+
 type error += Wrong_snapshot_export of History_mode.t * History_mode.t
-type error += Export_unknown_block of Block_hash.t
+type error += Wrong_block_export of Block_hash.t * wrong_block_export_error
 type error += Inconsistent_imported_block of Block_hash.t * Block_hash.t
 type error += Snapshot_import_failure of string
 type error += Wrong_reconstrcut_mode
@@ -51,17 +94,19 @@ let () =
     (fun (src, dst) -> Wrong_snapshot_export (src, dst));
   register_error_kind
     `Permanent
-    ~id:"ExportUnknownBlock"
-    ~title:"Export unknown block"
-    ~description:"The block to export in the snapshot cannot be found."
-    ~pp:begin fun ppf bh ->
+    ~id:"WrongBlockExport"
+    ~title:"Wrong block export"
+    ~description:"The block to export in the snapshot is not valid."
+    ~pp:begin fun ppf (bh,kind) ->
       Format.fprintf ppf
-        "Fails to export snapshot as the block with block_hash %a cannot be found."
-        Block_hash.pp bh
+        "Fails to export snapshot as the block with block hash %a %a."
+        Block_hash.pp bh pp_wrong_block_export_error kind
     end
-    Data_encoding.(obj1 (req "block_hash" Block_hash.encoding))
-    (function Export_unknown_block bh -> Some bh | _ -> None)
-    (fun bh -> Export_unknown_block bh);
+    Data_encoding.(obj2
+                     (req "block_hash" Block_hash.encoding)
+                     (req "kind" wrong_block_export_error_encoding))
+    (function Wrong_block_export (bh, kind) -> Some (bh, kind) | _ -> None)
+    (fun (bh, kind) -> Wrong_block_export (bh, kind));
   register_error_kind
     `Permanent
     ~id:"InconsistentImportedBlock"
@@ -112,15 +157,23 @@ let compute_export_limit
     block_store chain_data_store
     block_header export_rolling =
   let block_hash = Block_header.hash block_header in
-  Store.Block.Contents.read
-    (block_store, block_hash) >>=? fun block_content ->
+  Store.Block.Contents.read_opt
+    (block_store, block_hash) >>= begin function
+    | Some cnts -> return cnts
+    | None -> fail @@ Wrong_block_export (block_hash, Pruned)
+  end >>=? fun block_content ->
   let max_op_ttl = block_content.max_operations_ttl in
   begin
     if not export_rolling then
-      Store.Chain_data.Caboose.read chain_data_store >>=? fun (rb_level,_) ->
-      return rb_level
-    else
-      return (Int32.(sub block_header.Block_header.shell.level (of_int max_op_ttl)))
+      Store.Chain_data.Caboose.read chain_data_store >>=? fun (caboose_level,_) ->
+      return caboose_level
+    else begin
+      let limit = Int32.(sub block_header.Block_header.shell.level (of_int max_op_ttl)) in
+      (* fail when the limit exceed the genesis or the genesis is included in the export limit *)
+      fail_when (limit <= 0l)
+        (Wrong_block_export (block_hash, Too_few_predecessors)) >>=? fun () ->
+      return limit
+    end
   end >>=? fun export_limit ->
   (* never include genesis *)
   return (max 1l export_limit)
@@ -171,7 +224,7 @@ let export ?(export_rolling=false) data_dir filename block =
     | Archive | Full -> return_unit
     | Rolling ->
         if export_rolling then return_unit else
-          fail @@ Wrong_snapshot_export (history_mode, History_mode.Rolling)
+          fail @@ Wrong_snapshot_export (history_mode, History_mode.Full)
   end >>=? fun () ->
   begin
     match block with
@@ -189,7 +242,7 @@ let export ?(export_rolling=false) data_dir filename block =
   Store.Block.Header.read_opt (block_store, block_hash) >>=
   begin function
     | None ->
-        fail @@ Export_unknown_block block_hash
+        fail @@ Wrong_block_export (block_hash, Cannot_be_found)
     | Some block_header ->
         lwt_log_notice "Dumping: %a"
           Block_hash.pp block_hash >>= fun () ->
