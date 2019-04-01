@@ -203,4 +203,5 @@ val validate_context_hash_consistency_and_commit :
   message:string ->
   author:string ->
   parents:Context_hash.t list ->
+  index:index ->
   bool Lwt.t

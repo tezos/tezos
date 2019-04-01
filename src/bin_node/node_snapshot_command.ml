@@ -544,7 +544,7 @@ let reconstruct_contexts
   return_unit
 
 
-let import_protocol_data store pruned_blocks (level, protocol_data) =
+let import_protocol_data index store pruned_blocks (level, protocol_data) =
   (* Retreive the original context hash of the block. *)
   let block_header =
     let pruned_block = snd @@ pruned_blocks.(Int32.to_int level - 1) in
@@ -567,6 +567,7 @@ let import_protocol_data store pruned_blocks (level, protocol_data) =
     ~expected_context_hash
     ~test_chain
     ~protocol_hash
+    ~index
   >>= function
   | true ->
       let protocol_level = block_header.shell.proto_level in
@@ -575,11 +576,11 @@ let import_protocol_data store pruned_blocks (level, protocol_data) =
   | false ->
       fail (Wrong_protocol_hash protocol_hash)
 
-let import_protocol_data_list store pruned_blocks protocol_data =
+let import_protocol_data_list index store pruned_blocks protocol_data =
   let rec aux = function
     | [] -> return_unit
     | (level, protocol_data) :: xs ->
-        import_protocol_data store pruned_blocks (level, protocol_data) >>=? fun () ->
+        import_protocol_data index store pruned_blocks (level, protocol_data) >>=? fun () ->
         aux xs
   in aux protocol_data
 
@@ -680,7 +681,8 @@ let import ?(reconstruct = false) data_dir filename block =
                set_history_mode store history >>= fun () ->
 
                (* … and we import protocol data...*)
-               import_protocol_data_list chain_store history protocol_data >>=? fun () ->
+               import_protocol_data_list
+                 context_index chain_store history protocol_data >>=? fun () ->
 
                (* … and we write data in store.*)
                store_pruned_blocks store block_store chain_data history >>= fun () ->
