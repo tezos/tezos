@@ -381,21 +381,27 @@ let get_directory block =
               Lwt.return dir
 
 let get_header_directory chain_state header =
-  State.Block.header_of_hash chain_state header.Block_header.shell.predecessor >>= function
-  | None ->
-      let dir = build_raw_header_rpc_directory (module Block_services.Fake_protocol)
-      in Lwt.return dir
-  | Some pred ->
-      State.Chain.get_level_indexed_protocol
-        chain_state pred >>= fun protocol_hash ->
-      let (module Proto) = get_protocol protocol_hash in
-      State.Block.get_header_rpc_directory chain_state header >>= function
-      | Some dir ->
-          Lwt.return dir
-      | None ->
-          let dir = build_raw_header_rpc_directory (module Proto) in
-          State.Block.set_header_rpc_directory chain_state header dir >>= fun () ->
-          Lwt.return dir
+  if header.Block_header.shell.level = 0l then
+    Lwt.return
+      (build_raw_header_rpc_directory (module Block_services.Fake_protocol))
+  else
+    State.Block.header_of_hash chain_state header.Block_header.shell.predecessor
+    >>= function
+    | None ->
+        Lwt.return
+          (build_raw_header_rpc_directory (module Block_services.Fake_protocol))
+    | Some pred ->
+        State.Chain.get_level_indexed_protocol
+          chain_state pred >>= fun protocol_hash ->
+        let (module Proto) = get_protocol protocol_hash in
+        State.Block.get_header_rpc_directory chain_state header >>= function
+        | Some dir ->
+            Lwt.return dir
+        | None ->
+            let dir = build_raw_header_rpc_directory (module Proto) in
+            State.Block.set_header_rpc_directory
+              chain_state header dir >>= fun () ->
+            Lwt.return dir
 
 let get_block chain_state = function
   | `Genesis ->
@@ -455,8 +461,7 @@ let build_rpc_directory chain_state block =
       Lwt.fail Not_found
   | Some b ->
       State.Chain.save_point chain_state >>= fun (level_save_point, _) ->
-      let level_b = State.Block.level b in
-      if (level_b >= level_save_point) then begin
+      if State.Block.level b >= level_save_point then begin
         get_directory b >>= fun dir ->
         Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)
       end
