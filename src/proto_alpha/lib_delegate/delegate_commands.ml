@@ -142,8 +142,6 @@ let delegate_commands () =
              cctxt#message "No orphan nonces found." >>= fun () ->
              return_unit
            end else
-             let filtered_nonces = Client_baking_nonces.remove_all nonces orphans in
-             save cctxt nonces_location filtered_nonces >>=? fun () ->
              (* "Backup-ing" orphan nonces *)
              let orphan_nonces_file = "orphan_nonce" in
              cctxt#load orphan_nonces_file ~default:empty encoding >>=? fun orphan_nonces ->
@@ -154,6 +152,8 @@ let delegate_commands () =
              cctxt#message "Successfully filtered %d orphan \
                             nonces and moved them to '$TEZOS_CLIENT/%s'."
                (Block_hash.Map.cardinal orphans) orphan_nonces_file >>= fun () ->
+             let filtered_nonces = Client_baking_nonces.remove_all nonces orphans in
+             save cctxt nonces_location filtered_nonces >>=? fun () ->
              return_unit
          end) ;
     command ~group ~desc: "List orphan nonces."
