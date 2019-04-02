@@ -175,39 +175,44 @@ let may_update_checkpoint chain_state checkpoint =
       State.Chain.set_checkpoint chain_state checkpoint
 
 let store_known_protocols state =
+  let embedded_protocols = Registered_protocol.list_embedded () in
   Lwt_list.iter_s
     (fun protocol_hash ->
        State.Protocol.known state protocol_hash >>= function
        | true ->
-           lwt_log_notice Tag.DSL.(fun f ->
-               f "Protocol store : %a is already in store"
+           lwt_log_info Tag.DSL.(fun f ->
+               f "protocol %a is already in store: nothing to do"
                -% a Protocol_hash.Logging.tag protocol_hash
-               -% t event "Writing protocol to store"
-             )
+               -% t event "embedded_protocol_already_stored")
        | false ->
-           State.Protocol.store state
-             (Registered_protocol.get_embedded_sources_exn protocol_hash) >>=
-           function
-           | Some hash ->
-               if not (Protocol_hash.equal hash protocol_hash) then
-                 lwt_log_info Tag.DSL.(fun f ->
-                     f "Protocol store : %a is not fetchable (incorrect hash)"
-                     -% a Protocol_hash.Logging.tag protocol_hash
-                     -% t event "Writing protocol to store"
-                   )
-               else
-                 lwt_log_info Tag.DSL.(fun f ->
-                     f "Protocol store : %a is fetchable"
-                     -% a Protocol_hash.Logging.tag protocol_hash
-                     -% t event "Writing protocol to store"
-                   )
+           match Registered_protocol.get_embedded_sources protocol_hash with
            | None ->
                lwt_log_info Tag.DSL.(fun f ->
-                   f "Protocol store : %a sources are not found"
+                   f "protocol %a won't be stored: missing source files"
                    -% a Protocol_hash.Logging.tag protocol_hash
-                   -% t event "Writing protocol to store"
+                   -% t event "embedded_protocol_missing_sources"
                  )
-    ) (Registered_protocol.list_embedded ())
+           | Some protocol ->
+               let hash = Protocol.hash protocol in
+               if not (Protocol_hash.equal hash protocol_hash) then
+                 lwt_log_info Tag.DSL.(fun f ->
+                     f "protocol %a won't be stored: wrong hash"
+                     -% a Protocol_hash.Logging.tag protocol_hash
+                     -% t event "embedded_protocol_inconsistent_hash")
+               else
+                 State.Protocol.store state protocol >>= function
+                 | Some hash' ->
+                     assert (hash = hash') ;
+                     lwt_log_info Tag.DSL.(fun f ->
+                         f "protocol %a successfully stored"
+                         -% a Protocol_hash.Logging.tag protocol_hash
+                         -% t event "embedded_protocol_stored")
+                 | None ->
+                     lwt_log_info Tag.DSL.(fun f ->
+                         f "protocol %a is already in store: nothing to do"
+                         -% a Protocol_hash.Logging.tag protocol_hash
+                         -% t event "embedded_protocol_already_stored")
+    ) embedded_protocols
 
 let create
     ?(sandboxed = false)
