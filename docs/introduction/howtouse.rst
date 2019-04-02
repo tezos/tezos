@@ -20,11 +20,11 @@ After a successful compilation, you should have the following binaries:
   (see :ref:`signer`);
 
 Note that Alphanet and Zeronet only support the last version of the
-protocol which is always called `alpha` while Betanet must also
+protocol which is always called `alpha` while Mainnet must also
 support all past protocols.
-For this reason the name of the 3 daemons in Betanet contains the
+For this reason the name of the 3 daemons in Mainnet contains the
 incremental number and the partial hash of the protocol they are bound
-to, such as ``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
+to, such as ``tezos-{baker,endorser,accuser}-004-Pt24m4xi``.
 
 
 Read The Friendly Manual
@@ -498,7 +498,7 @@ The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific informations you'll
 have to resort to RPCs.
 For example to check the value of important constants in Tezos, which
-may differ between Betanet, Alphanet and Zeronet, you can use:
+may differ between Mainnet, Alphanet and Zeronet, you can use:
 
 ::
 
