@@ -17,10 +17,13 @@ depends: [
   "tezos-client-001-PtCJ7pwo"
   "tezos-client-002-PsYLVpVv"
   "tezos-client-003-PsddFKi3"
+  "tezos-client-004-Pt24m4xi"
   "tezos-client-001-PtCJ7pwo-commands"
   "tezos-client-002-PsYLVpVv-commands"
   "tezos-client-003-PsddFKi3-commands"
   "tezos-baking-003-PsddFKi3-commands"
+  "tezos-client-004-Pt24m4xi-commands"
+  "tezos-baking-004-Pt24m4xi-commands"
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }
