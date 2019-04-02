@@ -57,10 +57,10 @@ let () =
 let sed =
   Format.sprintf
     "sed -E -i.old \
-     -e 's/name = \"(TEZOS[_A-Z]+)[^\"]*\" ;/name = \"\\1%s\" ;/' \
-     ../src/lib_shell/distributed_db_message.ml"
+     -e 's/chain_name = \"(TEZOS[_A-Z]+)[^\"]*\"/chain_name = \"\\1%s\"/' \
+     ../src/lib_base/distributed_db_version.ml"
     date
 
 let () =
   Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-                Lwt_unix.unlink "../src/lib_shell/distributed_db_message.ml.old")
+                Lwt_unix.unlink "../src/lib_base/distributed_db_version.ml.old")
