@@ -27,7 +27,9 @@ let () =
   Prevalidator_filters.register
     (module Tezos_mempool_002_PsYLVpVv.Filter) ;
   Prevalidator_filters.register
-    (module Tezos_mempool_003_PsddFKi3.Filter)
+    (module Tezos_mempool_003_PsddFKi3.Filter) ;
+  Prevalidator_filters.register
+    (module Tezos_mempool_004_Pt24m4xi.Filter)
 
 (** Commands *)
 
