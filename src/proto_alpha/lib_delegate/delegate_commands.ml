@@ -131,7 +131,13 @@ let delegate_commands () =
            let open Client_baking_nonces in
            (* Filtering orphan nonces *)
            load cctxt nonces_location >>=? fun nonces ->
-           get_outdated_nonces cctxt ~chain nonces >>=? fun (orphans, _) ->
+           Block_hash.Map.fold (fun block nonce acc ->
+               acc >>= fun acc ->
+               Shell_services.Blocks.Header.shell_header
+                 cctxt ~chain ~block:(`Hash (block, 0)) () >>= function
+               | Ok _ -> Lwt.return acc
+               | Error _ -> Lwt.return (Block_hash.Map.add block nonce acc)
+             ) nonces (Lwt.return empty) >>= fun orphans ->
            if Block_hash.Map.cardinal orphans = 0 then begin
              cctxt#message "No orphan nonces found." >>= fun () ->
              return_unit
