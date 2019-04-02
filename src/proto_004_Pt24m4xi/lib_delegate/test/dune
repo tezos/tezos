@@ -17,7 +17,7 @@
                    -open Tezos_rpc_http
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_000_Ps9mPmXa
+                   -open Tezos_client_genesis
                    -open Tezos_client_004_Pt24m4xi
                    -open Tezos_baking_004_Pt24m4xi
                    -open Tezos_client_base_unix)))

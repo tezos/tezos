@@ -116,15 +116,25 @@ test:p2p:pool:
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
-test:proto_alpha:lib_protocol:
+test:proto_003_PsddFKi3:lib_protocol:
   <<: *test_definition
   script:
-    - dune build @src/proto_alpha/lib_protocol/runtest
+    - dune build @src/proto_003_PsddFKi3/lib_protocol/runtest
 
-test:proto_alpha:lib_client:
+test:proto_003_PsddFKi3:lib_client:
   <<: *test_definition
   script:
-    - dune build @src/proto_alpha/lib_client/test/runtest
+    - dune build @src/proto_003_PsddFKi3/lib_client/test/runtest
+
+test:proto_004_Pt24m4xi:lib_protocol:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_004_Pt24m4xi/lib_protocol/runtest
+
+test:proto_004_Pt24m4xi:lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_004_Pt24m4xi/lib_client/test/runtest
 
 test:p2p:peerset:
   <<: *test_definition
@@ -144,7 +154,7 @@ test:p2p:banned_peers:
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - dune build @src/proto_alpha/lib_delegate/runtest_vote
+    - dune build @src/proto_004_Pt24m4xi/lib_delegate/runtest_vote
 
 test:basic.sh:
   <<: *test_definition

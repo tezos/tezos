@@ -118,7 +118,7 @@ let may_setup_pidfile = function
 
 let commands base_dir require_auth : Client_context.full command list =
   Tezos_signer_backends.Ledger.commands () @
-  (Client_keys_commands.commands None @
+  (Client_keys_commands.commands (Some `Zeronet) @
    [ command ~group
        ~desc: "Launch a signer daemon over a TCP socket."
        (args5
