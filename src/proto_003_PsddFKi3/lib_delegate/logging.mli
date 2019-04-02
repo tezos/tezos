@@ -23,48 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols = [
-  "Alpha", "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP" ;
-]
+val timestamp_tag : Time.t Tag.def
+val valid_ops : int Tag.def
+val op_count : int Tag.def
+val refused_ops : int Tag.def
+val bake_priority_tag : int Tag.def
+val fitness_tag : Fitness.t Tag.def
+val current_slots_tag : int Tag.def
+val future_slots_tag : int Tag.def
+val timespan_tag : int64 Tag.def
 
-let main _node =
-  (* Style : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.style ;
-  (* Script : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.script ;
-  (* Page title *)
-  Format.printf "%a" Rst.pp_h1 "P2P message format" ;
-  (* include/copy usage.rst from input  *)
-  let rec loop () =
-    let s = read_line () in
-    Format.printf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
-  Format.printf "@\n" ;
-  (* Data *)
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Block_header.encoding) ;
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Operation.encoding) ;
-  List.iter
-    (fun (_name, hash) ->
-       let hash = Protocol_hash.of_b58check_exn hash in
-       let (module Proto) = Registered_protocol.get_exn hash in
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Block_header (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
-    )
-    protocols ;
-  return ()
+val signed_header_tag : MBytes.t Tag.def
+val signed_operation_tag : MBytes.t Tag.def
+val operations_tag : Tezos_base.Operation.t list list Tag.def
+val raw_operations_tag : Proto_alpha.Alpha_context.Operation.raw list Tag.def
+val bake_op_count_tag : int Tag.def
+val endorsement_slot_tag : int Tag.def
+val endorsement_slots_tag : int list Tag.def
+val denounced_endorsements_slots_tag : int list Tag.def
+val denouncement_source_tag : string Tag.def
+val level_tag : Proto_alpha.Alpha_context.Raw_level.t Tag.def
+val nonce_tag : Proto_alpha.Alpha_context.Nonce.t Tag.def
+val chain_tag : Block_services.chain Tag.def
+val block_tag : Block_services.block Tag.def
+val worker_tag : string Tag.def
+val block_header_tag : Block_header.t Tag.def
 
-let () =
-  Lwt_main.run (Node_helpers.with_node main)
+open Proto_alpha.Alpha_context
+val conflicting_endorsements_tag : (Kind.endorsement operation * Kind.endorsement operation) Tag.def

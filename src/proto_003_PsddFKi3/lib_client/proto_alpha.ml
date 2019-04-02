@@ -23,48 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols = [
-  "Alpha", "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP" ;
-]
+module Name = struct let name = "003-PsddFKi3" end
+module T = Tezos_protocol_environment.Make(Tezos_storage.Context)
+module Alpha_environment = T.MakeV1(Name)()
 
-let main _node =
-  (* Style : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.style ;
-  (* Script : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.script ;
-  (* Page title *)
-  Format.printf "%a" Rst.pp_h1 "P2P message format" ;
-  (* include/copy usage.rst from input  *)
-  let rec loop () =
-    let s = read_line () in
-    Format.printf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
-  Format.printf "@\n" ;
-  (* Data *)
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Block_header.encoding) ;
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Operation.encoding) ;
-  List.iter
-    (fun (_name, hash) ->
-       let hash = Protocol_hash.of_b58check_exn hash in
-       let (module Proto) = Registered_protocol.get_exn hash in
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Block_header (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
-    )
-    protocols ;
-  return ()
+module Proto = Tezos_protocol_003_PsddFKi3.Functor.Make(Alpha_environment)
+module Alpha_block_services = Block_services.Make(Proto)(Proto)
 
-let () =
-  Lwt_main.run (Node_helpers.with_node main)
+include Proto
+module LiftedMain = Alpha_environment.Lift(Proto)
+
+class type rpc_context = object
+  inherit RPC_context.json
+  inherit [Shell_services.chain * Shell_services.block] Alpha_environment.RPC_context.simple
+end
+
+class wrap_proto_context (t : RPC_context.json) : rpc_context = object
+  method base : Uri.t = t#base
+  method generic_json_call = t#generic_json_call
+  method call_service : 'm 'p 'q 'i 'o.
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    'p -> 'q -> 'i -> 'o tzresult Lwt.t= t#call_service
+  method call_streamed_service : 'm 'p 'q 'i 'o.
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    on_chunk: ('o -> unit) ->
+    on_close: (unit -> unit) ->
+    'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = t#call_streamed_service
+  inherit [Shell_services.chain,
+           Shell_services.block] Alpha_environment.proto_rpc_context
+      (t :> RPC_context.t)
+      Shell_services.Blocks.path
+end
+
+class type full = object
+  inherit Client_context.full
+  inherit [Shell_services.chain * Shell_services.block] Alpha_environment.RPC_context.simple
+end
+
+class wrap_full (t : Client_context.full) : full = object
+  inherit Client_context.proxy_context t
+  inherit [Shell_services.chain, Shell_services.block] Alpha_environment.proto_rpc_context
+      (t :> RPC_context.t)
+      Shell_services.Blocks.path
+end
+
+let register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error =
+  let id = "client." ^ Name.name ^ "." ^ id in
+  register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error
+

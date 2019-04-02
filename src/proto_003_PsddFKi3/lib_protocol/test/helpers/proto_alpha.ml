@@ -23,48 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols = [
-  "Alpha", "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP" ;
-]
+module Name = struct let name = "003_PsddFKi3" end
+module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
 
-let main _node =
-  (* Style : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.style ;
-  (* Script : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.script ;
-  (* Page title *)
-  Format.printf "%a" Rst.pp_h1 "P2P message format" ;
-  (* include/copy usage.rst from input  *)
-  let rec loop () =
-    let s = read_line () in
-    Format.printf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
-  Format.printf "@\n" ;
-  (* Data *)
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Block_header.encoding) ;
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Operation.encoding) ;
-  List.iter
-    (fun (_name, hash) ->
-       let hash = Protocol_hash.of_b58check_exn hash in
-       let (module Proto) = Registered_protocol.get_exn hash in
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Block_header (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
-    )
-    protocols ;
-  return ()
+type alpha_error = Alpha_environment.Error_monad.error
+type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
 
-let () =
-  Lwt_main.run (Node_helpers.with_node main)
+module Proto = Tezos_protocol_003_PsddFKi3.Functor.Make(Alpha_environment)
+module Block_services = struct
+  include Block_services
+  include Block_services.Make(Proto)(Proto)
+end
+include Proto
+
+module M = Alpha_environment.Lift(Main)
+
+let register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error =
+  let id = "client." ^ Name.name ^ "." ^ id in
+  register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error

@@ -23,48 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols = [
-  "Alpha", "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP" ;
-]
+open Proto_alpha
 
-let main _node =
-  (* Style : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.style ;
-  (* Script : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.script ;
-  (* Page title *)
-  Format.printf "%a" Rst.pp_h1 "P2P message format" ;
-  (* include/copy usage.rst from input  *)
+let is_updated_constant = "\x00\x00\x00\x03"
+let is_updated_cstruct = MBytes.of_string is_updated_constant
+let is_updated_constant_len = String.length is_updated_constant
+
+let generate_proof_of_work_nonce () =
+  MBytes.concat ""
+    [is_updated_cstruct ;
+     Rand.generate
+       (Alpha_context.Constants.proof_of_work_nonce_size - is_updated_constant_len)]
+
+let empty_proof_of_work_nonce =
+  MBytes.of_string
+    (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+
+let mine cctxt chain block shell builder =
+  Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
+  let threshold = constants.parametric.proof_of_work_threshold in
   let rec loop () =
-    let s = read_line () in
-    Format.printf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
-  Format.printf "@\n" ;
-  (* Data *)
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Block_header.encoding) ;
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Operation.encoding) ;
-  List.iter
-    (fun (_name, hash) ->
-       let hash = Protocol_hash.of_b58check_exn hash in
-       let (module Proto) = Registered_protocol.get_exn hash in
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Block_header (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
-    )
-    protocols ;
-  return ()
-
-let () =
-  Lwt_main.run (Node_helpers.with_node main)
+    let block = builder (generate_proof_of_work_nonce ()) in
+    if Baking.check_header_proof_of_work_stamp shell block threshold then
+      return block
+    else
+      loop ()
+  in
+  loop ()

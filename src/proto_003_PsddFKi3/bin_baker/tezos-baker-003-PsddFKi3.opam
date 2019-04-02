@@ -9,25 +9,12 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.0.1" }
   "tezos-base"
-  "tezos-client-base"
-  "tezos-client-genesis"
-  "tezos-client-demo"
   "tezos-client-003-PsddFKi3"
-  "tezos-client-004-Pt24m4xi"
-  "tezos-client-003-PsddFKi3-commands"
-  "tezos-baking-003-PsddFKi3"
+  "tezos-client-commands"
   "tezos-baking-003-PsddFKi3-commands"
-  "tezos-client-004-Pt24m4xi-commands"
-  "tezos-baking-004-Pt24m4xi-commands"
   "tezos-client-base-unix"
-  "tezos-signer-backends"
-  "tezos-node" { with-test }
-  "tezos-protocol-compiler" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
-]
-synopsis: "Tezos: `tezos-client` binary"
+synopsis: "Tezos/Protocol: `tezos-baker-003-PsddFKi3` binary"

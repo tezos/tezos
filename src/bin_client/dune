@@ -8,11 +8,11 @@
             tezos-client-commands
             tezos-client-genesis
             tezos-client-demo
-            tezos-client-alpha
+            tezos-client-003-PsddFKi3
             tezos-stdlib-unix
             tezos-client-base-unix
-            tezos-client-alpha-commands.registration
-            tezos-baking-alpha-commands.registration
+            tezos-client-003-PsddFKi3-commands.registration
+            tezos-baking-003-PsddFKi3-commands.registration
             tezos-client-004-Pt24m4xi
             tezos-client-004-Pt24m4xi-commands.registration
             tezos-baking-004-Pt24m4xi-commands.registration

@@ -23,48 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols = [
-  "Alpha", "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP" ;
-]
+open Proto_alpha.Alpha_context
 
-let main _node =
-  (* Style : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.style ;
-  (* Script : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.script ;
-  (* Page title *)
-  Format.printf "%a" Rst.pp_h1 "P2P message format" ;
-  (* include/copy usage.rst from input  *)
-  let rec loop () =
-    let s = read_line () in
-    Format.printf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
-  Format.printf "@\n" ;
-  (* Data *)
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Block_header.encoding) ;
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
-    Data_encoding.Binary_schema.pp
-    (Data_encoding.Binary.describe Operation.encoding) ;
-  List.iter
-    (fun (_name, hash) ->
-       let hash = Protocol_hash.of_b58check_exn hash in
-       let (module Proto) = Registered_protocol.get_exn hash in
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Block_header (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
-    )
-    protocols ;
-  return ()
+type t
 
-let () =
-  Lwt_main.run (Node_helpers.with_node main)
+val empty: t
+
+val load: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t tzresult Lwt.t
+
+val save: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t -> unit tzresult Lwt.t
+
+val mem: t -> Block_hash.t -> bool
+
+val find_opt: t -> Block_hash.t -> Nonce.t option
+
+val add: t -> Block_hash.t -> Nonce.t -> t
+
+val remove: t -> Block_hash.t -> t
+
+(** [filter_outdated_nonces] filters nonces older than 5 cycles in the
+    nonce file or nonces associated to blocks that cannot be retrieved
+*)
+val filter_outdated_nonces:
+  #Proto_alpha.full ->
+  ?constants: Constants.t ->
+  chain: Chain_services.chain ->
+  [ `Nonce ] Client_baking_files.location ->
+  t ->
+  t tzresult Lwt.t
+
+(** [get_unrevealed_nonces] retrieve registered nonces *)
+val get_unrevealed_nonces:
+  #Proto_alpha.full ->
+  [ `Nonce ] Client_baking_files.location ->
+  t ->
+  (Raw_level.t * Nonce.t) list tzresult Lwt.t

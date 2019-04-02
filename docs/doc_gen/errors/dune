@@ -1,12 +1,12 @@
 (executable
  (name error_doc)
  (libraries tezos-shell
-            tezos-client-alpha)
+            tezos-client-003-PsddFKi3)
  (flags (:standard -w -9+27-30-32-40@8
                    -open Tezos_base
                    -open Tezos_error_monad
                    -open Tezos_data_encoding
-                   -open Tezos_client_alpha
+                   -open Tezos_client_003_PsddFKi3
                    -safe-string
                    -linkall)))
 

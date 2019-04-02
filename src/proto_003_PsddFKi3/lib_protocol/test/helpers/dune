@@ -1,5 +1,5 @@
 (library
- (name tezos_alpha_bench_helpers)
+ (name tezos_003_PsddFKi3_test_helpers)
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell-services
