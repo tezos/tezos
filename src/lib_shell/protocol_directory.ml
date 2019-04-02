@@ -46,9 +46,8 @@ let build_rpc_directory block_validator state =
   end ;
 
   register1 Protocol_services.S.fetch begin fun hash () () ->
-    Block_validator.fetch_and_compile_protocol block_validator hash >>=
-    fun _ ->
-    return hash
+    Block_validator.fetch_and_compile_protocol block_validator hash >>=? fun _proto ->
+    return_unit
   end ;
 
   !dir

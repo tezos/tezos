@@ -45,7 +45,7 @@ module S = struct
     RPC_service.get_service
       ~description: "Fetch a protocol from the network."
       ~query: RPC_query.empty
-      ~output: Protocol_hash.encoding
+      ~output: unit
       RPC_path.(root / "fetch_protocol" /: protocols_arg)
 
 end

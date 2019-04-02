@@ -35,7 +35,7 @@ val list:
 val fetch:
   #simple ->
   Protocol_hash.t ->
-  Protocol_hash.t tzresult Lwt.t
+  unit tzresult Lwt.t
 
 module S : sig
 
@@ -52,6 +52,6 @@ module S : sig
   val fetch:
     ([ `GET ], unit,
      unit * Protocol_hash.t, unit, unit,
-     Protocol_hash.t) RPC_service.t
+     unit) RPC_service.t
 
 end

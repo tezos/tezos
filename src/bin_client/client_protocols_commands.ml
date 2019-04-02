@@ -81,16 +81,21 @@ let commands () =
          return_unit
       ) ;
 
-    command ~group ~desc: "Fetch some protocols from the network."
+    command ~group ~desc: "Fetch a protocol from the network."
       no_options
       (prefixes [ "fetch" ; "protocol" ]
-       @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
+       @@ Protocol_hash.param ~name:"protocol hash"
        @@ stop
       )
       (fun () hash (cctxt : #Client_context.full) ->
-         Shell_services.Protocol.fetch cctxt hash >>=? fun hash ->
-         cctxt#message "Fetched protocol %s"
-           (Protocol_hash.to_short_b58check hash) >>= fun () ->
-         return_unit
+         Shell_services.Protocol.fetch cctxt hash >>= function
+         | Ok () ->
+             cctxt#message "Protocol %a successfully fetched."
+               Protocol_hash.pp_short hash >>= fun () ->
+             return_unit
+         | Error err ->
+             cctxt#error "Error while fetching protocol: %a"
+               Error_monad.pp_print_error err >>= fun () ->
+             return_unit
       )
   ]
