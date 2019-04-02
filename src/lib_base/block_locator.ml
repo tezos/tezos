@@ -131,6 +131,17 @@ let estimated_length seed (head, hist) =
   let step, state = Step.next state in
   loop step state hist
 
+let fold ~f ~init (head, hist) seed =
+  let rec loop state acc = function
+    | [] | [_] -> acc
+    | block :: (pred :: rem as hist) ->
+        let step, state = Step.next state in
+        let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
+        loop state acc hist in
+  let head = Block_header.hash head in
+  let state = Step.init seed head in
+  loop state init (head :: hist)
+
 type step = {
   block: Block_hash.t ;
   predecessor: Block_hash.t ;
@@ -140,74 +151,38 @@ type step = {
 
 let pp_step ppf step = Format.fprintf ppf "%d%s" step.step (if step.strict_step then "" else " max")
 
-let fold ~f ~init (head, hist) seed =
-  let rec loop state acc = function
-    | [] | [_] -> acc
-    | block :: (pred :: rem as hist) ->
-        let step, state = Step.next state in
-        let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
-        loop state acc hist in
-  let hash = Block_header.hash head in
-  let state = Step.init seed hash in
-  loop state init (hash :: hist)
-
 let to_steps seed locator =
-  let f acc ~block ~pred ~step ~strict_step =
-    { block ; predecessor = pred ; step ; strict_step } :: acc in
-  fold ~init:[] ~f locator seed
+  fold locator seed
+    ~init:[]
+    ~f: begin fun acc ~block ~pred ~step ~strict_step ->
+      { block ; predecessor = pred ; step ; strict_step } :: acc
+    end
 
-let fold_truncate ~f ~init ~last_pred ~limit (head, hist) seed =
-  let rec loop state step_sum acc = function
-    | [] | [_] -> acc
-    | block :: (pred :: rem as hist) ->
-        (* step is the steps to do to reach 'pred'.
-           Hence if the sum of the steps already done + the ones to do
-           to reach pred is superior to the limit then we are going
-           beyond the save point. So in this case
-           we need to truncate to the save point and set strict to false.
-        *)
-        let step, state = Step.next state in
-        let new_step_sum = step + step_sum in
-        if new_step_sum >= limit then
-          f acc ~block ~pred:last_pred ~step ~strict_step:false
-        else
-          let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
-          loop state new_step_sum acc hist in
-  let hash = Block_header.hash head in
-  let initial_state = Step.init seed hash in
-  loop initial_state 0 init (hash :: hist)
-
-let to_steps_truncate ~limit ~last_pred seed locator =
-  let f acc ~block ~pred ~step ~strict_step =
-    { block ; predecessor = pred ; step ; strict_step } :: acc in
-  fold_truncate ~init:[] ~f ~last_pred ~limit locator seed
-
-let compute
-    ~get_predecessor
-    ~caboose
-    ~size
-    block_hash
-    header
-    seed =
-  let rec loop acc size state current_block_hash =
+let compute ~predecessor ~genesis block_hash header seed ~size =
+  let rec loop acc size state block =
     if size = 0 then
-      Lwt.return acc
+      Lwt.return (List.rev acc)
     else
-      let (step, state) = Step.next state in
-      get_predecessor current_block_hash step >>= function
+      let step, state = Step.next state in
+      predecessor block step >>= function
       | None ->
-          if Block_hash.equal caboose current_block_hash then
-            Lwt.return acc
+          (* We reached genesis before size *)
+          if Block_hash.equal block genesis then
+            Lwt.return (List.rev acc)
           else
-            Lwt.return (caboose :: acc)
-      | Some predecessor ->
-          loop (predecessor :: acc) (pred size) state predecessor in
+            Lwt.return (List.rev (genesis :: acc))
+      | Some pred ->
+          loop (pred :: acc) (size - 1) state pred in
   if size <= 0 then
     Lwt.return (header, [])
   else
-    let initial_state = Step.init seed block_hash in
-    loop [] size initial_state block_hash >>= fun hist ->
-    Lwt.return (header, List.rev hist)
+    let state = Step.init seed block_hash in
+    let step, state = Step.next state in
+    predecessor block_hash step >>= function
+    | None -> Lwt.return (header, [])
+    | Some p ->
+        loop [p] (size-1) state p >>= fun hist ->
+        Lwt.return (header, hist)
 
 type validity =
   | Unknown
@@ -217,24 +192,24 @@ type validity =
 let unknown_prefix ~is_known (head, hist) =
   let rec loop hist acc =
     match hist with
-    | [] -> Lwt.return `Unknown
+    | [] -> Lwt.return_none
     | h :: t ->
         is_known h >>= function
         | Known_valid ->
-            Lwt.return (`Ok (h, (List.rev (h :: acc))))
+            Lwt.return_some (h, (List.rev (h :: acc)))
         | Known_invalid ->
-            Lwt.return `Invalid
+            Lwt.return_none
         | Unknown ->
             loop t (h :: acc)
   in
   is_known (Block_header.hash head) >>= function
   | Known_valid ->
-      Lwt.return (`Ok (Block_header.hash head, (head, [])))
+      Lwt.return_some (Block_header.hash head, (head, []))
   | Known_invalid ->
-      Lwt.return `Invalid
+      Lwt.return_none
   | Unknown ->
       loop hist [] >>= function
-      | `Ok (tail, hist) ->
-          Lwt.return (`Ok (tail, (head, hist)))
-      | (`Invalid | `Unknown) as e ->
-          Lwt.return e
+      | None ->
+          Lwt.return_none
+      | Some (tail, hist) ->
+          Lwt.return_some (tail, (head, hist))

@@ -90,11 +90,11 @@ let apply_block bvp ~predecessor block_header operations =
   begin
     Chain.data chain_state >>= fun chain_data ->
     if State.Block.equal chain_data.current_head predecessor then
-      return (chain_data.live_blocks, chain_data.live_operations)
+      Lwt.return (chain_data.live_blocks, chain_data.live_operations)
     else
       Chain_traversal.live_blocks
         predecessor (State.Block.max_operations_ttl predecessor)
-  end >>=? fun (live_blocks, live_operations) ->
+  end >>= fun (live_blocks, live_operations) ->
   Block_validation.check_liveness
     ~live_operations ~live_blocks block_hash operations >>=? fun () ->
   match bvp with

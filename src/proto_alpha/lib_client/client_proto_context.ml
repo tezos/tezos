@@ -366,7 +366,7 @@ let inject_activate_operation
         return_unit
     | Some _confirmations ->
         Alpha_services.Contract.balance
-          cctxt (chain, `Head 0)
+          cctxt (chain, block)
           (Contract.implicit_contract (Ed25519 pkh)) >>=? fun balance ->
         cctxt#message "Account %s (%a) activated with %s%a."
           alias
@@ -482,6 +482,7 @@ let get_proposals
   Alpha_services.Voting.proposals cctxt cb
 
 let submit_proposals
+    ?dry_run
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposals =
   (* We need the next level, not the current *)
@@ -490,10 +491,10 @@ let submit_proposals
   let contents = Single ( Proposals { source ; period ; proposals } ) in
   Injection.inject_operation cctxt ~chain ~block ?confirmations
     ~fee_parameter:Injection.dummy_fee_parameter
-    ~src_sk contents
+    ?dry_run ~src_sk contents
 
 let submit_ballot
-    (cctxt : #Proto_alpha.full)
+    ?dry_run (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
@@ -502,7 +503,7 @@ let submit_ballot
   let contents = Single ( Ballot { source ; period ; proposal ; ballot } ) in
   Injection.inject_operation cctxt ~chain ~block ?confirmations
     ~fee_parameter:Injection.dummy_fee_parameter
-    ~src_sk contents
+    ?dry_run ~src_sk contents
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match a.receipt, a.protocol_data with
@@ -531,7 +532,7 @@ let get_operation_from_block
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
       Proto_alpha.Alpha_block_services.Operations.operation cctxt
-        ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
+        ~chain ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
     (cctxt : #Proto_alpha.full)

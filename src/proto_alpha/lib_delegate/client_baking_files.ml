@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs. <contact@tezcore.com>                    *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,21 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Archive | Full | Rolling
+type _ location =
+  { filename : string ;
+    chain : Chain_services.chain }
 
-let encoding = Data_encoding.string_enum
-    [ ("archive", Archive) ;
-      ("full", Full) ;
-      ("rolling", Rolling) ;
-    ]
+let resolve_location (cctxt : #Client_context.full) ~chain (kind : 'a) : 'a location tzresult Lwt.t =
+  let basename = match kind with
+    | `Block -> "block"
+    | `Endorsement -> "endorsement"
+    | `Nonce -> "nonce" in
+  let test_filename chain_id =
+    Format.kasprintf return "test_%a_%s" Chain_id.pp_short chain_id basename in
+  begin match chain with
+    | `Main -> return basename
+    | `Test ->
+        Chain_services.chain_id cctxt ~chain:`Test () >>=? fun chain_id ->
+        test_filename chain_id
+    | `Hash chain_id ->
+        Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
+        if Chain_id.(chain_id = main_chain_id) then
+          return basename
+        else
+          test_filename chain_id
+  end >>=? fun filename -> return { filename ; chain }
 
-let equal = function
-  | (Archive, Archive)
-  | (Full, Full)
-  | (Rolling, Rolling) -> true
-  | _ -> false
-
-let pp ppf = function
-  | Archive -> Format.fprintf ppf "archive"
-  | Full -> Format.fprintf ppf "full"
-  | Rolling -> Format.fprintf ppf "rolling"
+let filename { filename } = filename
+let chain { chain } = chain

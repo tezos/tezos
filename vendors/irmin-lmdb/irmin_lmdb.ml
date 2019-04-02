@@ -22,11 +22,6 @@ module Option = struct
   let value_map ~default ~f = function
     | None -> default
     | Some v -> f v
-
-  let get = function
-    | Some v -> v
-    | None   -> failwith "no value"
-
 end
 
 module Result = struct
@@ -35,33 +30,24 @@ module Result = struct
     | Error err -> Error err
 end
 
+let cstruct_of_ba_copy ba =
+  let cs = Cstruct.of_bigarray ba in
+  let len = Cstruct.len cs in
+  let cs_copy = Cstruct.create_unsafe len in
+  Cstruct.blit cs 0 cs_copy 0 len ;
+  cs_copy
+
 open Lwt.Infix
 
-type wtxn = Lmdb.rw Lmdb.txn * Lmdb.db
-
-(* The GC has 3 modes:
-   - normal: all reads and writes are done normally on the main database file.
-   - promotion: a (concurrent) promotion to a different database file is in
-     progresss.
-   - pivot: eg. "stop-the-world" all the operations are stopped, the database
-     files are swapped on disk. *)
-
-type mode =
-  | Normal
-  | Promotion
-  | Pivot
-
 type t = {
+  db: Lmdb.t ;
   root: string ;
-  readonly: bool;
-  mutable db: Lmdb.t ;
-  mutable gc_mode: mode;
-  mutable wtxn: wtxn option;
+  mutable wtxn: (Lmdb.rw Lmdb.txn * Lmdb.db) option;
 }
 
-let of_result op = function
-  | Ok v      -> Lwt.return v
-  | Error err -> Fmt.kstrf Lwt.fail_with "%s: %a" op Lmdb.pp_error err
+let of_result = function
+  | Ok v -> Lwt.return v
+  | Error err -> Lwt.fail_with (Lmdb.string_of_error err)
 
 let (|>>) v f =
   match v with
@@ -76,6 +62,27 @@ let get_wtxn db =
       Lmdb.opendb txn |>> fun ddb ->
       db.wtxn <- Some (txn, ddb);
       Ok (txn, ddb)
+
+let commit_wtxn db =
+  match db.wtxn with
+  | None -> Ok ()
+  | Some (t, _ddb) ->
+      db.wtxn <- None;
+      Lmdb.commit_txn t
+
+let add db k v =
+  get_wtxn db |>> fun (txn, ddb) ->
+  Lmdb.put_string txn ddb k v
+
+let add db k v =
+  of_result @@ add db k v
+
+let add_cstruct db k v =
+  get_wtxn db |>> fun (txn, ddb) ->
+  Lmdb.put txn ddb k (Cstruct.to_bigarray v)
+
+let add_cstruct db k v =
+  of_result @@ add_cstruct db k v
 
 let src = Logs.Src.create "irmin.lmdb" ~doc:"Irmin in a Lmdb store"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -98,27 +105,8 @@ module Conf = struct
   let root = Irmin.Private.Conf.root
   let mapsize =
     Irmin.Private.Conf.key "mapsize" int64_converter 409_600_000_000L
-  let readonly =
-    Irmin.Private.Conf.key "readonly" bool_converter false
-
-  type t = {
-    root    :  string ;
-    mapsize : int64 ;
-    readonly: bool ;
-    (* TODO *)
-    (* ?write_buffer_size:int -> *)
-    (* ?max_open_files:int -> *)
-    (* ?block_size:int -> *)
-    (* ?block_restart_interval:int -> *)
-    (* ?cache_size:int *)
-  }
-
-  let of_config c =
-    let root = Irmin.Private.Conf.get c root in
-    let mapsize = Irmin.Private.Conf.get c mapsize in
-    let readonly = Irmin.Private.Conf.get c readonly in
-    let root = match root with None -> "irmin" | Some root -> root in
-    { root ; mapsize ; readonly }
+  let readonly = 
+    Irmin.Private.Conf.key "readonly" bool_converter false 
 
 end
 
@@ -129,49 +117,7 @@ let config
   let config = C.add config Conf.readonly readonly in
   Option.value_map mapsize ~default:config ~f:(C.add config Conf.mapsize)
 
-let open_db ~root ~mapsize ~readonly =
-  if not (Sys.file_exists root) then Unix.mkdir root 0o755;
-  let flags = if readonly then [ Lmdb.RdOnly ] else [] in
-  let sync_flag =
-    match Sys.getenv_opt "TEZOS_CONTEXT_SYNC" with
-    | None -> []
-    | Some s ->
-        match String.lowercase_ascii s with
-        | "nosync" -> [ Lmdb.NoSync ]
-        | "nometasync" -> [ Lmdb.NoMetaSync ]
-        | _ ->
-            Printf.eprintf "Unrecognized TEZOS_SYNC option : %s\n\
-                            allowed: nosync nometasync" s;
-            []
-  in
-  let flags = sync_flag @ Lmdb.NoRdAhead :: Lmdb.NoTLS :: flags in
-  let file_flags = if readonly then 0o444 else 0o644 in
-  match Lmdb.opendir ~mapsize ~flags root file_flags with
-  | Ok db     -> db
-  | Error err ->
-      Fmt.failwith "open {%s} %a" (Filename.basename root) Lmdb.pp_error err
-
-let dbs = Hashtbl.create 3
-
-let make conf =
-  let { Conf.root ; mapsize ; readonly } = Conf.of_config conf in
-  try Hashtbl.find dbs (root, readonly)
-  with Not_found ->
-    let db = open_db ~root ~mapsize ~readonly in
-    let db = {
-      db; root; readonly;
-      gc_mode = Normal;
-      wtxn = None;
-    } in
-    Hashtbl.add dbs (root, readonly) db;
-    db
-
-let close t =
-  Hashtbl.remove dbs (t.root, t.readonly);
-  Lmdb.closedir t.db
-
-type ('r) reader =
-  { f : 'k. 'k Lmdb.txn -> Lmdb.db -> ('r, Lmdb.error) result } [@@unboxed]
+type ('r) reader = { f : 'k. 'k Lmdb.txn -> Lmdb.db -> ('r, Lmdb.error) result } [@@unboxed]
 
 let with_read_db db ~f =
   match db.wtxn with
@@ -180,95 +126,15 @@ let with_read_db db ~f =
   | Some (txn, ddb) ->
       f.f txn ddb
 
-let get txn db k =
-  Result.map ~f:Cstruct.of_bigarray (Lmdb.get txn db k)
+let mem db k =
+  with_read_db db ~f:{ f = fun txn db -> Lmdb.mem txn db k } |>
+  of_result
 
 let find_bind db k ~f =
-  match
-    with_read_db db ~f:{ f = fun txn db -> Result.map ~f (get txn db k) }
-  with
-  | Error KeyNotFound -> Ok None
-  | Error err -> Error err
-  | Ok v -> Ok v
-
-module Raw = struct
-
-  let mem db k =
-    with_read_db db ~f:{ f = fun txn db -> Lmdb.mem txn db k }
-    |> of_result "mem"
-
-  let find db key of_ba =
-    find_bind db key ~f:(fun v -> Option.of_result (of_ba v))
-    |> of_result "find"
-
-  let add_string db k v =
-    (get_wtxn db |>> fun (txn, ddb) ->
-     Lmdb.put_string txn ddb k v)
-    |> of_result "add_string"
-
-  let add_cstruct db k v =
-    (get_wtxn db |>> fun (txn, ddb) ->
-     Lmdb.put txn ddb k (Cstruct.to_bigarray v))
-  |> of_result "add_ba"
-
-  let add db k = function
-    | `String v   -> add_string db k v
-    | `Cstruct v  -> add_cstruct db k v
-
-  let remove db k =
-    (get_wtxn db |>> fun (txn, ddb) ->
-     match Lmdb.del txn ddb k with
-     | Ok () | Error Lmdb.KeyNotFound -> Ok ()
-     | x -> x)
-    |> of_result "remove"
-
-  let commit op db =
-    (match db.wtxn with
-     | None -> Ok ()
-     | Some (t, _ddb) ->
-         db.wtxn <- None;
-         Lmdb.commit_txn t)
-    |> of_result op
-
-  let fsync db =
-    Lmdb.sync ~force:true db.db
-    |> of_result "fsync"
-
-end
-
-module AO (K: Irmin.Hash.S) (V: Irmin.Contents.S0) (Conv: sig
-    val of_key: K.t -> string
-    val to_value: Cstruct.t -> (V.t, [`Msg of string]) result
-    val of_value: V.t -> [`String of string | `Cstruct of Cstruct.t]
-    val digest: V.t -> K.t
-  end) = struct
-
-  include Conv
-
-  type nonrec t = t
-  type key = K.t
-  type value = V.t
-
-  let mem db key =
-    Raw.mem db (Conv.of_key key)
-
-  let unsafe_find db key =
-    Raw.find db (Conv.of_key key) @@ fun v ->
-    Conv.to_value v
-
-  let find db key =
-    unsafe_find db key
-
-  let unsafe_add db v =
-    let k = Conv.digest v in
-    let v = Conv.of_value v in
-    Raw.add db (Conv.of_key k) v >|= fun () ->
-    k
-
-  let add db v =
-    unsafe_add db v
-
-end
+  match with_read_db db ~f:{ f = fun txn db -> Result.map ~f (Lmdb.get txn db k) } with
+  | Error KeyNotFound -> Lwt.return_none
+  | Error err -> Lwt.fail_with (Lmdb.string_of_error err)
+  | Ok v -> Lwt.return v
 
 module Irmin_value_store
     (M: Irmin.Metadata.S)
@@ -277,14 +143,34 @@ module Irmin_value_store
     (P: Irmin.Path.S) = struct
 
   module XContents = struct
+
+    type nonrec t = t
+    type key = H.t
+    type value = C.t
+
+    let lmdb_of_key h =
+      "contents/" ^ Cstruct.to_string (H.to_raw h)
+
+    let mem db key =
+      let key = lmdb_of_key key in
+      mem db key
+
+    let find db key =
+      let key = lmdb_of_key key in
+      find_bind db key ~f:begin fun v ->
+        Option.of_result (C.of_string Cstruct.(to_string (of_bigarray v)))
+      end
+
+    let to_string = Fmt.to_to_string C.pp
+
+    let add db v =
+      let k = H.digest C.t v in
+      let k_lmdb = lmdb_of_key k in
+      let v = to_string v in
+      add db k_lmdb v >|= fun () -> k
+
     module Val = C
     module Key = H
-    include AO (Key) (Val) (struct
-        let of_key h   = "contents/" ^ Cstruct.to_string (Key.to_raw h)
-        let to_value v = Val.of_string (Cstruct.(to_string v))
-        let of_value s = `String (Fmt.to_to_string Val.pp s)
-        let digest v   = Key.digest Val.t v
-      end)
   end
 
   module Contents = Irmin.Contents.Store(XContents)
@@ -323,32 +209,6 @@ module Irmin_value_store
             | { kind = `Contents m ; _ } -> Some m)
         |+ field "name" string (fun { name ; _ } -> name)
         |+ field "node" H.t (fun { node ; _ } -> node)
-        |> sealr
-
-      let hash_v2_t =
-        let open Irmin_v2_type in
-        like ~cli:(H.pp, H.of_string)
-          (string_of (`Fixed H.digest_size))
-          (fun x -> H.of_raw (Cstruct.of_string x))
-          (fun x -> Cstruct.to_string (H.to_raw x))
-
-      let metadata_v2_t =
-        Irmin_v2_type.(like unit) (fun _ -> M.default) (fun _ -> ())
-
-      let entry_v2_t =
-        let open Irmin_v2_type in
-        record "Tree.entry"
-          (fun kind name node ->
-             let kind =
-               match kind with
-               | None -> `Node
-               | Some m -> `Contents m in
-             { kind ; name ; node } )
-        |+ field "kind" (option metadata_v2_t) (function
-            | { kind = `Node ; _ } -> None
-            | { kind = `Contents m ; _ } -> Some m)
-        |+ field "name" string (fun { name ; _ } -> name)
-        |+ field "node" hash_v2_t (fun { node ; _ } -> node)
         |> sealr
 
       let value_t =
@@ -541,47 +401,36 @@ module Irmin_value_store
       let t = Irmin.Type.like N.t of_n to_n
     end
 
-    let v1_t = Irmin.Type.list Val.entry_t
+    module AO = struct
 
-    type entries = { version: int; entries: Val.entry list }
+      type nonrec t = t
+      type key = H.t
+      type value = Val.t
 
-    let v2_t =
-      let open Irmin_v2_type in
-      record "entries" (fun v entries -> { version = Char.code v; entries })
-      |+ field "version" char (fun t -> Char.chr t.version)
-      |+ field "entries" (list Val.entry_v2_t) (fun t -> t.entries)
-      |> sealr
+      let lmdb_of_key h =
+        "node/" ^ Cstruct.to_string (H.to_raw h)
 
-    let version v = match Cstruct.get_uint8 v 0 with
-      | 0 -> `V1
-      | 1 -> `V2
-      | n -> Fmt.failwith "Unsuppported node version: %d" n
+      let mem db key =
+        let key = lmdb_of_key key in
+        mem db key
 
-    include AO (Key) (Val) (struct
+      let of_cstruct v =
+        Irmin.Type.decode_cstruct (Irmin.Type.list Val.entry_t) v |>
+        Option.of_result
 
-        let of_key h = "node/" ^ Cstruct.to_string (H.to_raw h)
+      let find db key =
+        let key = lmdb_of_key key in
+        find_bind db key ~f:(fun v -> of_cstruct (cstruct_of_ba_copy v))
 
-        let to_value v = match version v with
-          | `V1 -> Irmin.Type.decode_cstruct v1_t v
-          | `V2 ->
-              match Irmin_v2_type.decode_bin v2_t (Cstruct.to_string v) with
-              | Ok t -> Ok t.entries
-              | Error _ as e -> e
-
-        let of_value v =
-          (* always use v2 encoding to write new values *)
-          let c = Irmin_v2_type.encode_bin v2_t { entries = v; version = 1 } in
-          `String c
-
-        let digest v =
-          (* use v1 encoding for the digest *)
-          let v = Irmin.Type.encode_cstruct (Irmin.Type.list Val.entry_t) v in
-          H.digest Irmin.Type.cstruct v
-
-      end)
+      let add db v =
+        let v = Irmin.Type.encode_cstruct (Irmin.Type.list Val.entry_t) v in
+        let k = H.digest Irmin.Type.cstruct v in
+        let k_lmdb = lmdb_of_key k in
+        add_cstruct db k_lmdb v >|= fun () -> k
+    end
+    include AO
 
   end
-
   module Node = Irmin.Private.Node.Store(Contents)(P)(M)(XNode)
 
   module XCommit = struct
@@ -615,19 +464,36 @@ module Irmin_value_store
 
     module Key = H
 
-    include AO (Key) (Val) (struct
-        let of_key h = "commit/" ^ Cstruct.to_string (H.to_raw h)
-        let of_value v = `Cstruct (Irmin.Type.encode_cstruct Val.t v)
-        let to_value v = Irmin.Type.decode_cstruct Val.t v
-        let digest v =
-          let v = Irmin.Type.encode_cstruct Val.t v in
-          H.digest Irmin.Type.cstruct v
-      end)
+    module AO = struct
 
-    let add db v =
-      add db v >>= fun k ->
-      Raw.commit "Commit.add" db >|= fun () ->
-      k
+      let lmdb_of_key h =
+        "commit/" ^ Cstruct.to_string (H.to_raw h)
+
+      type nonrec t = t
+      type key = H.t
+      type value = Val.t
+
+      let mem db key =
+        let key = lmdb_of_key key in
+        mem db key
+
+      let of_cstruct v =
+        Irmin.Type.decode_cstruct Val.t v |>
+        Option.of_result
+
+      let find db key =
+        let key = lmdb_of_key key in
+        find_bind db key ~f:(fun v -> of_cstruct (cstruct_of_ba_copy v))
+
+      let add db v =
+        let v = Irmin.Type.encode_cstruct Val.t v in
+        let k = H.digest Irmin.Type.cstruct v in
+        let k_lmdb = lmdb_of_key k in
+        add_cstruct db k_lmdb v >>= fun () ->
+        of_result @@ commit_wtxn db >|= fun () -> k
+
+    end
+    include AO
 
   end
   module Commit = Irmin.Private.Commit.Store(Node)(XCommit)
@@ -657,37 +523,49 @@ module Irmin_branch_store (B: Branch) (H: Irmin.Hash.S) = struct
   module Val = H
 
   module W = Irmin.Private.Watch.Make(Key)(Val)
-  module L = Irmin.Private.Lock.Make(B)
 
   type nonrec t = {
     db: t;
     w: W.t;
-    l: L.t;
   }
 
   let watches = Hashtbl.create 10
 
   type key = Key.t
   type value = Val.t
-  type watch = W.watch
+  type watch = W.watch * (unit -> unit Lwt.t)
 
-  let lmdb_of_branch r = "refs/" ^ Fmt.to_to_string B.pp_ref r
-  let hash_of_lmdb v = H.of_raw v
-  let lmdb_of_hash r = H.to_raw r
+  (* let branch_of_lmdb r = *)
+  (* let str = String.trim @@ Git.Reference.to_raw r in *)
+  (* match B.of_ref str with *)
+  (* | Ok r           -> Some r *)
+  (* | Error (`Msg _) -> None *)
+
+  let lmdb_of_branch r = Fmt.to_to_string B.pp_ref r
 
   let mem db r =
-    Raw.mem db.db (lmdb_of_branch r)
-
-  let unsafe_find db r =
-    Raw.find db.db (lmdb_of_branch r) (fun x -> Ok (hash_of_lmdb x))
+    mem db.db (lmdb_of_branch r)
 
   let find db r =
-    unsafe_find db r
+    find_bind db.db (lmdb_of_branch r)
+      ~f:(fun v -> Some (H.of_raw (cstruct_of_ba_copy v)))
 
-  let watch_key t key ?init f = W.watch_key t.w key ?init f
+  let listen_dir _ =
+    Lwt.return (fun () -> Lwt.return_unit)
 
-  let watch t ?init f = W.watch t.w ?init f
-  let unwatch t w = W.unwatch t.w w
+  let watch_key t key ?init f =
+    listen_dir t >>= fun stop ->
+    W.watch_key t.w key ?init f >|= fun w ->
+    (w, stop)
+
+  let watch t ?init f =
+    listen_dir t >>= fun stop ->
+    W.watch t.w ?init f >|= fun w ->
+    (w, stop)
+
+  let unwatch t (w, stop) =
+    stop () >>= fun () ->
+    W.unwatch t.w w
 
   let v db (* ~head *) =
     let w =
@@ -698,53 +576,48 @@ module Irmin_branch_store (B: Branch) (H: Irmin.Hash.S) = struct
         Hashtbl.add watches db.root w;
         w
     in
-    let l = L.v () in
-    Lwt.return { db ; w; l }
+    Lwt.return { db ; w }
 
-  let list _ =
-    (* CR(samoht): normally this should return the references, but
-       Tezos don't use that function, so just skip it. *)
-    Lwt.return_nil (* TODO, or not *)
+  let list _ = Lwt.return_nil (* TODO, or not *)
 
-  let set_unsafe t r k =
-    let r = lmdb_of_branch r in
-    let k = lmdb_of_hash k in
-    Raw.add_cstruct t.db r k
+  (* let write_index _t _gr _gk = *)
+  (* Lwt.return_unit *)
 
-  let set t r k =
-    Log.debug (fun f -> f "set %a" B.pp r);
-    L.with_lock t.l r @@ fun () ->
-    set_unsafe t r k >>= fun () ->
-    Raw.commit "set" t.db
+  let set _t r _k =
+    Log.debug (fun f -> f "update %a" B.pp r);
+    Lwt.return_unit
+  (* let gr = git_of_branch r in *)
+  (* let gk = git_of_commit k in *)
+  (* G.write_reference t.t gr gk >>= fun () -> *)
+  (* W.notify t.w r (Some k) >>= fun () -> *)
+  (* write_index t gr (Git.Hash.to_commit gk) *)
 
-  let remove_unsafe t r =
-    let r = lmdb_of_branch r in
-    Raw.remove t.db r
-
-  let remove t r =
+  let remove _t r =
     Log.debug (fun f -> f "remove %a" B.pp r);
-    L.with_lock t.l r @@ fun () ->
-    remove_unsafe t r >>= fun () ->
-    Raw.commit "remove" t.db
+    Lwt.return_unit
+  (* G.remove_reference t.t (git_of_branch r) >>= fun () -> *)
+  (* W.notify t.w r None *)
 
-  let eq_hashes = Irmin.Type.equal H.t
-
-  let test_and_set t r ~test ~set =
+  let test_and_set _t _r ~test:_ ~set:_ =
     Log.debug (fun f -> f "test_and_set");
-    L.with_lock t.l r @@ fun () ->
-    find t r >>= fun v ->
-    let set () =
-      (match set with
-       | None   -> remove_unsafe t r
-       | Some v -> set_unsafe t r v)
-      >>= fun () ->
-      Raw.commit "test_and_set" t.db >|= fun () ->
-      true
-    in
-    match test, v with
-    | None  , None   -> set ()
-    | Some v, Some v'-> if eq_hashes v v' then set () else Lwt.return false
-    | __ -> Lwt.return false
+    Lwt.return_true
+    (* let gr = git_of_branch r in *)
+    (* let c = function None -> None | Some h -> Some (git_of_commit h) in *)
+    (* G.test_and_set_reference t.t gr ~test:(c test) ~set:(c set) >>= fun b -> *)
+    (* (if b then W.notify t.w r set else Lwt.return_unit) >>= fun () -> *)
+    (* begin *)
+    (* We do not protect [write_index] because it can take a log
+       time and we don't want to hold the lock for too long. Would
+       be safer to grab a lock, although the expanded filesystem
+       is not critical for Irmin consistency (it's only a
+       convenience for the user). *)
+    (* if b then match set with *)
+    (* | None   -> Lwt.return_unit *)
+    (* | Some v -> write_index t gr (Git.Hash.to_commit (git_of_commit v)) *)
+    (* else *)
+    (* Lwt.return_unit *)
+    (* end >|= fun () -> *)
+    (* b *)
 
 end
 
@@ -781,248 +654,55 @@ module Make
       let node_t t : Node.t = contents_t t, t.db
       let commit_t t : Commit.t = node_t t, t.db
 
-      let v config =
-        let db = make config in
-        Branch.v db >|= fun branch ->
-        { db; branch; config }
+      type config = {
+        root   : string option ;
+        mapsize : int64 ;
+        readonly : bool ;
+        (* TODO *)
+        (* ?write_buffer_size:int -> *)
+        (* ?max_open_files:int -> *)
+        (* ?block_size:int -> *)
+        (* ?block_restart_interval:int -> *)
+        (* ?cache_size:int *)
+      }
+
+      let config c =
+        let root = Irmin.Private.Conf.get c Conf.root in
+        let mapsize = Irmin.Private.Conf.get c Conf.mapsize in
+        let readonly = Irmin.Private.Conf.get c Conf.readonly in
+        { root ; mapsize ; readonly }
+
+      let v conf =
+        let { root ; mapsize ; readonly } = config conf in
+        let root = match root with None -> "irmin.ldb" | Some root -> root in
+        if not (Sys.file_exists root) then Unix.mkdir root 0o755 ;
+        let flags = if readonly then [ Lmdb.RdOnly ] else [] in
+        let sync_flag =
+          match Sys.getenv_opt "TEZOS_CONTEXT_SYNC" with
+          | None -> []
+          | Some s ->
+              match String.lowercase_ascii s with
+              | "nosync" -> [ Lmdb.NoSync ]
+              | "nometasync" -> [ Lmdb.NoMetaSync ]
+              | _ ->
+                  Printf.eprintf "Unrecognized TEZOS_SYNC option : %s\n\
+                                  allowed: nosync nometasync" s;
+                  []
+        in
+        let flags = sync_flag @ Lmdb.NoRdAhead :: Lmdb.NoTLS :: flags in
+        let file_flags = if readonly then 0o444 else 0o644 in
+        match Lmdb.opendir ~mapsize ~flags root file_flags with
+        | Error err -> Lwt.fail_with (Lmdb.string_of_error err)
+        | Ok db ->
+            let db = { db ; root ; wtxn = None } in
+            Branch.v db >|= fun branch ->
+            { db; branch; config = conf }
 
     end
   end
 
   include Irmin.Make_ext(P)
 
-  type stats = {
-    mutable promoted_contents: int;
-    mutable promoted_nodes  : int;
-    mutable promoted_commits: int;
-    mutable upgraded_nodes : int;
-    mutable width: int;
-    mutable depth: int;
-  }
-
-  let pp_stats ppf t =
-    Fmt.pf ppf "[%d blobs/%d nodes (%d upgrades)/%d commits] depth:%d width:%d"
-      t.promoted_contents
-      t.promoted_nodes
-      t.upgraded_nodes
-      t.promoted_commits
-      t.depth
-      t.width
-
-  let stats () = {
-    promoted_contents = 0;
-    promoted_nodes = 0;
-    promoted_commits = 0;
-    upgraded_nodes = 0;
-    width = 0;
-    depth = 0;
-  }
-
-  (* poor-man GC *)
-  module Irmin_GC = struct
-
-    let incr_contents s = s.promoted_contents <- s.promoted_contents + 1
-    let incr_nodes s = s.promoted_nodes <- s.promoted_nodes + 1
-    let incr_upgraded_nodes s = s.upgraded_nodes <- s.upgraded_nodes + 1
-    let incr_commits s = s.promoted_commits <- s.promoted_commits + 1
-    let update_width s c = s.width <- max s.width (List.length c)
-    let update_depth s n = s.depth <- max s.depth n
-
-    module Tbl = Hashset.Make(struct
-          type t = string
-          let equal x y = String.equal x y
-          let hash t =
-            assert (String.length t > H.digest_size);
-            EndianString.NativeEndian.get_int64 t (String.length t - 8)
-            |> Int64.to_int
-        end)
-
-    type t = {
-      tbl   : Tbl.t;
-      new_db: P.Contents.t;
-      old_db: P.Contents.t;
-      stats : stats;
-      switch: Lwt_switch.t option;
-    }
-
-    let close t =
-      close t.new_db;
-      close t.old_db
-
-    let new_root repo =
-      let c = Conf.of_config repo.P.Repo.config in
-      c.Conf.root ^ ".1"
-
-    let v ?switch repo =
-      let config =
-        let root = new_root repo in
-        Irmin.Private.Conf.add repo.P.Repo.config Conf.root (Some root)
-      in
-      let new_db = make config in
-      let tbl = Tbl.create 10_123 in
-      let stats = stats () in
-      { tbl; stats; new_db; old_db = repo.db; switch }
-
-    let promote_val t k v =
-      Raw.add_cstruct t.new_db k v
-
-    let is_node k = String.length k > 4 && String.sub k 0 4 = "node"
-
-    let upgrade_node t v = match P.XNode.version v with
-      | `V2 -> `Cstruct v
-      | `V1 ->
-          incr_upgraded_nodes t.stats;
-          match P.XNode.to_value v with
-          | Ok v -> P.XNode.of_value v
-          | Error (`Msg e) ->
-              Fmt.failwith "Cannot upgrade node %S: %s\n%!"
-                (Cstruct.to_string v) e
-
-    let promote msg t k =
-      Raw.find t.old_db k (fun x -> Ok x) >>= function
-      | Some v ->
-          if is_node k then Raw.add t.new_db k( upgrade_node t v)
-          else promote_val t k v
-      | None   ->
-          let k = H.of_raw (Cstruct.of_string k) in
-          Fmt.failwith "promote %s: cannot promote key %a\n%!" msg H.pp k
-
-    let mem t k =
-      if Tbl.mem t.tbl k then Lwt.return true
-      else Raw.mem t.new_db k
-
-    let copy_contents t k =
-      Lwt_switch.check t.switch;
-      let k = P.XContents.of_key k in
-      mem t k >>= function
-      | true  -> Lwt.return ()
-      | false ->
-        Tbl.add t.tbl k;
-        incr_contents t.stats;
-        promote "contents" t k
-
-    let copy_node t k =
-      let rec aux x =
-        Lwt_switch.check t.switch;
-        match x with
-        | []                         -> Lwt.return ()
-        | (ks, _, `Black, _) :: todo ->
-            promote "node" t ks >>= fun () ->
-            aux todo
-        | (ks, k, `Gray , n) :: todo ->
-            mem t ks >>= function
-            | true  -> aux todo
-            | false ->
-                Tbl.add t.tbl ks;
-                P.XNode.unsafe_find t.old_db k >|= Option.get >>= fun v ->
-                let children = P.Node.Val.list v in
-                incr_nodes t.stats;
-                update_width t.stats children;
-                update_depth t.stats n;
-                let todo = ref ((ks, k, `Black, n) :: todo) in
-                Lwt_list.iter_p (fun (_, c) -> match c with
-                    | `Contents (k, _) -> copy_contents t k
-                    | `Node k ->
-                        let ks = P.XNode.of_key k in
-                        todo := (ks, k, `Gray, n+1) :: !todo;
-                        Lwt.return ()
-                  ) children
-                >>= fun () ->
-                aux !todo
-      in
-      let ks = P.XNode.of_key k in
-      mem t ks >>= function
-      | true  -> Lwt.return ()
-      | false -> aux [ks, k, `Gray, 0]
-
-    let copy_commit t k =
-      Lwt_switch.check t.switch;
-      P.XCommit.unsafe_find t.old_db k >|= Option.get >>= fun v ->
-      let k = P.XCommit.of_key k in
-      (* we ignore the parents *)
-      copy_node t (P.Commit.Val.node v) >>= fun () ->
-      incr_commits t.stats;
-      promote "commit" t k
-
-    let root repo =
-      let c = repo.P.Repo.config in
-      match Irmin.Private.Conf.get c Conf.root with
-      | None   -> "context"
-      | Some r -> r
-
-    let pivot ~branches repo t =
-      let rename () =
-        let old_data = Filename.concat (root repo) "data.mdb" in
-        let new_data = Filename.concat (new_root repo) "data.mdb" in
-        let old_lock = Filename.concat (root repo) "lock.mdb" in
-        let new_lock = Filename.concat (new_root repo) "lock.mdb" in
-        Lwt_unix.rename new_data old_data >>= fun () ->
-        Lwt_unix.unlink new_lock >>= fun () ->
-        Lwt_unix.unlink old_lock
-      in
-
-      (* promote the live refs *)
-      Lwt_list.iter_p (fun br ->
-          let k = P.Branch.lmdb_of_branch br in
-          promote "refs" t k
-        ) branches
-      >>= fun () ->
-
-      (* fsync *)
-      Raw.commit "pivot" t.new_db >>= fun () ->
-      Raw.fsync t.new_db >>= fun () ->
-
-      (* rename *)
-      close t;
-      rename () >>= fun () ->
-
-      (* re-open the database *)
-      P.Repo.v repo.config >|= fun x ->
-      repo.db.db <- x.db.db
-
-  end
-
-  let promote_all ~(repo:repo) ?before_pivot ~branches t roots =
-    repo.db.gc_mode <- Promotion;
-    let init_time = Unix.gettimeofday () in
-    let last_time = ref init_time in
-    Lwt_list.iteri_s (fun i k ->
-        Irmin_GC.copy_commit t k >>= fun () ->
-        let current_time = Unix.gettimeofday () in
-        if current_time -. !last_time > 5. (* print something every 5s *)
-        || i = 0 || i = List.length roots - 1
-        then (
-          last_time := current_time;
-          Fmt.pr "GC: %d min elapsed - %5d/%d %a\n%!"
-            (int_of_float ((!last_time -. init_time) /. 60.))
-            (i+1) (List.length roots) pp_stats t.stats;
-          (* flush to disk regularly to not hold too much data into RAM *)
-          if i mod 1000 = 0 then (
-            Irmin_GC.Tbl.clear t.tbl;
-            Raw.commit "flush roots" t.new_db
-          ) else
-            Lwt.return ()
-        ) else
-          Lwt.return ();
-      ) roots
-    >>= fun () ->
-    (match before_pivot with
-     | None   -> Lwt.return ()
-     | Some t -> t ()
-    ) >>= fun () ->
-    repo.db.gc_mode <- Pivot;
-    Irmin_GC.pivot ~branches repo t >|= fun () ->
-    repo.db.gc_mode <- Normal;
-    t.stats
-
-  let gc ~repo ?before_pivot ?(branches=[]) ?switch roots =
-    let t, w = Lwt.task () in
-    Lwt_switch.add_hook switch (fun () -> t);
-    let gc = Irmin_GC.v ?switch repo in
-    Lwt.catch
-      (fun ()  -> promote_all ~repo ?before_pivot ~branches gc roots)
-      (function
-        | Lwt_switch.Off -> Lwt.wakeup w (); Lwt.return gc.stats
-        | e -> Lwt.fail e)
-
 end
+
+include Conf

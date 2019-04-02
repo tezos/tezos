@@ -23,11 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let rec retry (cctxt: #Proto_alpha.full) ~delay ~tries f x =
+  f x >>= function
+  | Ok _ as r -> Lwt.return r
+  | Error (RPC_client.Request_failed
+             { error = Connection_failed _ ; _ } :: _) as err
+    when tries > 0 -> begin
+      cctxt#message
+        "Connection refused, retrying in %.2f seconds..."
+        delay >>= fun () ->
+      Lwt.pick
+        [ (Lwt_unix.sleep delay >|= fun () -> `Continue) ;
+          (Lwt_exit.termination_thread >|= fun _ -> `Killed) ;
+        ] >>= function
+      | `Killed ->
+          Lwt.return err
+      | `Continue ->
+          retry cctxt ~delay:(delay *. 1.5) ~tries:(tries - 1) f x
+    end
+  | Error _ as err ->
+      Lwt.return err
+
 let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the node to be synchronized with its \
                  peers..." >>= fun () ->
-  Shell_services.Monitor.bootstrapped cctxt >>=? fun _ ->
+  retry cctxt ~tries:5 ~delay:1.
+    Shell_services.Monitor.bootstrapped cctxt >>=? fun _ ->
   cctxt#message "Node synchronized." >>= fun () ->
   return_unit
 
@@ -44,7 +66,6 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
     match testchain with
     | Some (Active_test { protocol ; expiration_date })
       when Protocol_hash.equal Proto_alpha.hash protocol -> begin
-        Chain_services.chain_id cctxt ~chain:`Test () >>=? fun test_chain_id ->
         let abort_daemon () =
           cctxt#message "Test chain's expiration date reached \
                          (%a)... Stopping the daemon.@."
@@ -52,9 +73,8 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
           if cleanup_nonces then
             (* Clean-up existing nonces *)
             cctxt#with_lock begin fun () ->
-              Client_baking_nonces.load cctxt >>=? fun nonces ->
-              let nonces = Client_baking_nonces.remove_all nonces test_chain_id in
-              Client_baking_nonces.save cctxt nonces
+              Client_baking_files.resolve_location cctxt ~chain:`Test `Nonce >>=? fun nonces_location ->
+              Client_baking_nonces.(save cctxt nonces_location empty)
             end
           else
             return_unit >>=? fun () ->
@@ -126,6 +146,7 @@ module Baker = struct
       ?minimal_nanotez_per_byte
       ?await_endorsements
       ?max_priority
+      ~chain
       ~context_path
       delegates
       block_stream >>=? fun () ->

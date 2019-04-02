@@ -40,7 +40,6 @@ val chain_arg: chain RPC_arg.t
 type block = [
   | `Genesis
   | `Head of int
-  | `Alias of [ `Caboose | `Checkpoint | `Save_point ] * int
   | `Hash of Block_hash.t * int
   | `Level of Int32.t
 ]

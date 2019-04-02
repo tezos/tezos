@@ -125,7 +125,7 @@ let init context block_header =
   return { Updater.message = None ; context ;
            fitness = block_header.Block_header.fitness ;
            max_operations_ttl = 0 ;
-           last_allowed_fork_level = 0l ;
+           last_allowed_fork_level = block_header.level ;
          }
 
 let rpc_services = Services.rpc_services

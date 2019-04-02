@@ -71,10 +71,9 @@ let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.init
-    ~store_root ~context_root ~history_mode:Archive
-    state_genesis_block >>= function
+    ~store_root ~context_root state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
-  | Ok (_state, chain, _index, _history_mode) ->
+  | Ok (_state, chain, _index) ->
       Lwt.return chain
 
 
@@ -200,7 +199,7 @@ let print_chain chain bh =
 let linear_predecessor_n (chain:State.Chain.t) (bh:Block_hash.t) (distance:int)
   : Block_hash.t option Lwt.t =
   (* let _ = Printf.printf "LP: %4i " distance; print_block_h chain bh in *)
-  if distance < 1 then invalid_arg "distance < 1" else
+  if distance < 1 then invalid_arg "distance<1" else
     let rec loop bh distance =
       if distance = 0
       then Lwt.return_some bh   (* reached distance *)
@@ -230,7 +229,7 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
     match lin_res,exp_res with
     | None, None ->
         Lwt.return_unit
-    | Some _, None | None, Some _ ->
+    | None,Some _ | Some _,None ->
         Assert.fail_msg "mismatch between exponential and linear predecessor_n"
     | Some lin_res, Some exp_res ->
         (* check that the two results are the same *)
@@ -254,12 +253,12 @@ let seed =
   {Block_locator.receiver_id=receiver_id ; sender_id }
 
 (* compute locator using the linear predecessor *)
-let compute_linear_locator chain_state ~size block =
+let compute_linear_locator (chain:State.Chain.t) ~size block =
+  let genesis = State.Chain.genesis chain in
   let block_hash = State.Block.hash block in
   let header = State.Block.header block in
-  Block_locator.compute
-    ~get_predecessor:(linear_predecessor_n chain_state)
-    block_hash header ~size seed
+  Block_locator.compute ~predecessor:(linear_predecessor_n chain)
+    ~genesis:genesis.block block_hash header ~size seed
 
 
 (* given the size of a chain, returns the size required for a locator
@@ -308,30 +307,25 @@ let test_locator base_dir =
   res >>= fun head ->
 
   let check_locator size : unit tzresult Lwt.t =
-    State.read_chain_data chain begin fun _ data ->
-      Lwt.return (data.caboose, data.save_point)
-    end >>= fun ((_, caboose), _save_point) ->
-    State.Block.read chain head >>=? begin fun block ->
-      time ~runs:runs (fun () ->
-          State.compute_locator chain ~size block seed) |>
-      fun (l_exp,t_exp) ->
-      time ~runs:runs (fun () ->
-          compute_linear_locator chain
-            ~caboose ~size block)
-      |> fun (l_lin,t_lin) ->
-      l_exp >>= fun l_exp ->
-      l_lin >>= fun l_lin ->
-      let _, l_exp = (l_exp : Block_locator.t :> _ * _) in
-      let _, l_lin = (l_lin : Block_locator.t :> _ * _) in
-      let _ = Printf.printf "%10i %f %f\n" size t_exp t_lin in
-      List.iter2
-        (fun hn ho ->
-           if not (Block_hash.equal hn ho)
-           then
-             Assert.fail_msg "Invalid locator %i" size)
-        l_exp l_lin;
-      return_unit
-    end
+    State.Block.read chain head >>=? fun block ->
+    time ~runs:runs (fun () ->
+        State.compute_locator chain ~size:size block seed) |>
+    fun (l_exp,t_exp) ->
+    time ~runs:runs (fun () ->
+        compute_linear_locator chain ~size:size block) |>
+    fun (l_lin,t_lin) ->
+    l_exp >>= fun l_exp ->
+    l_lin >>= fun l_lin ->
+    let _, l_exp = (l_exp : Block_locator.t :> _ * _) in
+    let _, l_lin = (l_lin : Block_locator.t :> _ * _) in
+    let _ = Printf.printf "%10i %f %f\n" size t_exp t_lin in
+    List.iter2
+      (fun hn ho ->
+         if not (Block_hash.equal hn ho)
+         then
+           Assert.fail_msg "Invalid locator %i" size)
+      l_exp l_lin;
+    return_unit
   in
   let stop = locator_limit + 20 in
   let rec loop size =

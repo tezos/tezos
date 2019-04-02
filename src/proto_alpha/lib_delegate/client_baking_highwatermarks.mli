@@ -26,7 +26,6 @@
 open Proto_alpha
 open Alpha_context
 
-type error += Invalid_chain_id of Chain_id.t
 type error += Level_previously_endorsed of Raw_level.t
 type error += Level_previously_baked of Raw_level.t
 
@@ -34,34 +33,30 @@ type t
 
 val encoding: t Data_encoding.t
 
-val should_upgrade_blocks_file: #Client_context.full -> bool tzresult Lwt.t
-val should_upgrade_endorsements_file: #Client_context.full -> bool tzresult Lwt.t
-val upgrade_files: #Client_context.full -> unit tzresult Lwt.t
-
 val may_inject_block:
-  #Client_context.full ->
-  chain: Chain_services.chain ->
+  #Proto_alpha.full ->
+  [ `Block ] Client_baking_files.location ->
   delegate: Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
 val may_inject_endorsement:
-  #Client_context.full ->
-  chain: Chain_services.chain ->
+  #Proto_alpha.full ->
+  [ `Endorsement ] Client_baking_files.location ->
   delegate: Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
 val record_block:
-  #Client_context.full ->
-  chain:Chain_services.chain ->
+  #Proto_alpha.full ->
+  [ `Block ] Client_baking_files.location ->
   delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t
 
 val record_endorsement:
-  #Client_context.full ->
-  chain:Chain_services.chain ->
+  #Proto_alpha.full ->
+  [ `Endorsement ] Client_baking_files.location ->
   delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t

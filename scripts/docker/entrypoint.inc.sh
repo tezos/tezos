@@ -62,10 +62,9 @@ launch_node() {
             mv "$node_data_dir/identity.json" /tmp
         fi
         rm -rf "$node_data_dir"
-        rm -rf "$client_dir/nonces"
-        rm -rf "$client_dir/endorsements"
-        rm -rf "$client_dir/blocks"
-        rm -rf "$client_dir/highwatermarks"
+        rm -rf "$client_dir/"*nonces
+        rm -rf "$client_dir/"*endorsements
+        rm -rf "$client_dir/"*blocks
         if [ -f "/tmp/identity.json" ]; then \
             mkdir -p "$node_data_dir"
             mv /tmp/identity.json "$node_data_dir/"
@@ -126,10 +125,27 @@ launch_baker_test() {
 	 run with local node "$node_data_dir" "$@"
 }
 
+launch_baker_test() {
+    configure_client
+    exec "$baker" --chain test \
+	 --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run with local node "$node_data_dir" "$@"
+}
+
 launch_endorser() {
     configure_client
     wait_for_the_node_to_be_bootstraped
     exec "$endorser" --chain main \
+	 --base-dir "$client_dir" \
+         --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
+	 run "$@"
+}
+
+launch_endorser_test() {
+    configure_client
+    wait_for_the_node_to_be_bootstraped
+    exec "$endorser" --chain test \
 	 --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
 	 run "$@"

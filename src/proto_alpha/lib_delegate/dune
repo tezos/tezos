@@ -9,6 +9,7 @@
             tezos-client-alpha
             tezos-client-commands
             tezos-storage
+            tezos-rpc-http
             tezos-rpc)
  (library_flags (:standard -linkall))
  (modules (:standard \
@@ -22,7 +23,8 @@
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
                    -open Tezos_storage
-                   -open Tezos_rpc)))
+                   -open Tezos_rpc
+                   -open Tezos_rpc_http)))
 
 (library
  (name tezos_baking_alpha_commands)

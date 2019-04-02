@@ -112,7 +112,6 @@ let wrap_context_init f _ () =
     create_block3a idx block2 >>= fun block3a ->
     create_block3b idx block2  >>= fun block3b ->
     f { idx; genesis; block2 ; block3a; block3b } >>= fun result ->
-    Context.close () >>= fun () ->
     Lwt.return result
   end
 
@@ -227,42 +226,6 @@ let test_fold { idx ; genesis } =
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return_unit
 
-let test_dump { idx; genesis; block2; block3b; _ } =
-  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir2 ->
-    let dumpfile = base_dir2 // "dump" in
-    let ctxt_hashes = [genesis;block2;block3b;] in
-    let bhs =
-      List.map
-        (fun context ->
-           Block_header.{
-             protocol_data = MBytes.empty;
-             shell = {
-               level = 0l;
-               proto_level = 0;
-               predecessor = Block_hash.zero;
-               timestamp = Time.epoch;
-               validation_passes = 0;
-               operations_hash = Operation_list_list_hash.zero;
-               fitness = [];
-               context;
-             } },
-           Context.Block_data.empty )
-        ctxt_hashes
-    in
-    Context.dump_contexts idx (List.map (fun (a, b) -> (a, b, [])) bhs) ~filename:dumpfile >>=? fun () ->
-    let root = base_dir2 // "context" in
-    Context.init ?patch_context:None root >>= fun idx2 ->
-    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun l ->
-    let l = List.map (fun (bh,_, _) -> bh.Block_header.shell.context) l in
-    Assert.equal_context_hash_list ~msg:__LOC__ ctxt_hashes l ;
-    return ()
-  end
-  >>= function
-  | Error err ->
-      Error_monad.pp_print_error Format.err_formatter err ;
-      assert false
-  | Ok () -> Lwt.return_unit
-
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list = [
@@ -271,7 +234,6 @@ let tests : (string * (t -> unit Lwt.t)) list = [
   "fork", test_fork ;
   "replay", test_replay ;
   "fold", test_fold ;
-  "dump", test_dump ;
 ]
 
 

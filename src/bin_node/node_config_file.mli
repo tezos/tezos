@@ -60,7 +60,6 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
-  history_mode : History_mode.t option ;
 }
 
 val default_data_dir: string
@@ -91,7 +90,6 @@ val update:
   ?rpc_tls:tls ->
   ?log_output:Logging_unix.Output.t ->
   ?bootstrap_threshold:int ->
-  ?history_mode:History_mode.t ->
   t -> t tzresult Lwt.t
 
 val to_string: t -> string

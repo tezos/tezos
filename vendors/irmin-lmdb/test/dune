@@ -1,3 +1,0 @@
-(executable
-  (name      test)
-  (libraries irmin-lmdb alcotest-lwt))

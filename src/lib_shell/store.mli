@@ -31,26 +31,8 @@ type global_store = t
 (** [init ~mapsize path] returns an initialized store at [path] of
     maximum capacity [mapsize] bytes. *)
 val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
-val close: t -> unit
+val close : t -> unit
 
-val open_with_atomic_rw:
-  ?mapsize:int64 -> string ->
-  (t -> 'a Error_monad.tzresult Lwt.t) ->
-  'a tzresult Lwt.t
-
-val with_atomic_rw:
-  t ->
-  (unit -> 'a Lwt.t) ->
-  'a Lwt.t
-
-(** {2 Configuration} **********************************************************)
-
-module Configuration : sig
-
-  module History_mode : SINGLE_STORE
-    with type t := global_store
-     and type value := History_mode.t
-end
 
 (** {2 Chain store} **********************************************************)
 
@@ -111,18 +93,6 @@ module Chain_data : sig
 
   module Checkpoint : SINGLE_STORE
     with type t := store
-     and type value := Block_header.t
-
-  module Checkpoint_0_0_1 : SINGLE_STORE
-    with type t := store
-     and type value := Int32.t * Block_hash.t
-
-  module Save_point : SINGLE_STORE
-    with type t := store
-     and type value := Int32.t * Block_hash.t
-
-  module Caboose : SINGLE_STORE
-    with type t := store
      and type value := Int32.t * Block_hash.t
 
 end
@@ -134,9 +104,6 @@ module Block : sig
 
   type store
   val get: Chain.store -> store
-
-  val fold: store -> init:'a -> f:(Block_hash.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-  val iter: store -> (Block_hash.t -> unit Lwt.t) -> unit Lwt.t
 
   type contents = {
     message: string option ;
@@ -153,10 +120,6 @@ module Block : sig
   module Contents : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := contents
-
-  module Contents_0_0_1 : SINGLE_STORE
-    with type t := store * Block_hash.t
-     and type value := Block_header.t * contents
 
   module Operation_hashes : MAP_STORE
     with type t = store * Block_hash.t

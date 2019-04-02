@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let genesis : State.Chain.genesis = {
-  time =
-    Time.of_notation_exn "2019-02-26T16:36:29Z" ;
-  block =
-    Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesis6b9b5aWckpQ" ;
-  protocol =
-    Protocol_hash.of_b58check_exn
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
-}
+type _ location
+
+val resolve_location:
+  #Client_context.full ->
+  chain: Chain_services.chain ->
+  ([< `Block | `Endorsement | `Nonce ] as 'kind) ->
+  'kind location tzresult Lwt.t
+
+val filename : _ location -> string
+val chain : _ location -> Chain_services.chain

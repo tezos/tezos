@@ -51,9 +51,7 @@ let with_node f =
       Node.default_peer_validator_limits
       Node.default_block_validator_limits
       Node.default_prevalidator_limits
-      Node.default_chain_validator_limits
-      None
-    >>=? fun node ->
+      Node.default_chain_validator_limits >>=? fun node ->
     f node >>=? fun () ->
     return () in
   Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run >>= function

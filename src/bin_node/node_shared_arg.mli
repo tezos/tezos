@@ -48,7 +48,6 @@ type t = {
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging_unix.Output.t option ;
   bootstrap_threshold: int option ;
-  history_mode: History_mode.t option ;
 }
 
 module Term : sig
@@ -64,4 +63,3 @@ module Manpage : sig
   val args: Cmdliner.Manpage.block list
   val bugs: Cmdliner.Manpage.block list
 end
-

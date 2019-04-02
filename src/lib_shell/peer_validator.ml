@@ -79,15 +79,15 @@ module Types = struct
     peer_id: P2p_peer.Id.t ;
     parameters : parameters ;
     mutable bootstrapped: bool ;
-    mutable last_validated_head: Block_hash.t ;
-    mutable last_advertised_head: Block_hash.t ;
+    mutable last_validated_head: Block_header.t ;
+    mutable last_advertised_head: Block_header.t ;
   }
 
   let view (state : state) _ : view =
     let { bootstrapped ; last_validated_head ; last_advertised_head } = state in
     { bootstrapped ;
-      last_validated_head = last_validated_head ;
-      last_advertised_head = last_advertised_head }
+      last_validated_head = Block_header.hash last_validated_head ;
+      last_advertised_head = Block_header.hash last_advertised_head }
 
 end
 
@@ -106,7 +106,7 @@ let set_bootstrapped pv =
     pv.parameters.notify_bootstrapped () ;
   end
 
-let bootstrap_new_branch w history_mode _head unknown_prefix =
+let bootstrap_new_branch w _ancestor _head unknown_prefix =
   let pv = Worker.state w in
   let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
   (* sender and receiver are inverted here because they are from
@@ -122,9 +122,7 @@ let bootstrap_new_branch w history_mode _head unknown_prefix =
       ~block_header_timeout:pv.parameters.limits.block_header_timeout
       ~block_operations_timeout:pv.parameters.limits.block_operations_timeout
       pv.parameters.block_validator
-      pv.peer_id pv.parameters.chain_db unknown_prefix
-      history_mode
-  in
+      pv.peer_id pv.parameters.chain_db unknown_prefix in
   Worker.protect w
     ~on_error:begin fun error ->
       (* if the peer_validator is killed, let's cancel the pipeline *)
@@ -193,7 +191,7 @@ let only_if_fitness_increases w distant_header cont =
 let assert_acceptable_head w hash (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Chain.acceptable_block chain_state header >>= fun acceptable ->
+  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
   fail_unless acceptable
     (Validation_errors.Checkpoint_error (hash, Some pv.peer_id))
 
@@ -212,7 +210,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
       Block_hash.pp_short hash
       P2p_peer.Id.pp_short pv.peer_id ;
     set_bootstrapped pv ;
-    pv.last_validated_head <- Block_header.hash header ;
+    pv.last_validated_head <- header ;
     return_unit
   end else if invalid_block then begin
     debug w
@@ -242,23 +240,22 @@ let may_validate_new_head w hash (header : Block_header.t) =
     validate_new_head w hash header
   end
 
-let may_validate_new_branch w history_mode distant_hash locator =
+let may_validate_new_branch w distant_hash locator =
   let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
   assert_acceptable_head w
     (Block_header.hash distant_header) distant_header >>=? fun () ->
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Block.known_ancestor chain_state history_mode locator >>= function
+  State.Block.known_ancestor chain_state locator >>= function
   | None ->
       debug w
         "ignoring branch %a without common ancestor from peer: %a."
         Block_hash.pp_short distant_hash
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
-  | Some unknown_prefix ->
-      bootstrap_new_branch w history_mode distant_header unknown_prefix
-
+  | Some (ancestor, unknown_prefix) ->
+      bootstrap_new_branch w ancestor distant_header unknown_prefix
 
 let on_no_request w =
   let pv = Worker.state w in
@@ -268,7 +265,7 @@ let on_no_request w =
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
   return_unit
 
-let on_request (type a) history_mode w (req : a Request.t) : a tzresult Lwt.t =
+let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
   let pv = Worker.state w in
   match req with
   | Request.New_head (hash, header) ->
@@ -282,7 +279,7 @@ let on_request (type a) history_mode w (req : a Request.t) : a tzresult Lwt.t =
       debug w "processing new branch %a from peer %a."
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pv.peer_id ;
-      may_validate_new_branch w history_mode hash locator
+      may_validate_new_branch w hash locator
 
 let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
@@ -337,16 +334,17 @@ let on_close w =
 
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
-  let genesis = State.Chain.genesis chain_state in
+  State.Block.read_exn chain_state
+    (State.Chain.genesis chain_state).block >>= fun genesis ->
   let rec pv = {
     peer_id = snd name ;
     parameters = { parameters with notify_new_block } ;
     bootstrapped = false ;
-    last_validated_head = genesis.block ;
-    last_advertised_head = genesis.block ;
+    last_validated_head = State.Block.header genesis ;
+    last_advertised_head = State.Block.header genesis ;
   }
   and notify_new_block block =
-    pv.last_validated_head <- State.Block.hash block ;
+    pv.last_validated_head <- State.Block.header block ;
     parameters.notify_new_block block in
   return pv
 
@@ -356,10 +354,10 @@ let table =
     match neu with
     | Request.New_branch (_, locator, _) ->
         let header, _ = (locator : Block_locator.t :> _ * _) in
-        pv.last_advertised_head <- Block_header.hash header ;
+        pv.last_advertised_head <- header ;
         Some (Worker.Any_request neu)
     | Request.New_head (_, header) ->
-        pv.last_advertised_head <- Block_header.hash header ;
+        pv.last_advertised_head <- header ;
         (* TODO penalize decreasing fitness *)
         match old with
         | Some (Worker.Any_request (Request.New_branch _) as old) ->
@@ -374,7 +372,6 @@ let create
     ?(notify_new_block = fun _ -> ())
     ?(notify_bootstrapped = fun () -> ())
     ?(notify_termination = fun _ -> ())
-    history_mode
     limits block_validator chain_db peer_id =
   let name = (State.Chain.id (Distributed_db.chain_state chain_db), peer_id) in
   let parameters = {
@@ -388,7 +385,7 @@ let create
   let module Handlers = struct
     type self = t
     let on_launch = on_launch
-    let on_request = (fun x y -> on_request history_mode x y)
+    let on_request = on_request
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion

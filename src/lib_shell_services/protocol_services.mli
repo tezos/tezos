@@ -32,6 +32,11 @@ val list:
   #simple ->
   Protocol_hash.t list tzresult Lwt.t
 
+val fetch:
+  #simple ->
+  Protocol_hash.t ->
+  unit tzresult Lwt.t
+
 module S : sig
 
   val contents:
@@ -43,5 +48,10 @@ module S : sig
     ([ `GET ], unit,
      unit, unit, unit,
      Protocol_hash.t list) RPC_service.t
+
+  val fetch:
+    ([ `GET ], unit,
+     unit * Protocol_hash.t, unit, unit,
+     unit) RPC_service.t
 
 end

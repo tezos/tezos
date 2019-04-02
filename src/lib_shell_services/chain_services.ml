@@ -44,13 +44,6 @@ type invalid_block = {
 type prefix = Block_services.chain_prefix
 let path = Block_services.chain_path
 
-let checkpoint_encoding =
-  (obj4
-     (req "block" Block_header.encoding)
-     (dft "save_point" int32 0l)
-     (dft "caboose" int32 0l)
-     (req "history_mode" History_mode.encoding))
-
 let invalid_block_encoding =
   conv
     (fun { hash ; level ; errors } -> (hash, level, errors))
@@ -70,14 +63,6 @@ module S = struct
       ~query: RPC_query.empty
       ~output: Chain_id.encoding
       RPC_path.(path / "chain_id")
-
-  let checkpoint =
-    RPC_service.get_service
-      ~description:"The current checkpoint for this chain."
-      ~query: RPC_query.empty
-      ~output: checkpoint_encoding
-      RPC_path.(path / "checkpoint")
-
 
   module Blocks = struct
 
@@ -166,9 +151,6 @@ let chain_id ctxt =
     match chain with
     | `Hash h -> return h
     | _ -> f chain () ()
-
-let checkpoint ctxt ?(chain = `Main) ()  =
-  make_call0 S.checkpoint ctxt chain () ()
 
 module Blocks = struct
 

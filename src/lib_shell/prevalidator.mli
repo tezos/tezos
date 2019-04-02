@@ -86,7 +86,7 @@ val fitness: t -> Fitness.t Lwt.t
 val operations: t -> (error Preapply_result.t * Operation.t Operation_hash.Map.t)
 
 (** Returns the list of pending operations known to this prevalidation worker *)
-val pending: t -> Operation.t Operation_hash.Map.t Lwt.t
+val pending: ?block:State.Block.t -> t -> Operation.t Operation_hash.Map.t Lwt.t
 
 (** Returns the list of prevalidation contexts running and their associated chain *)
 val running_workers: unit -> (Chain_id.t * Protocol_hash.t * t) list

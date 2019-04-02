@@ -96,7 +96,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_chain_max_tll: int option ;
-  checkpoint: Block_header.t option ;
+  checkpoint: (Int32.t * Block_hash.t) option ;
 }
 
 and peer_validator_limits = Peer_validator.limits = {
@@ -164,9 +164,7 @@ let default_chain_validator_limits = {
   }
 }
 
-let default_history_mode = History_mode.Full
-
-let may_update_checkpoint chain_state checkpoint history_mode =
+let may_update_checkpoint chain_state checkpoint =
   match checkpoint with
   | None ->
       Lwt.return_unit
@@ -174,14 +172,47 @@ let may_update_checkpoint chain_state checkpoint history_mode =
       State.best_known_head_for_checkpoint
         chain_state checkpoint >>= fun new_head ->
       Chain.set_head chain_state new_head >>= fun _old_head ->
-      begin match history_mode with
-        | History_mode.Archive ->
-            State.Chain.set_checkpoint chain_state checkpoint
-        | Full ->
-            State.Chain.set_checkpoint_then_purge_full chain_state checkpoint
-        | Rolling ->
-            State.Chain.set_checkpoint_then_purge_rolling chain_state checkpoint
-      end
+      State.Chain.set_checkpoint chain_state checkpoint
+
+let store_known_protocols state =
+  let embedded_protocols = Registered_protocol.list_embedded () in
+  Lwt_list.iter_s
+    (fun protocol_hash ->
+       State.Protocol.known state protocol_hash >>= function
+       | true ->
+           lwt_log_info Tag.DSL.(fun f ->
+               f "protocol %a is already in store: nothing to do"
+               -% a Protocol_hash.Logging.tag protocol_hash
+               -% t event "embedded_protocol_already_stored")
+       | false ->
+           match Registered_protocol.get_embedded_sources protocol_hash with
+           | None ->
+               lwt_log_info Tag.DSL.(fun f ->
+                   f "protocol %a won't be stored: missing source files"
+                   -% a Protocol_hash.Logging.tag protocol_hash
+                   -% t event "embedded_protocol_missing_sources"
+                 )
+           | Some protocol ->
+               let hash = Protocol.hash protocol in
+               if not (Protocol_hash.equal hash protocol_hash) then
+                 lwt_log_info Tag.DSL.(fun f ->
+                     f "protocol %a won't be stored: wrong hash"
+                     -% a Protocol_hash.Logging.tag protocol_hash
+                     -% t event "embedded_protocol_inconsistent_hash")
+               else
+                 State.Protocol.store state protocol >>= function
+                 | Some hash' ->
+                     assert (hash = hash') ;
+                     lwt_log_info Tag.DSL.(fun f ->
+                         f "protocol %a successfully stored"
+                         -% a Protocol_hash.Logging.tag protocol_hash
+                         -% t event "embedded_protocol_stored")
+                 | None ->
+                     lwt_log_info Tag.DSL.(fun f ->
+                         f "protocol %a is already in store: nothing to do"
+                         -% a Protocol_hash.Logging.tag protocol_hash
+                         -% t event "embedded_protocol_already_stored")
+    ) embedded_protocols
 
 let create
     ?(sandboxed = false)
@@ -192,18 +223,18 @@ let create
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
-    chain_validator_limits
-    history_mode =
+    chain_validator_limits =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some (config, _limits) -> not config.P2p.disable_mempool, not config.P2p.disable_testchain
     | None -> true, true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ?history_mode ?patch_context
-    genesis >>=? fun (state, mainchain_state, context_index, history_mode) ->
-  may_update_checkpoint mainchain_state checkpoint history_mode >>= fun () ->
+    ~store_root ~context_root ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index) ->
+  may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
+  store_known_protocols state >>= fun () ->
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
@@ -215,7 +246,7 @@ let create
   (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate validator
     ?max_child_ttl ~start_prevalidator
-    mainchain_state history_mode >>=? fun mainchain_validator ->
+    mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Distributed_db.shutdown distributed_db >>= fun () ->
@@ -240,7 +271,8 @@ let build_rpc_directory node =
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q) in
 
-  merge (Protocol_directory.build_rpc_directory node.state) ;
+  merge (Protocol_directory.build_rpc_directory
+           (Block_validator.running_worker ()) node.state) ;
   merge (Monitor_directory.build_rpc_directory
            node.validator node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;

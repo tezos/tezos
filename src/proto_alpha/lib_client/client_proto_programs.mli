@@ -33,7 +33,7 @@ module Program : Client_aliases.Alias
 val run :
   #Proto_alpha.rpc_context ->
   chain:Shell_services.chain ->
-  Shell_services.block ->
+  block:Shell_services.block ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
@@ -46,7 +46,7 @@ val run :
 val trace :
   #Proto_alpha.rpc_context ->
   chain:Shell_services.chain ->
-  Shell_services.block ->
+  block:Shell_services.block ->
   ?amount:Tez.t ->
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
@@ -78,7 +78,7 @@ val print_trace_result :
 val typecheck_data :
   #Proto_alpha.rpc_context ->
   chain:Shell_services.chain ->
-  Shell_services.block ->
+  block:Shell_services.block ->
   ?gas:Z.t ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
@@ -88,7 +88,7 @@ val typecheck_data :
 val typecheck_program :
   #Proto_alpha.rpc_context ->
   chain:Shell_services.chain ->
-  Shell_services.block ->
+  block:Shell_services.block ->
   ?gas:Z.t ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t

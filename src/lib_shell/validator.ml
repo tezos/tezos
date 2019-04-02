@@ -67,7 +67,7 @@ let create state db
 
 let activate v ?max_child_ttl
     ~start_prevalidator
-    chain_state history_mode =
+    chain_state =
   let chain_id = State.Chain.id chain_state in
   lwt_log_notice Tag.DSL.(fun f ->
       f "activate chain %a"
@@ -87,7 +87,6 @@ let activate v ?max_child_ttl
         v.chains_input
         v.db chain_state
         v.chain_validator_limits
-        history_mode
 
 let get_exn { active_chains } chain_id =
   Chain_id.Table.find active_chains chain_id

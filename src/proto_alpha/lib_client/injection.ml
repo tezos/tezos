@@ -35,7 +35,6 @@ let get_branch (rpc_config: #Proto_alpha.full)
     match block with
     | `Head n -> return (`Head (n+branch))
     | `Hash (h,n) -> return (`Hash (h,n+branch))
-    | `Alias (a,n) -> return (`Alias (a,n))
     | `Genesis -> return `Genesis
     | `Level i -> return (`Level i)
   end >>=? fun block ->

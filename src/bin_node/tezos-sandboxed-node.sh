@@ -15,9 +15,11 @@ start_sandboxed_node() {
     rpc=$((18730 + id))
     expected_pow="${expected_pow:-0.0}"
     expected_connections="${expected_connections:-3}"
-    if ! [ -n "${node_dir}" ]; then
-       node_dir="$(mktemp -d -t tezos-node.XXXXXXXX)"
-       node_dirs+=("$node_dir")
+    if [ -n "$DATA_DIR" ]; then
+        node_dir="$DATA_DIR"
+    else
+        node_dir="$(mktemp -d -t tezos-node.XXXXXXXX)"
+        node_dirs+=("$node_dir")
     fi
     peers=("--no-bootstrap-peers")
     for peer_port in $(seq 19730 $((19730 + max_peer_id))); do
@@ -38,14 +40,14 @@ EOF
     fi
 
     if ! [ -f "${node_dir}/config.json" ]; then
-	if [ -n "$USE_TLS" ]; then
+        if [ -n "$USE_TLS" ]; then
             $node config init \
-		  --data-dir "$node_dir" \
-		  --net-addr "127.0.0.1:$port" \
-		  --rpc-addr "127.0.0.1:$rpc" \
-		  --rpc-tls  "${node_dir}/tezos.crt,${node_dir}/tezos.key" \
-		  --expected-pow "$expected_pow" \
-		  --connections "$expected_connections"
+                  --data-dir "$node_dir" \
+                  --net-addr "127.0.0.1:$port" \
+                  --rpc-addr "127.0.0.1:$rpc" \
+                  --rpc-tls  "${node_dir}/tezos.crt,${node_dir}/tezos.key" \
+                  --expected-pow "$expected_pow" \
+                  --connections "$expected_connections"
 
             cat > "${node_dir}/tezos.crt" <<EOF
 Certificate:
@@ -166,14 +168,14 @@ XRWBqNomtTmVA25kchhzSMBQ
 -----END PRIVATE KEY-----
 EOF
 
-	else
+        else
             $node config init \
-		  --data-dir "$node_dir" \
-		  --net-addr "127.0.0.1:$port" \
-		  --rpc-addr "127.0.0.1:$rpc" \
-		  --expected-pow "$expected_pow" \
-		  --connections "$expected_connections"
-	fi
+                  --data-dir "$node_dir" \
+                  --net-addr "127.0.0.1:$port" \
+                  --rpc-addr "127.0.0.1:$rpc" \
+                  --expected-pow "$expected_pow" \
+                  --connections "$expected_connections"
+        fi
     fi
 
     [ -f "${node_dir}/identity.json" ] || $node identity generate "$expected_pow" --data-dir "$node_dir"

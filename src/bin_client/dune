@@ -9,16 +9,10 @@
             tezos-client-genesis
             tezos-client-demo
             tezos-client-alpha
-            tezos-client-004-PsuzFErA
-            tezos-client-004-PsGn8G5U
             tezos-stdlib-unix
             tezos-client-base-unix
             tezos-client-alpha-commands.registration
-            tezos-client-004-PsuzFErA-commands.registration
-            tezos-client-004-PsGn8G5U-commands.registration
             tezos-baking-alpha-commands.registration
-            tezos-baking-004-PsuzFErA-commands.registration
-            tezos-baking-004-PsGn8G5U-commands.registration
             tezos-signer-backends)
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string

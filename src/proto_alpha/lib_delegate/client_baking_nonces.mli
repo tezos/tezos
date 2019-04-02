@@ -23,60 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
-open Alpha_context
+open Proto_alpha.Alpha_context
 
-type t
+type t = Nonce.t Block_hash.Map.t
 
-val load:
-  #Client_context.wallet ->
+val encoding: t Data_encoding.t
+
+val empty: t
+
+val load: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t tzresult Lwt.t
+
+val save: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t -> unit tzresult Lwt.t
+
+val mem: t -> Block_hash.t -> bool
+
+val find_opt: t -> Block_hash.t -> Nonce.t option
+
+val add: t -> Block_hash.t -> Nonce.t -> t
+
+val add_all: t -> t -> t
+
+val remove: t -> Block_hash.t -> t
+
+val remove_all: t -> t -> t
+
+(** [get_outdated_nonces] returns the nonces that cannot be associated
+    to blocks (orphans) and the nonces that are older than 5 cycles. *)
+val get_outdated_nonces:
+  #Proto_alpha.full ->
+  ?constants:Constants.t ->
+  chain:Block_services.chain ->
+  t ->
+  (t * t) tzresult Lwt.t
+
+(** [filter_outdated_nonces] filters nonces older than 5 cycles in the
+    nonce file. *)
+val filter_outdated_nonces:
+  #Proto_alpha.full ->
+  ?constants: Constants.t ->
+  [ `Nonce ] Client_baking_files.location ->
+  t ->
   t tzresult Lwt.t
 
-val save:
-  #Client_context.wallet ->
+(** [get_unrevealed_nonces] retrieve registered nonces *)
+val get_unrevealed_nonces:
+  #Proto_alpha.full ->
+  [ `Nonce ] Client_baking_files.location ->
   t ->
-  unit tzresult Lwt.t
-
-val mem:
-  t ->
-  Chain_id.t ->
-  Block_hash.t ->
-  bool
-
-val find_opt:
-  t ->
-  Chain_id.t ->
-  Block_hash.t ->
-  Nonce.t option
-
-val add:
-  t ->
-  Chain_id.t ->
-  Block_hash.t ->
-  Nonce.t ->
-  t
-
-val remove:
-  t ->
-  Chain_id.t ->
-  Block_hash.t ->
-  t
-
-val remove_all:
-  t ->
-  Chain_id.t ->
-  t
-
-val find_chain_nonces_opt:
-  t ->
-  Chain_id.t ->
-  Nonce.t Block_hash.Map.t option
-
-val should_upgrade_nonce_file:
-  #Client_context.full ->
-  bool tzresult Lwt.t
-
-val upgrade_nonce_file:
-  #Client_context.full ->
-  main_chain_id: Chain_id.t ->
-  unit tzresult Lwt.t
+  (Raw_level.t * Nonce.t) list tzresult Lwt.t

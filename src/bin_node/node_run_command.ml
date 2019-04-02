@@ -25,7 +25,17 @@
 (*****************************************************************************)
 
 open Node_logging
-open Genesis_chain
+
+let genesis : State.Chain.genesis = {
+  time =
+    Time.of_notation_exn "2018-11-23T22:24:02Z" ;
+  block =
+    Block_hash.of_b58check_exn
+      "BLockGenesisGenesisGenesisGenesisGenesisf73b4bQ1BPy" ;
+  protocol =
+    Protocol_hash.of_b58check_exn
+      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
+}
 
 type error += Non_private_sandbox of P2p_addr.t
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
@@ -63,17 +73,10 @@ let () =
 
 let (//) = Filename.concat
 
-let find_log_rules default =
-  match Option.try_with (fun () -> Sys.getenv "TEZOS_LOG"),
-        Option.try_with (fun () -> Sys.getenv "LWT_LOG")
-  with
-  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
-  | None, Some rules -> "environment variable LWT_LOG", Some rules
-  | None, None -> "configuration file", default
-  | Some rules, Some _ ->
-      warn "Both environment variables TEZOS_LOG and LWT_LOG \
-            defined, using TEZOS_LOG." ;
-      "environment varible TEZOS_LOG", Some rules
+let store_dir data_dir = data_dir // "store"
+let context_dir data_dir = data_dir // "context"
+let protocol_dir data_dir = data_dir // "protocol"
+let lock_file data_dir = data_dir // "lock"
 
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let patch_context json ctxt =
@@ -178,8 +181,8 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let node_config : Node.config = {
     genesis ;
     patch_context = Some (patch_context sandbox_param) ;
-    store_root = Node_data_version.store_dir config.data_dir ;
-    context_root = Node_data_version.context_dir config.data_dir ;
+    store_root = store_dir config.data_dir ;
+    context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
     test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
     checkpoint ;
@@ -191,7 +194,6 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     config.shell.block_validator_limits
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
-    config.shell.history_mode
 
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =
@@ -248,82 +250,17 @@ let init_signal () =
   ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
   ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
 
-module Contexts_to_gc = Set.Make (struct
-    type t = Chain_id.t * Block_header.t
-    let compare
-        (id_a, { Block_header.shell = { level = level_a } })
-        (id_b, { Block_header.shell = { level = level_b } }) =
-      compare (id_a, level_a) (id_b, level_b)
-  end)
-
-let run_gc (config : Node_config_file.t) =
-  let cpt = ref 0 in
-  lwt_log_notice "Collecting live contexts before to run the GC..." >>= fun () ->
-  Store.init ~mapsize:4_000_000_000_000L (Node_data_version.store_dir config.data_dir)
-  >>= function
-  | Error _e -> Lwt.fail_with "Store.init" (* XXX: use the error monad *)
-  | Ok store ->
-      let predecessors store max_level head chain_id acc =
-        let rec aux acc hash =
-          Store.Block.Header.read_exn (store, hash) >>= fun h ->
-          if Contexts_to_gc.mem (chain_id, h) acc then Lwt.return acc else
-            let acc = Contexts_to_gc.add (chain_id, h) acc in
-            if Unix.isatty Unix.stderr && !cpt mod 1000 = 0 then
-              Format.eprintf "%dK contexts examined%!\
-                              \b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
-                (!cpt / 1000) ;
-            incr cpt ;
-            if h.shell.level <= max_level then Lwt.return acc
-            else
-              Store.Block.Predecessors.read_exn (store, hash) 0 >>= fun pred ->
-              aux acc pred
-        in
-        aux acc head in
-      let alive_in_chain acc id =
-        let chain_t = Store.Chain.get store id in
-        let block_t = Store.Block.get chain_t in
-        let chain_data_t = Store.Chain_data.get chain_t in
-        Store.Chain.Genesis_hash.read_exn chain_t >>= fun genesis ->
-        Store.Block.Header.read_exn (Store.Block.get chain_t, genesis) >>= fun genesis_header ->
-        Store.Chain_data.(Known_heads.read_all @@ get chain_t) >>= fun heads ->
-        Store.Chain_data.Save_point.read_exn chain_data_t >>= fun (save_level, _) ->
-        Lwt_list.fold_left_s (fun (acc, max_head_level) head ->
-            Store.Block.Header.read_exn (block_t, head) >>= fun { shell = { level = head_level } } ->
-            predecessors block_t save_level head id acc >|= fun acc ->
-            acc, max max_head_level head_level)
-          (acc, save_level) (Block_hash.Set.elements heads)
-        >>= fun (acc, max_head_level) ->
-        if Unix.isatty Unix.stderr then Format.eprintf "@." ;
-        lwt_log_notice
-          "Keeping contexts of chain %a from level %ld to %ld"
-          Chain_id.pp id save_level max_head_level >>= fun () ->
-        (* Always promote the genesis block *)
-        Lwt.return (Contexts_to_gc.add (id, genesis_header) acc)
-      in
-      Store.Chain.list store >>= fun ids ->
-      Lwt_list.fold_left_s alive_in_chain Contexts_to_gc.empty ids
-      >>= fun roots ->
-      Tezos_storage.Context.init
-        ~mapsize:4_000_000_000_000L (Node_data_version.context_dir config.data_dir)
-      >>= fun context ->
-      lwt_log_notice "Sorting contexts, most recent first..." >>= fun () ->
-      let roots = Contexts_to_gc.elements roots in
-      let roots = List.rev_map (fun (_, { Block_header.shell = { context } }) -> context) roots in
-      lwt_log_notice "Running the context GC..." >>= fun () ->
-      Tezos_storage.Context.gc context ~roots
-
-let run ?verbosity ?sandbox ?checkpoint ~gc (config : Node_config_file.t) =
+let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
-    ~unlink_on_exit:true (Node_data_version.lock_file config.data_dir) >>=? fun () ->
+    ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
   init_signal () ;
   let log_cfg =
     match verbosity with
     | None -> config.log
     | Some default_level -> { config.log with default_level } in
   Logging_unix.init ~cfg:log_cfg () >>= fun () ->
-  (if not gc then Lwt.return () else run_gc config) >>= fun () ->
-  Updater.init (Node_data_version.protocol_dir config.data_dir) ;
+  Updater.init (protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node ?sandbox ?checkpoint config >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
@@ -337,7 +274,7 @@ let run ?verbosity ?sandbox ?checkpoint ~gc (config : Node_config_file.t) =
   Logging_unix.close () >>= fun () ->
   return_unit
 
-let process sandbox verbosity checkpoint gc args =
+let process sandbox verbosity checkpoint args =
   let verbosity =
     match verbosity with
     | [] -> None
@@ -349,14 +286,6 @@ let process sandbox verbosity checkpoint gc args =
           | Some _ -> true
           | None -> false)
       args >>=? fun config ->
-    (*Do not allow gc AND history mode*)
-    begin match config.shell.history_mode with
-      | None -> return_unit
-      | Some _ ->
-          fail_when gc
-            (failure "Cannot run GC and set history mode at the same time. \
-                      Please upgrade history mode first.")
-    end >>=? fun () ->
     begin match sandbox with
       | Some _ ->
           if config.data_dir = Node_config_file.default_data_dir
@@ -368,16 +297,32 @@ let process sandbox verbosity checkpoint gc args =
       match checkpoint with
       | None -> return_none
       | Some s ->
-          match Block_header.of_b58check s with
-          | Some b -> return_some b
-          | None ->
-              failwith "Failed to parse the provided checkpoint (Base58Check-encoded)."
+          match String.split ',' s with
+          | [ lvl ; block ] ->
+              Lwt.return (Block_hash.of_b58check block) >>=? fun block ->
+              begin
+                match Int32.of_string_opt lvl with
+                | None ->
+                    failwith "%s isn't a 32bit integer" lvl
+                | Some lvl ->
+                    return lvl
+              end >>=? fun lvl ->
+              return_some (lvl, block)
+          | [] -> assert false
+          | [_] ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is not present in %s" s
+          | _ ->
+              failwith "Checkoints are expected to follow the format \
+                        \"<level>,<block_hash>\". \
+                        The character ',' is present more than once in %s" s
     end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
-      (Node_data_version.lock_file config.data_dir) >>=? function
+      (lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint ~gc config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint config)
           (function
             |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                 begin match config.rpc.listen_addr with
@@ -430,18 +375,8 @@ module Term = struct
          info ~docs:Node_shared_arg.Manpage.misc_section
            ~doc ~docv:"<level>,<block_hash>" ["checkpoint"])
 
-  let gc =
-    let open Cmdliner in
-    let doc =
-      "Run the context GC on startup."
-    in
-    Arg.(value
-         & flag
-         & info ~doc ~docs:Node_shared_arg.Manpage.misc_section
-           ["gc"])
-
   let term =
-    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $ checkpoint $ gc $
+    Cmdliner.Term.(ret (const process $ sandbox $ verbosity $ checkpoint $
                         Node_shared_arg.Term.args))
 
 end

@@ -153,6 +153,6 @@ let write file identity =
   if Sys.file_exists file then
     fail (Existent_identity_file file)
   else
-    Node_data_version.ensure_data_dir (Filename.dirname file) >>=? fun _version ->
+    Node_data_version.ensure_data_dir (Filename.dirname file) >>=? fun () ->
     Lwt_utils_unix.Json.write_file file
       (Data_encoding.Json.construct P2p_identity.encoding identity)

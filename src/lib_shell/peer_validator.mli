@@ -36,13 +36,12 @@ type limits = {
 
 val peer_id: t -> P2p_peer.Id.t
 val bootstrapped: t -> bool
-val current_head: t -> Block_hash.t
+val current_head: t -> Block_header.t
 
 val create:
   ?notify_new_block: (State.Block.t -> unit) ->
   ?notify_bootstrapped: (unit -> unit) ->
   ?notify_termination: (unit -> unit) ->
-  History_mode.t ->
   limits ->
   Block_validator.t ->
   Distributed_db.chain_db -> P2p_peer.Id.t -> t tzresult Lwt.t
