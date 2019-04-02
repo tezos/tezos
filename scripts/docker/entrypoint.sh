@@ -48,6 +48,9 @@ case $command in
     tezos-accuser)
         launch_accuser "$@"
         ;;
+    tezos-accuser-test)
+        launch_accuser_test "$@"
+        ;;
     tezos-client)
         configure_client
         exec "$client" "$@"

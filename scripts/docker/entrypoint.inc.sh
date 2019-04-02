@@ -114,7 +114,7 @@ launch_baker() {
     exec "$baker" --chain main \
 	 --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 run with local node "$node_data_dir"
+	 run with local node "$node_data_dir" "$@"
 }
 
 launch_baker_test() {
@@ -131,7 +131,7 @@ launch_endorser() {
     exec "$endorser" --chain main \
 	 --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
-	 run --endorsement-delay 10
+	 run "$@"
 }
 
 launch_endorser_test() {
