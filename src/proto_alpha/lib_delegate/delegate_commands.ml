@@ -149,8 +149,26 @@ let delegate_commands () =
                             nonces and moved them to '$TEZOS_CLIENT/%s'."
                (Block_hash.Map.cardinal orphans) orphan_nonces_file >>= fun () ->
              return_unit
-         end
-      )
+         end) ;
+    command ~group ~desc: "List orphan nonces."
+      no_options
+      (prefixes [ "list" ; "orphan" ; "nonces" ]
+       @@ stop)
+      (fun () (cctxt : #Proto_alpha.full) ->
+         cctxt#with_lock begin fun () ->
+           let open Client_baking_nonces in
+           let orphan_nonces_file = "orphan_nonce" in
+           cctxt#load orphan_nonces_file ~default:empty encoding >>=? fun orphan_nonces ->
+           let block_hashes = List.map fst (Block_hash.Map.bindings orphan_nonces) in
+           cctxt#message "@[<v 2>Found %d orphan nonces associated to \
+                          the potentially unknown following blocks:@ \
+                          %a@]"
+             (Block_hash.Map.cardinal orphan_nonces)
+             (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
+             block_hashes >>= fun () ->
+           return_unit
+         end) ;
+
   ]
 
 let init_signal () =
