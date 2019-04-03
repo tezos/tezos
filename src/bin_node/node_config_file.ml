@@ -313,7 +313,7 @@ let p2p =
                          is disabled to decrease the node storage \
                          usage and computation by droping the \
                          validation of the test network blocks."
-          bool true)
+          bool false)
     )
 
 let rpc : rpc Data_encoding.t =
