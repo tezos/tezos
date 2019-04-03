@@ -74,7 +74,7 @@ type error += Wrong_snapshot_export of History_mode.t * History_mode.t
 type error += Wrong_block_export of Block_hash.t * wrong_block_export_error
 type error += Inconsistent_imported_block of Block_hash.t * Block_hash.t
 type error += Snapshot_import_failure of string
-type error += Wrong_reconstrcut_mode
+type error += Wrong_reconstruct_mode
 type error += Wrong_protocol_hash of Protocol_hash.t
 
 let () =
@@ -147,8 +147,8 @@ let () =
         Format.fprintf ppf
           "Contexts reconstruction is available with full mode snapshots only.")
     Data_encoding.empty
-    (function Wrong_reconstrcut_mode -> Some () | _ -> None)
-    (fun () -> Wrong_reconstrcut_mode) ;
+    (function Wrong_reconstruct_mode -> Some () | _ -> None)
+    (fun () -> Wrong_reconstruct_mode) ;
   register_error_kind
     `Permanent
     ~id:"Wrong_protocol_hash"
@@ -708,7 +708,7 @@ let import ?(reconstruct = false) data_dir filename block =
                    if is_full_snapshot history then
                      reconstruct_contexts store context_index chain_id block_store history
                    else
-                     fail Wrong_reconstrcut_mode
+                     fail Wrong_reconstruct_mode
                | false ->
                    return_unit
              end
