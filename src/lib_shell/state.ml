@@ -872,8 +872,7 @@ module Block = struct
            with the current checkpoint.  *)
         begin
           let predecessor = block_header.shell.predecessor in
-          Store.Block.Header.known
-            (store, predecessor) >>= fun valid_predecessor ->
+          Store.Block.Contents.known (store, predecessor) >>= fun valid_predecessor ->
           if not valid_predecessor then
             Lwt.return_false
           else
