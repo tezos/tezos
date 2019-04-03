@@ -27,6 +27,8 @@ stages:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
   before_script:
     - opam list
     - . ./scripts/version.sh
@@ -703,6 +705,8 @@ publish:docker:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
   before_script:
     - apk add git
     - mkdir ~/.docker || true
