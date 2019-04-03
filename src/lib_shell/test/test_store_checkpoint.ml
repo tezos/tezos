@@ -54,8 +54,7 @@ let lolblock ?(operations = []) header =
   let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
-  let header =
-    { Block_header.shell =
+  ( { Block_header.shell =
         { timestamp = Time.of_seconds (Random.int64 1500L) ;
           level = 0l ; (* dummy *)
           proto_level = 0 ; (* dummy *)
@@ -64,17 +63,13 @@ let lolblock ?(operations = []) header =
           fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
                      MBytes.of_string @@ string_of_int @@ 12] ;
           context = Context_hash.zero } ;
-      protocol_data = MBytes.of_string header ;
-    } in
-  let contents =
-    { Store.Block.header ;
-      metadata = MBytes.create 0 ;
+      protocol_data = MBytes.of_string header ; } ,
+    { Store.Block.metadata = MBytes.create 0 ;
       max_operations_ttl = 0 ;
       message = None ;
       context = Context_hash.zero ;
       last_allowed_fork_level = 0l ;
-    } in
-  header, contents
+    } )
 
 
 let (block_header,_) = lolblock "A1"

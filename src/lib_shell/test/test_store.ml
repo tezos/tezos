@@ -93,49 +93,59 @@ let lolblock ?(operations = []) header =
   let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
-  { Store.Block.header =
-      { Block_header.shell =
-          { timestamp = Time.of_seconds (Random.int64 1500L) ;
-            level = 0l ; (* dummy *)
-            proto_level = 0 ; (* dummy *)
-            validation_passes = Random.int 32 ;
-            predecessor = genesis_block ; operations_hash ;
-            fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
-                       MBytes.of_string @@ string_of_int @@ 12] ;
-            context = Context_hash.zero } ;
-        protocol_data = MBytes.of_string header ;
-      } ;
-    metadata = MBytes.create 0 ;
-    max_operations_ttl = 0 ;
-    message = None ;
-    context = Context_hash.zero ;
-    last_allowed_fork_level = 0l ;
-  }
+  ( { Block_header.shell =
+        { timestamp = Time.of_seconds (Random.int64 1500L) ;
+          level = 0l ; (* dummy *)
+          proto_level = 0 ; (* dummy *)
+          validation_passes = Random.int 32 ;
+          predecessor = genesis_block ; operations_hash ;
+          fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
+                     MBytes.of_string @@ string_of_int @@ 12] ;
+          context = Context_hash.zero } ;
+      protocol_data = MBytes.of_string header ; } ,
+    { Store.Block.metadata = MBytes.create 0 ;
+      max_operations_ttl = 0 ;
+      message = None ;
+      context = Context_hash.zero ;
+      last_allowed_fork_level = 0l ;
+    } )
 
-let b1 = lolblock "Blop !"
-let bh1 = Block_header.hash b1.header
-let b2 = lolblock "Tacatlopo"
-let bh2 = Block_header.hash b2.header
-let b3 = lolblock ~operations:[oph1;oph2] "Persil"
-let bh3 = Block_header.hash b3.header
+let (b1_header,b1_contents) as b1 = lolblock "Blop !"
+let bh1 = Block_header.hash b1_header
+let (b2_header,b2_contents) as b2 = lolblock "Tacatlopo"
+let bh2 = Block_header.hash b2_header
+let (b3_header,b3_contents) as b3 = lolblock ~operations:[oph1;oph2] "Persil"
+let bh3 = Block_header.hash b3_header
 let bh3' =
   let raw = Bytes.of_string @@ Block_hash.to_string bh3 in
   Bytes.set raw 31 '\000' ;
   Bytes.set raw 30 '\000' ;
   Block_hash.of_string_exn @@ Bytes.to_string raw
 
-let equal (b1: Store.Block.contents) (b2: Store.Block.contents) =
-  Block_header.equal b1.header b2.header &&
-  b1.message = b2.message
+let equal
+    (b1_header,b1_contents : Block_header.t * Store.Block.contents)
+    (b2_header,b2_contents : Block_header.t * Store.Block.contents) =
+  Block_header.equal b1_header b2_header &&
+  b1_contents.message = b2_contents.message
 
 let check_block s h b =
   Store.Block.Contents.read (s, h) >>= function
-  | Ok b' when equal b b' -> Lwt.return_unit
-  | Ok _ ->
-      Format.eprintf
-        "Error while reading block %a\n%!"
-        Block_hash.pp_short h ;
-      exit 1
+  | Ok bc' ->
+      begin
+        Store.Block.Header.read (s, h) >>= function
+        | Ok bh' when  equal b (bh',bc') ->
+            Lwt.return_unit
+        | Ok _ ->
+            Format.eprintf
+              "Error while reading block %a\n%!"
+              Block_hash.pp_short h ;
+            exit 1
+        | Error err ->
+            Format.eprintf "@[Error while reading block header %a:@ %a\n@]"
+              Block_hash.pp_short h
+              pp_print_error err ;
+            exit 1
+      end
   | Error err ->
       Format.eprintf "@[Error while reading block %a:@ %a\n@]"
         Block_hash.pp_short h
@@ -145,9 +155,12 @@ let check_block s h b =
 let test_block s =
   let s = Store.Chain.get s chain_id in
   let s = Store.Block.get s in
-  Block.Contents.store (s, bh1) b1 >>= fun () ->
-  Block.Contents.store (s, bh2) b2 >>= fun () ->
-  Block.Contents.store (s, bh3) b3 >>= fun () ->
+  Block.Contents.store (s, bh1) b1_contents >>= fun () ->
+  Block.Contents.store (s, bh2) b2_contents >>= fun () ->
+  Block.Contents.store (s, bh3) b3_contents >>= fun () ->
+  Block.Header.store (s, bh1) b1_header >>= fun () ->
+  Block.Header.store (s, bh2) b2_header >>= fun () ->
+  Block.Header.store (s, bh3) b3_header >>= fun () ->
   check_block s bh1 b1 >>= fun () ->
   check_block s bh2 b2 >>= fun () ->
   check_block s bh3 b3
@@ -155,10 +168,14 @@ let test_block s =
 let test_expand s =
   let s = Store.Chain.get s chain_id in
   let s = Store.Block.get s in
-  Block.Contents.store (s, bh1) b1 >>= fun () ->
-  Block.Contents.store (s, bh2) b2 >>= fun () ->
-  Block.Contents.store (s, bh3) b3 >>= fun () ->
-  Block.Contents.store (s, bh3') b3 >>= fun () ->
+  Block.Contents.store (s, bh1) b1_contents >>= fun () ->
+  Block.Contents.store (s, bh2) b2_contents >>= fun () ->
+  Block.Contents.store (s, bh3) b3_contents >>= fun () ->
+  Block.Contents.store (s, bh3') b3_contents >>= fun () ->
+  Block.Header.store (s, bh1) b1_header >>= fun () ->
+  Block.Header.store (s, bh2) b2_header >>= fun () ->
+  Block.Header.store (s, bh3) b3_header >>= fun () ->
+  Block.Header.store (s, bh3') b3_header >>= fun () ->
   Base58.complete (Block_hash.to_short_b58check bh1) >>= fun res ->
   Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b58check bh1] ;
   Base58.complete (Block_hash.to_short_b58check bh2) >>= fun res ->
