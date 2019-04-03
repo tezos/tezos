@@ -28,6 +28,8 @@ stages:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
   before_script:
     - opam list
     - . ./scripts/version.sh
@@ -668,6 +670,8 @@ publish:docker:
     - alphanet-staging
     - zeronet-staging
     - mainnet-staging
+    - zeronet-snapshots
+    - mainnet-snapshots
   before_script:
     - apk add git
     - mkdir ~/.docker || true
@@ -721,7 +725,7 @@ publish:doc:
   image: alpine:latest
   stage: deploy
   only:
-    - zeronet@tezos/tezos
+    - zeronet-snapshots@tezos/tezos
   dependencies: []
   before_script:
     - mkdir -p ~/.ssh
