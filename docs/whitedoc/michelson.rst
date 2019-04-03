@@ -1644,19 +1644,19 @@ to increase clarity about illegal states.
 
 ::
 
-    > ASSERT_SOME  =>  IF_NONE {FAIL} {}
+    > ASSERT_SOME @x =>  IF_NONE {FAIL} {RENAME @x}
 
 -  ``ASSERT_LEFT``
 
 ::
 
-    > ASSERT_LEFT  =>  IF_LEFT {} {FAIL}
+    > ASSERT_LEFT @x =>  IF_LEFT {RENAME @x} {FAIL}
 
 -  ``ASSERT_RIGHT``
 
 ::
 
-    > ASSERT_RIGHT  =>  IF_LEFT {FAIL} {}
+    > ASSERT_RIGHT @x =>  IF_LEFT {FAIL} {RENAME @x}
 
 Syntactic Conveniences
 ~~~~~~~~~~~~~~~~~~~~~~
