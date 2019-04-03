@@ -108,7 +108,7 @@ let default_p2p = {
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
-  enable_testchain = false ;
+  enable_testchain = true ;
 }
 
 let default_rpc = {
