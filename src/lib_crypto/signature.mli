@@ -46,6 +46,8 @@ type watermark =
 
 val bytes_of_watermark: watermark -> MBytes.t
 
+val pp_watermark : Format.formatter -> watermark -> unit
+
 include S.SIGNATURE with type Public_key_hash.t = public_key_hash
                      and type Public_key.t = public_key
                      and type Secret_key.t = secret_key
