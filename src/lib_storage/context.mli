@@ -167,29 +167,27 @@ module Protocol_data : sig
 
 end
 
-val get_protocol_data_from_headers :
-  index -> Block_header.t list -> (int32 * Protocol_data.data) list Lwt.t
+val get_protocol_data_from_header :
+  index -> Block_header.t -> Protocol_data.t Lwt.t
 
 val dump_contexts :
   index ->
-  (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
+  (Block_header.t * Block_data.t *
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
+   Block_header.t) list ->
   filename:string ->
   unit tzresult Lwt.t
 
 val dump_contexts_fd :
   index ->
-  (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
+  (Block_header.t * Block_data.t *
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
+   Block_header.t) list ->
   fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
 
 val restore_contexts : index -> filename:string ->
   (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list tzresult Lwt.t
-
-val dump_contexts_fd :
-  index ->
-  (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list ->
-  fd:Lwt_unix.file_descr ->
-  unit tzresult Lwt.t
 
 val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
   (Block_header.t * Block_data.t * Pruned_block.t list * Protocol_data.t list) list tzresult Lwt.t
