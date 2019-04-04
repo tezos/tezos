@@ -775,10 +775,10 @@ let get_transition_block_headers pruned_blocks =
   | [] -> assert false
   | x :: xs -> aux [] x xs
 
-let get_protocol_data_from_pruned_block index pruned_block =
-  checkout_exn index pruned_block.Pruned_block.block_header.Block_header.shell.context
+let get_protocol_data_from_header index block_header =
+  checkout_exn index block_header.Block_header.shell.context
   >>= fun context ->
-  let level = pruned_block.block_header.shell.level in
+  let level = block_header.shell.level in
   let irmin_info = Dumpable_context.context_info context in
   let date = Irmin.Info.date irmin_info in
   let author = Irmin.Info.author irmin_info in
@@ -800,11 +800,10 @@ let get_protocol_data_from_pruned_block index pruned_block =
       info ;
     })
 
-let load_protocol_data index pruned_blocks =
-  let transition_pruned_blocks =
-    get_transition_block_headers pruned_blocks in
+let get_protocol_data_from_headers index headers =
   Lwt_list.map_s
-    (get_protocol_data_from_pruned_block index) transition_pruned_blocks
+    (get_protocol_data_from_header index) headers
+
 
 (* Mock some GitStore types, so we can build our own Merkle tree. *)
 

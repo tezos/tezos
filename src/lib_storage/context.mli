@@ -167,8 +167,8 @@ module Protocol_data : sig
 
 end
 
-val load_protocol_data : index -> Pruned_block.t list ->
-  Protocol_data.t list Lwt.t
+val get_protocol_data_from_headers :
+  index -> Block_header.t list -> (int32 * Protocol_data.data) list Lwt.t
 
 val dump_contexts :
   index ->
