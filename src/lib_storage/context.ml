@@ -521,6 +521,8 @@ module Pruned_block = struct
   let of_bytes =
     Data_encoding.Binary.of_bytes encoding
 
+  let header { block_header } = block_header
+
 end
 
 module Block_data = struct
@@ -792,11 +794,6 @@ let get_protocol_data_from_header index block_header =
       info ;
     })
 
-let get_protocol_data_from_headers index headers =
-  Lwt_list.map_s
-    (get_protocol_data_from_header index) headers
-
-
 (* Mock some GitStore types, so we can build our own Merkle tree. *)
 
 module Mock : sig
@@ -918,7 +915,7 @@ let () = register_error_kind `Permanent
             | _ -> None)
     (fun e -> Suspicious_file e)
 
-let dump_contexts idx block_headers ~filename =
+let dump_contexts idx datas ~filename =
   let file_init () =
     Lwt_unix.openfile filename Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o666
     >>= return
@@ -930,7 +927,7 @@ let dump_contexts idx block_headers ~filename =
           let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
           fail (Cannot_create_file msg))
   >>=? fun fd ->
-  dump_contexts_fd idx block_headers ~fd
+  dump_contexts_fd idx datas ~fd
 
 let restore_contexts idx ~filename =
   let file_init () =

@@ -243,7 +243,7 @@ let test_dump { idx; genesis; block2; block3b; _ } =
           fitness = [];
           context;
         } } in
-    let empty_pruned_block = ({
+    let _empty_pruned_block = ({
         block_header = empty_block_header Context_hash.zero ;
         operations = [] ;
         operation_hashes = [] ;
@@ -253,9 +253,9 @@ let test_dump { idx; genesis; block2; block3b; _ } =
         (fun context ->
            empty_block_header context,
            Context.Block_data.empty,
-           [ empty_pruned_block ],
-           [ Context.Protocol_data.empty ])
-        ctxt_hashes
+           (fun _ -> return (None, None)),
+           empty_block_header context
+        ) ctxt_hashes
     in
     Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
