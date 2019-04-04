@@ -73,19 +73,21 @@ echo 'Checking the current period = proposal with non empty listings'
 echo 'Injecting protocols...'
 
 cp -r demo $tempdir/proto1
-$admin_client inject protocol $tempdir/proto1
+proto1=`$admin_client inject protocol $tempdir/proto1 | sed -r 's/Injected protocol (.*) successfully/\1/'`
 
 cp -r demo $tempdir/proto2
 echo '(* 2 *)' >> $tempdir/proto2/main.ml
-$admin_client inject protocol $tempdir/proto2
+proto2=`$admin_client inject protocol $tempdir/proto2 | sed -r 's/Injected protocol (.*) successfully/\1/'`
 
 cp -r demo $tempdir/proto3
 echo '(* 3 *)' >> $tempdir/proto3/main.ml
-$admin_client inject protocol $tempdir/proto3
+proto3=`$admin_client inject protocol $tempdir/proto3 | sed -r 's/Injected protocol (.*) successfully/\1/'`
 
-proto_str=`$admin_client list protocols | grep "P" | head -3` # assuming new protocols listed first
-echo New protocols: $proto_str
-proto=($proto_str)
+proto=($proto1 $proto2 $proto3)
+printf 'New injected protocol: %s\n' "${proto[@]}"
+
+[[ "${#proto[@]}" == "3" ]] \
+    || { echo "Invalid number of injected protocols" ; exit 1 ; }
 
 # Proposals
 
