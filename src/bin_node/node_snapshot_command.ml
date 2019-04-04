@@ -114,7 +114,7 @@ let compute_export_limit
 
 let load_pruned_blocks block_store block_header export_limit =
   let cpt = ref 0 in
-  let rec load_pruned (bh : Block_header.t) acc limit =
+  let rec load_pruned (bh : Block_header.t) (protocol_acc, pruned_blocks_acc) limit =
     Tezos_stdlib.Utils.display_progress
       ~refresh_rate:(!cpt, 1_000)
       "Retrieving history: %iK/%iK blocks"
@@ -122,21 +122,31 @@ let load_pruned_blocks block_store block_header export_limit =
       ((!cpt + (Int32.to_int bh.shell.level - Int32.to_int limit)) / 1_000);
     incr cpt;
     if bh.shell.level <= limit then
-      return acc
+      return (bh :: protocol_acc, pruned_blocks_acc)
     else
       let pbh = bh.shell.predecessor in
       Store.Block.Contents.read (block_store, pbh) >>=? fun { header = pbhd } ->
       Store.Block.Operations.bindings (block_store, pbh) >>= fun operations ->
       Store.Block.Operation_hashes.bindings (block_store, pbh) >>= fun operation_hashes ->
+      (* protocol data *)
+      let pbh_proto_level = bh.Block_header.shell.proto_level in
+      let pbhd_proto_level = pbhd.Block_header.shell.proto_level in
       let pruned_block = ({
           block_header = pbhd ;
           operations ;
           operation_hashes ;
-        } : Context.Pruned_block.t ) in
-      load_pruned pbhd (pruned_block :: acc) limit in
-  load_pruned block_header [] export_limit >>= fun pruned_blocks ->
+        } : Context.Pruned_block.t )
+      in
+      let new_acc =
+        if pbh_proto_level <> pbhd_proto_level then
+          (bh :: protocol_acc, pruned_block :: pruned_blocks_acc)
+        else
+          (protocol_acc, pruned_block :: pruned_blocks_acc)
+      in
+      load_pruned pbhd new_acc limit in
+  load_pruned block_header ([], []) export_limit >>= fun result ->
   Tezos_stdlib.Utils.display_progress_end () ;
-  Lwt.return pruned_blocks
+  Lwt.return result
 
 let export ?(export_rolling=false) data_dir filename block =
   let data_dir =
@@ -198,17 +208,16 @@ let export ?(export_rolling=false) data_dir filename block =
         load_pruned_blocks
           block_store
           block_header
-          export_limit >>=? fun old_pruned_blocks_rev ->
+          export_limit >>=? fun (protocol_data_headers, old_pruned_blocks_rev) ->
 
-        let old_pruned_blocks = List.rev old_pruned_blocks_rev in
-
-        Context.load_protocol_data context_index old_pruned_blocks >>= fun protocol_data ->
+        Context.get_protocol_data_from_headers
+          context_index protocol_data_headers >>= fun protocol_data ->
 
         let block_data =
-          ({block_header = block_header ;
+          ({block_header ;
             operations } : Context.Block_data.t ) in
 
-        return (pred_block_header, block_data, old_pruned_blocks, protocol_data)
+        return (pred_block_header, block_data, List.rev old_pruned_blocks_rev, protocol_data)
   end
   >>=? fun data_to_dump ->
   Store.close store;
