@@ -714,8 +714,8 @@ let forge_block
   (* Now for some logging *)
   let total_op_count = List.length operations_arg in
   let valid_op_count = List.length (List.concat operations) in
-  lwt_log_info Tag.DSL.(fun f ->
-      f "Found %d valid operations (%d refused) for timestamp %a@.Computed fitness %a"
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "Found %d valid operations (%d refused) for timestamp %a. Computed fitness %a."
       -% t event "found_valid_operations"
       -% s valid_ops valid_op_count
       -% s refused_ops (total_op_count - valid_op_count)
@@ -945,7 +945,7 @@ let build_block
 
   fetch_operations cctxt ~chain state slot >>=? function
   | None ->
-      lwt_log_info Tag.DSL.(fun f ->
+      lwt_log_notice Tag.DSL.(fun f ->
           f "Received a new head while waiting for operations. Aborting this block."
           -% t event "new_head_received") >>= fun () ->
       return_none
@@ -1067,11 +1067,7 @@ let bake (cctxt : #Proto_alpha.full) ~chain state =
             else return_unit end >>=? fun () ->
           return_unit
     end
-  | None -> (* Error while building a block *)
-      lwt_log_error Tag.DSL.(fun f ->
-          f "Error while building a block."
-          -% t event "cannot_build_block") >>= fun () ->
-      return_unit
+  | None -> return_unit
 
 (** [get_baking_slots] calls the node via RPC to retrieve the potential
     slots for the given delegates within a given range of priority *)
