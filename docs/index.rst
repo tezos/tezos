@@ -131,6 +131,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Releases:
+
+   releases/april
+
+.. toctree::
+   :maxdepth: 2
    :caption: Developer Tutorials:
 
    tutorials/rpc
