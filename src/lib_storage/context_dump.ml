@@ -44,6 +44,7 @@ module type Dump_interface = sig
     type t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
+    val header : t -> Block_header.t
   end
 
   module Block_data : sig
@@ -110,7 +111,8 @@ module type S = sig
 
   val dump_contexts_fd :
     index ->
-    (block_header * block_data * pruned_block list * protocol_data list) list ->
+    (block_header * block_data *
+     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t) * block_header) list ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 end
 
@@ -372,7 +374,6 @@ module Make (I:Dump_interface)
     | Loot -> fail @@ Bad_read ("can't have protocol data here")
     | End -> fail @@ Bad_read ("unexpected end of file")
 
-
   let set_int64 buf i =
     let b = Bytes.create 8 in
     EndianBytes.BigEndian.set_int64 b 0 i;
@@ -527,7 +528,7 @@ module Make (I:Dump_interface)
 
   (* Dumping *)
 
-  let dump_contexts_fd idx blocks ~fd =
+  let dump_contexts_fd idx datas ~fd =
 
     let buf = Buffer.create 1_000_000 in
     let written = ref 0 in
@@ -600,7 +601,7 @@ module Make (I:Dump_interface)
     Lwt.catch begin fun () ->
       magic_set () >>= fun () ->
       Error_monad.iter_s
-        (fun (bh,meta,pruned,proto_data) ->
+        (fun (bh, meta, pruned_iterator, starting_block_header) ->
            I.get_context idx bh >>= function
            | None -> fail @@ Context_not_found (I.Block_header.to_bytes bh)
            | Some ctxt ->
@@ -610,27 +611,40 @@ module Make (I:Dump_interface)
                I.context_parents ctxt >>= fun parents ->
                set_meta buf meta_tbl (I.Block_data.to_bytes meta) >>= fun meta_h ->
                (* Dump pruned blocks *)
-               Lwt_list.fold_left_s (fun cpt pruned ->
-                   Tezos_stdlib.Utils.display_progress
-                     ~refresh_rate:(cpt, 1_000)
-                     "History: %dK block, %dMiB written"
-                     (cpt / 1_000) (!written / 1_048_576) ;
-                   set_command buf Proot ;
-                   let mbhash = I.Pruned_block.to_bytes pruned in
-                   set_mbytes buf mbhash ;
-                   maybe_flush () >>= fun () ->
-                   Lwt.return (cpt + 1)) 0 pruned >>= fun _cpt ->
+               let dump_pruned cpt pruned =
+                 Tezos_stdlib.Utils.display_progress
+                   ~refresh_rate:(cpt, 1_000)
+                   "History: %dK block, %dMiB written"
+                   (cpt / 1_000) (!written / 1_048_576) ;
+                 set_command buf Proot ;
+                 let mbhash = I.Pruned_block.to_bytes pruned in
+                 set_mbytes buf mbhash ;
+                 maybe_flush () in
+               let rec aux cpt acc header =
+                 pruned_iterator header >>=? function
+                 | (None, None) -> return acc (* assert false *)
+                 | (None, Some protocol_data) ->
+                     return (protocol_data :: acc)
+                 | (Some pred_pruned, Some protocol_data) ->
+                     dump_pruned cpt pred_pruned >>= fun () ->
+                     aux (succ cpt) (protocol_data :: acc)
+                       (I.Pruned_block.header pred_pruned)
+                 | (Some pred_pruned, None) ->
+                     dump_pruned cpt pred_pruned >>= fun () ->
+                     aux (succ cpt) acc
+                       (I.Pruned_block.header pred_pruned)
+               in aux 0 [] starting_block_header >>=? fun protocol_datas ->
                (* Dump protocol data *)
                Lwt_list.iter_s (fun proto ->
                    set_command buf Loot ;
                    let mbhash = I.Protocol_data.to_bytes proto in
                    set_mbytes buf mbhash ;
-                   maybe_flush ()
-                 ) proto_data >>= fun () ->
+                   maybe_flush () ;
+                 ) protocol_datas >>= fun () ->
                set_root buf bh (I.context_info ctxt) parents meta_h ;
                return_unit
         )
-        blocks
+        datas
       >>=? fun () ->
       set_command buf End;
       flush () >>= fun () ->
