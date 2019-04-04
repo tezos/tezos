@@ -529,6 +529,8 @@ module Pruned_block = struct
   let of_bytes =
     Data_encoding.Binary.of_bytes encoding
 
+  let header { block_header } = block_header
+
 end
 
 module Block_data = struct
@@ -801,11 +803,6 @@ let get_protocol_data_from_header index block_header =
       info ;
     })
 
-let get_protocol_data_from_headers index headers =
-  Lwt_list.map_s
-    (get_protocol_data_from_header index) headers
-
-
 (* Context dumper *)
 
 module Context_dumper = Context_dump.Make(Dumpable_context)
@@ -826,7 +823,35 @@ let () = register_error_kind `Permanent
             | _ -> None)
     (fun e -> Cannot_create_file e)
 
-let dump_contexts idx block_headers ~filename =
+type error += Cannot_open_file of string
+let () = register_error_kind `Permanent
+    ~id:"context_dump.read.cannot_open"
+    ~title:"Cannot open file for context restoring"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Error while opening file for context restoring: %s@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_restore_cannot_open" string) )
+    (function Cannot_open_file e -> Some e
+            | _ -> None)
+    (fun e -> Cannot_open_file e)
+
+type error += Suspicious_file of int
+let () = register_error_kind `Permanent
+    ~id:"context_dump.read.suspicious"
+    ~title:"Suspicious file: data after end"
+    ~description:""
+    ~pp:(fun ppf uerr ->
+        Format.fprintf ppf
+          "@[Remaining bytes in file after context restoring: %d@]"
+          uerr)
+    Data_encoding.(obj1 (req "context_restore_suspicious" int31) )
+    (function Suspicious_file e -> Some e
+            | _ -> None)
+    (fun e -> Suspicious_file e)
+
+let dump_contexts idx datas ~filename =
   let file_init () =
     Lwt_unix.openfile filename Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o666
     >>= return
@@ -838,4 +863,4 @@ let dump_contexts idx block_headers ~filename =
           let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
           fail (Cannot_create_file msg))
   >>=? fun fd ->
-  dump_contexts_fd idx block_headers ~fd
+  dump_contexts_fd idx datas ~fd

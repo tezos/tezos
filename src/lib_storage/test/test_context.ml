@@ -226,8 +226,6 @@ let test_fold { idx ; genesis } =
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return_unit
 
-(******************************************************************************)
-
 let tests : (string * (t -> unit Lwt.t)) list = [
   "simple", test_simple ;
   "continuation", test_continuation ;
