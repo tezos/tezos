@@ -546,10 +546,10 @@ let reconstruct_contexts
   return_unit
 
 
-let import_protocol_data index store pruned_blocks (level, protocol_data) =
+let import_protocol_data index store pruned_blocks level_oldest_block (level, protocol_data) =
   (* Retreive the original context hash of the block. *)
   let block_header =
-    let pruned_block = snd @@ pruned_blocks.(Int32.to_int level - 1) in
+    let pruned_block = snd @@ pruned_blocks.(Int32.to_int level - Int32.to_int level_oldest_block) in
     pruned_block.Context.Pruned_block.block_header
   in
   let expected_context_hash = block_header.shell.context in
@@ -579,10 +579,14 @@ let import_protocol_data index store pruned_blocks (level, protocol_data) =
       fail (Wrong_protocol_hash protocol_hash)
 
 let import_protocol_data_list index store pruned_blocks protocol_data =
+  let level_oldest_block =
+    let b = snd pruned_blocks.(0) in
+    b.Context.Pruned_block.block_header.shell.level
+  in
   let rec aux = function
     | [] -> return_unit
     | (level, protocol_data) :: xs ->
-        import_protocol_data index store pruned_blocks (level, protocol_data) >>=? fun () ->
+        import_protocol_data index store pruned_blocks level_oldest_block (level, protocol_data) >>=? fun () ->
         aux xs
   in aux protocol_data
 
