@@ -195,9 +195,9 @@ let endorsement_rights c level =
     Signature.Public_key_hash.Map.empty
     (0 --> (Constants.endorsers_per_block c - 1))
 
-let check_endorsement_rights ctxt chain_id (op : Kind.endorsement Operation.t) =
+let check_endorsement_rights ctxt (op : Kind.endorsement Operation.t) =
   let current_level = Level.current ctxt in
-  let Single (Endorsement { level ; _ }) = op.protocol_data.contents in
+  let Single (Endorsement { level ; slot }) = op.protocol_data.contents in
   begin
     if Raw_level.(succ level = current_level.level) then
       return (Alpha_context.allowed_endorsements ctxt)
@@ -206,10 +206,11 @@ let check_endorsement_rights ctxt chain_id (op : Kind.endorsement Operation.t) =
   end >>=? fun endorsements ->
   match
     Signature.Public_key_hash.Map.fold (* no find_first *)
-      (fun pkh (pk, slots, used) acc ->
-         match Operation.check_signature_sync pk chain_id op with
-         | Error _ -> acc
-         | Ok () -> Some (pkh, slots, used))
+      (fun pkh (_pk, slots, used) acc ->
+         if List.exists (Compare.Int.(=) slot) slots then
+           Some (pkh, slots, used)
+         else
+           acc)
       endorsements None
   with
   | None -> fail Unexpected_endorsement

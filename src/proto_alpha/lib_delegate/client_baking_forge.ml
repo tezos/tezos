@@ -981,7 +981,7 @@ let build_block
         Lwt_list.fold_left_s (fun sum op ->
             Lwt.return sum >>=? fun sum ->
             Alpha_services.Endorsing_power.get cctxt (chain, block)
-              op bi.Client_baking_blocks.chain_id >>=? fun power ->
+              op >>=? fun power ->
             return (sum + power))
           (Ok 0) endorsements >>=? fun included_endorsements ->
         let zero_period =

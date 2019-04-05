@@ -60,7 +60,7 @@ val endorsement_rights:
 (** Check that the operation was signed by a delegate allowed
     to endorse at the level specified by the endorsement. *)
 val check_endorsement_rights:
-  context -> Chain_id.t -> Kind.endorsement Operation.t ->
+  context -> Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 
 (** Returns the endorsement reward calculated w.r.t a given priority.  *)

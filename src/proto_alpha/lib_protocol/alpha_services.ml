@@ -112,11 +112,11 @@ end
 
 module Endorsing_power = struct
 
-  let endorsing_power ctxt chain_id (operation:packed_operation) =
+  let endorsing_power ctxt (operation:packed_operation) =
     let Operation_data data = operation.protocol_data in
     match data.contents with
     | Single Endorsement _ ->
-        Baking.check_endorsement_rights ctxt chain_id {
+        Baking.check_endorsement_rights ctxt {
           shell = operation.shell ;
           protocol_data = data ;
         } >>=? fun (_, slots, _) ->
@@ -130,19 +130,19 @@ module Endorsing_power = struct
       RPC_service.post_service
         ~description:"Count the endorsing power of an operation."
         ~query: RPC_query.empty
-        ~input: (tup2 Operation.encoding Chain_id.encoding)
+        ~input: Operation.encoding
         ~output: int31
         RPC_path.(open_root / "endorsing_power")
   end
 
   let register () =
     let open Services_registration in
-    register0 S.endorsing_power begin fun ctxt () (op, chain_id) ->
-      endorsing_power ctxt chain_id op
+    register0 S.endorsing_power begin fun ctxt () op ->
+      endorsing_power ctxt op
     end
 
-  let get ctxt block op chain_id =
-    RPC_context.make_call0 S.endorsing_power ctxt block () (op, chain_id)
+  let get ctxt block op =
+    RPC_context.make_call0 S.endorsing_power ctxt block () op
 
 end
 

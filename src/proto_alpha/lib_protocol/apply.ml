@@ -775,7 +775,7 @@ let apply_contents_list
       fail_unless
         Raw_level.(succ level = current_level)
         Invalid_endorsement_level >>=? fun () ->
-      Baking.check_endorsement_rights ctxt chain_id operation >>=? fun (delegate, slots, used) ->
+      Baking.check_endorsement_rights ctxt operation >>=? fun (delegate, slots, used) ->
       if used then fail (Duplicate_endorsement delegate)
       else
         let ctxt = record_endorsement ctxt delegate in
@@ -825,8 +825,8 @@ let apply_contents_list
             (Outdated_double_endorsement_evidence
                { level = level.level ;
                  last = oldest_level }) >>=? fun () ->
-          Baking.check_endorsement_rights ctxt chain_id op1 >>=? fun (delegate1, _, _) ->
-          Baking.check_endorsement_rights ctxt chain_id op2 >>=? fun (delegate2, _, _) ->
+          Baking.check_endorsement_rights ctxt op1 >>=? fun (delegate1, _, _) ->
+          Baking.check_endorsement_rights ctxt op2 >>=? fun (delegate2, _, _) ->
           fail_unless
             (Signature.Public_key_hash.equal delegate1 delegate2)
             (Inconsistent_double_endorsement_evidence

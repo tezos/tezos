@@ -49,7 +49,7 @@ module Endorsing_power : sig
   val get:
     'a #RPC_context.simple -> 'a ->
     Alpha_context.packed_operation ->
-    Chain_id.t -> int shell_tzresult Lwt.t
+    int shell_tzresult Lwt.t
 
 end
 
