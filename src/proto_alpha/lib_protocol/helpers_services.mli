@@ -143,6 +143,7 @@ module Forge : sig
   val endorsement:
     'a #RPC_context.simple -> 'a ->
     branch:Block_hash.t ->
+    slot:int ->
     level:Raw_level.t ->
     unit -> MBytes.t shell_tzresult Lwt.t
 

@@ -68,6 +68,7 @@ and _ contents_list =
 
 and _ contents =
   | Endorsement : {
+      slot: int ;
       level: Raw_level_repr.t ;
     } -> Kind.endorsement contents
   | Seed_nonce_revelation : {
@@ -320,7 +321,8 @@ module Encoding = struct
                inj: 'a -> 'b contents } -> 'b case
 
   let endorsement_encoding =
-    obj1
+    obj2
+      (req "slot" uint8)
       (req "level" Raw_level_repr.encoding)
 
   let endorsement_case =
@@ -333,9 +335,9 @@ module Encoding = struct
           | Contents (Endorsement _ as op) -> Some op
           | _ -> None) ;
       proj =
-        (fun (Endorsement { level }) -> level) ;
+        (fun (Endorsement { slot; level }) -> (slot, level)) ;
       inj =
-        (fun level -> Endorsement { level })
+        (fun (slot, level) -> Endorsement { slot; level })
     }
 
   let endorsement_encoding =

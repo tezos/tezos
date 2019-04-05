@@ -69,8 +69,7 @@ and _ contents_list =
 
 and _ contents =
   | Endorsement : {
-      (* TODO: add integer of one of the slots, and fix
-         check_endorsment_rights to avoid quadratic lookup *)
+      slot: int ;
       level: Raw_level_repr.t ;
     } -> Kind.endorsement contents
   | Seed_nonce_revelation : {

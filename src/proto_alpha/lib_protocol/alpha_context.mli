@@ -868,6 +868,7 @@ and _ contents_list =
 
 and _ contents =
   | Endorsement : {
+      slot: int ;
       level: Raw_level.t ;
     } -> Kind.endorsement contents
   | Seed_nonce_revelation : {

@@ -363,7 +363,7 @@ let rec pp_contents_and_result_list :
           Ed25519.Public_key_hash.pp id
           pp_balance_updates bus
     | Single_and_result
-        (Endorsement { level },
+        (Endorsement { level ; slot = _ },
          Endorsement_result { balance_updates ; delegate ; slots }) ->
         Format.fprintf ppf
           "@[<v 2>Endorsement:@,\

@@ -46,12 +46,13 @@ let inject_endorsement
     (cctxt : #Proto_alpha.full)
     ?async
     ~chain ~block
-    hash level
+    hash ~slot level
     delegate_sk delegate_pkh =
   Alpha_services.Forge.endorsement cctxt
     (chain, block)
     ~branch:hash
-    ~level:level
+    ~slot
+    ~level
     () >>=? fun bytes ->
   let wallet = (cctxt :> Client_context.wallet) in
   (* Double-check the right to inject an endorsement *)
@@ -86,20 +87,27 @@ let forge_endorsement
   Alpha_block_services.metadata cctxt
     ~chain ~block () >>=? fun { protocol_data = { level = { level ; _ } ; _ } ; _ } ->
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh >>=? fun oph ->
-  Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
-  lwt_log_notice Tag.DSL.(fun f ->
-      f "Injected endorsement for block '%a' \
-         (level %a, contract %s) '%a'"
-      -% t event "injected_endorsement"
-      -% a Block_hash.Logging.tag hash
-      -% a level_tag level
-      -% s Client_keys.Logging.tag name
-      -% t Signature.Public_key_hash.Logging.tag src_pkh
-      -% a Operation_hash.Logging.tag oph) >>= fun () ->
-  return oph
+  get_signing_slots cctxt ~chain ~block src_pkh level >>=? function
+  | None
+  | Some [] ->
+      (* FIXME *) cctxt#error "No endorsing rights for level %a." Raw_level.pp level
+  | Some (slot :: _) ->
+      inject_endorsement cctxt ~chain ~block ?async hash level ~slot src_sk src_pkh >>=? fun oph ->
+      Client_keys.get_key cctxt src_pkh >>=? fun (name, _pk, _sk) ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Injected endorsement for block '%a' \
+             (level %a, contract %s) '%a'"
+          -% t event "injected_endorsement"
+          -% a Block_hash.Logging.tag hash
+          -% a level_tag level
+          -% s Client_keys.Logging.tag name
+          -% t Signature.Public_key_hash.Logging.tag src_pkh
+          -% a Operation_hash.Logging.tag oph) >>= fun () ->
+      return oph
 
 (** Worker *)
+
+type slot = int
 
 type state = {
   delegates: public_key_hash list ;
@@ -109,7 +117,7 @@ type state = {
 
 and endorsements = {
   time: Time.t ;
-  delegates: public_key_hash list ;
+  delegates: ( public_key_hash * slot ) list ;
   block: Client_baking_blocks.block_info ;
 }
 
@@ -123,7 +131,7 @@ let get_delegates cctxt state = match state.delegates with
       return delegates
   | (_ :: _) as delegates -> return delegates
 
-let endorse_for_delegate cctxt block delegate_pkh =
+let endorse_for_delegate cctxt block (delegate_pkh, slot) =
   let { Client_baking_blocks.hash ; level ; chain_id ; _ } = block in
   Client_keys.get_key cctxt delegate_pkh >>=? fun (name, _pk, delegate_sk) ->
   lwt_debug Tag.DSL.(fun f ->
@@ -136,7 +144,7 @@ let endorse_for_delegate cctxt block delegate_pkh =
   let block = `Hash (hash, 0) in
   inject_endorsement cctxt
     ~chain ~block
-    hash level
+    hash ~slot level
     delegate_sk delegate_pkh >>=? fun oph ->
   lwt_log_notice Tag.DSL.(fun f ->
       f "Injected endorsement for block '%a' \
@@ -166,8 +174,8 @@ let allowed_to_endorse cctxt bi delegate  =
           -% t event "endorsement_no_slots_found"
           -% a Block_hash.Logging.tag bi.hash
           -% s Client_keys.Logging.tag name) >>= fun () ->
-      return_false
-  | Some (_ :: _ as slots) ->
+      return_none
+  | Some (slot :: _ as slots) ->
       lwt_debug Tag.DSL.(fun f ->
           f "Found slots for %a/%s (%a)"
           -% t event "endorsement_slots_found"
@@ -183,8 +191,9 @@ let allowed_to_endorse cctxt bi delegate  =
               f "Level %a (or higher) previously endorsed: do not endorse."
               -% t event "previously_endorsed"
               -% a level_tag level) >>= fun () ->
-          return_false
-      | true -> return_true
+          return_none
+      | true ->
+          return_some (delegate, slot)
 
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
@@ -200,7 +209,7 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
         -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
     let time = Time.(add (now ()) state.delay) in
     get_delegates cctxt state >>=? fun delegates ->
-    filter_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
+    filter_map_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {
         time ;
         block = bi ;
@@ -239,13 +248,14 @@ let create
   let timeout_k cctxt state (block, delegates) =
     state.pending <- None ;
     iter_s
-      (fun delegate -> endorse_for_delegate cctxt block delegate >>= function
+      (fun ((delegate_pkh, _) as delegate) ->
+         endorse_for_delegate cctxt block delegate >>= function
          | Ok () -> return_unit
          | Error errs ->
              lwt_log_error Tag.DSL.(fun f ->
                  f "@[<v 2>Error while injecting endorsement for delegate %a : @[%a@]@]@."
                  -% t event "error_while_endorsing"
-                 -% a Signature.Public_key_hash.Logging.tag delegate
+                 -% a Signature.Public_key_hash.Logging.tag delegate_pkh
                  -% a errs_tag errs) >>= fun () ->
              (* We continue anyway *)
              return_unit
