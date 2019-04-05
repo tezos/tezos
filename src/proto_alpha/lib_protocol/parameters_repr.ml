@@ -118,9 +118,6 @@ let constants_encoding =
        and endorsers_per_block =
          opt Compare.Int.(=)
            default.endorsers_per_block c.endorsers_per_block
-       and minimum_endorsements_per_priority =
-         opt Compare_minimum_endorsements_per_priority.(=)
-           default.minimum_endorsements_per_priority c.minimum_endorsements_per_priority
        and hard_gas_limit_per_operation =
          opt Compare.Z.(=)
            default.hard_gas_limit_per_operation c.hard_gas_limit_per_operation
@@ -169,6 +166,12 @@ let constants_encoding =
        and hard_storage_limit_per_operation =
          opt Compare.Z.(=)
            default.hard_storage_limit_per_operation c.hard_storage_limit_per_operation
+       and minimum_endorsements_per_priority =
+         opt Compare_minimum_endorsements_per_priority.(=)
+           default.minimum_endorsements_per_priority c.minimum_endorsements_per_priority
+       and delay_per_missing_endorsement =
+         opt Period_repr.(=)
+           default.delay_per_missing_endorsement c.delay_per_missing_endorsement
        in
        (( preserved_cycles,
           blocks_per_cycle,
@@ -177,7 +180,6 @@ let constants_encoding =
           blocks_per_voting_period,
           time_between_blocks,
           endorsers_per_block,
-          minimum_endorsements_per_priority,
           hard_gas_limit_per_operation,
           hard_gas_limit_per_block),
         ((proof_of_work_threshold,
@@ -193,7 +195,9 @@ let constants_encoding =
           endorsement_bonus_intercept,
           endorsement_bonus_slope,
           cost_per_byte,
-          hard_storage_limit_per_operation))))
+          hard_storage_limit_per_operation,
+          minimum_endorsements_per_priority,
+          delay_per_missing_endorsement))))
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -201,7 +205,6 @@ let constants_encoding =
             blocks_per_voting_period,
             time_between_blocks,
             endorsers_per_block,
-            minimum_endorsements_per_priority,
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
@@ -217,7 +220,9 @@ let constants_encoding =
             endorsement_bonus_intercept,
             endorsement_bonus_slope,
             cost_per_byte,
-            hard_storage_limit_per_operation))) ->
+            hard_storage_limit_per_operation,
+            minimum_endorsements_per_priority,
+            delay_per_missing_endorsement))) ->
       let unopt def = function None -> def | Some v -> v in
       let default = Constants_repr.default in
       { Constants_repr.preserved_cycles =
@@ -235,8 +240,6 @@ let constants_encoding =
           time_between_blocks ;
         endorsers_per_block =
           unopt default.endorsers_per_block endorsers_per_block ;
-        minimum_endorsements_per_priority =
-          unopt default.minimum_endorsements_per_priority minimum_endorsements_per_priority ;
         hard_gas_limit_per_operation =
           unopt default.hard_gas_limit_per_operation hard_gas_limit_per_operation ;
         hard_gas_limit_per_block =
@@ -269,9 +272,13 @@ let constants_encoding =
           unopt default.cost_per_byte cost_per_byte ;
         hard_storage_limit_per_operation =
           unopt default.hard_storage_limit_per_operation hard_storage_limit_per_operation ;
+        minimum_endorsements_per_priority =
+          unopt default.minimum_endorsements_per_priority minimum_endorsements_per_priority ;
+        delay_per_missing_endorsement =
+          unopt default.delay_per_missing_endorsement delay_per_missing_endorsement ;
       } )
     (merge_objs
-       (obj10
+       (obj9
           (opt "preserved_cycles" uint8)
           (opt "blocks_per_cycle" int32)
           (opt "blocks_per_commitment" int32)
@@ -279,7 +286,6 @@ let constants_encoding =
           (opt "blocks_per_voting_period" int32)
           (opt "time_between_blocks" (list Period_repr.encoding))
           (opt "endorsers_per_block" uint16)
-          (opt "minimum_endorsements_per_priority" (list uint16))
           (opt "hard_gas_limit_per_operation" z)
           (opt "hard_gas_limit_per_block" z))
        (merge_objs
@@ -292,13 +298,15 @@ let constants_encoding =
              (opt "block_security_deposit" Tez_repr.encoding)
              (opt "endorsement_security_deposit" Tez_repr.encoding)
              (opt "block_reward" Tez_repr.encoding))
-          (obj6
+          (obj8
              (opt "endorsement_reward" Tez_repr.encoding)
              (opt "endorsement_reward_priority_bonus" Tez_repr.encoding)
              (opt "endorsement_bonus_intercept" uint16)
              (opt "endorsement_bonus_slope" uint16)
              (opt "cost_per_byte" Tez_repr.encoding)
-             (opt "hard_storage_limit_per_operation" z))))
+             (opt "hard_storage_limit_per_operation" z)
+             (opt "minimum_endorsements_per_priority" (list uint16))
+             (opt "delay_per_missing_endorsement" Period_repr.encoding))))
 
 let encoding =
   let open Data_encoding in

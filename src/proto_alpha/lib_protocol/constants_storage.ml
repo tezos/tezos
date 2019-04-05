@@ -47,6 +47,9 @@ let endorsers_per_block c =
 let minimum_endorsements_per_priority c =
   let constants = Raw_context.constants c in
   constants.minimum_endorsements_per_priority
+let delay_per_missing_endorsement c =
+  let constants = Raw_context.constants c in
+  constants.delay_per_missing_endorsement
 let hard_gas_limit_per_operation c =
   let constants = Raw_context.constants c in
   constants.hard_gas_limit_per_operation

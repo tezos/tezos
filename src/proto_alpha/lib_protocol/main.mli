@@ -29,6 +29,7 @@ type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t ;
       baker : Alpha_context.public_key_hash ;
+      block_delay : Alpha_context.Period.t ;
     }
   | Partial_application of {
       block_header : Alpha_context.Block_header.t ;
@@ -41,6 +42,7 @@ type validation_mode =
       predecessor : Block_hash.t ;
       protocol_data : Alpha_context.Block_header.contents ;
       baker : Alpha_context.public_key_hash ;
+      block_delay : Alpha_context.Period.t ;
     }
 
 type validation_state =

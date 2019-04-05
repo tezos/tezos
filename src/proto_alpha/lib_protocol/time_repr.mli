@@ -31,4 +31,5 @@ val of_seconds: string -> time option
 val to_seconds_string: time -> string
 
 val (+?) : time -> Period_repr.t -> time tzresult
+val (-?) : time -> time -> Period_repr.t tzresult
 

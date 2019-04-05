@@ -81,6 +81,7 @@ module Timestamp : sig
   include BASIC_DATA with type t = Time.t
   type time = t
   val (+?) : time -> Period.t -> time tzresult
+  val (-?) : time -> time -> Period.t tzresult
 
   val of_notation: string -> time option
   val to_notation: time -> string
@@ -366,7 +367,6 @@ module Constants : sig
     blocks_per_voting_period: int32 ;
     time_between_blocks: Period.t list ;
     endorsers_per_block: int ;
-    minimum_endorsements_per_priority: int list ;
     hard_gas_limit_per_operation: Z.t ;
     hard_gas_limit_per_block: Z.t ;
     proof_of_work_threshold: int64 ;
@@ -383,6 +383,8 @@ module Constants : sig
     endorsement_bonus_slope: int ;
     cost_per_byte: Tez.t ;
     hard_storage_limit_per_operation: Z.t ;
+    minimum_endorsements_per_priority: int list ;
+    delay_per_missing_endorsement : Period.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -394,6 +396,7 @@ module Constants : sig
   val time_between_blocks: context -> Period.t list
   val endorsers_per_block: context -> int
   val minimum_endorsements_per_priority: context -> int list
+  val delay_per_missing_endorsement: context -> Period.t
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t

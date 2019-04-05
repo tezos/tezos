@@ -27,6 +27,7 @@ include Time
 type time = t
 
 type error += Timestamp_add (* `Permanent *)
+type error += Timestamp_sub (* `Permanent *)
 
 let () =
   register_error_kind
@@ -38,7 +39,17 @@ let () =
         Format.fprintf ppf "Overflow when adding timestamps.")
     Data_encoding.empty
     (function Timestamp_add -> Some () | _ -> None)
-    (fun () -> Timestamp_add)
+    (fun () -> Timestamp_add);
+  register_error_kind
+    `Permanent
+    ~id:"timestamp_sub"
+    ~title:"Timestamp sub"
+    ~description:"Substracting timestamps resulted in negative period."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Substracting timestamps resulted in negative period.")
+    Data_encoding.empty
+    (function Timestamp_sub -> Some () | _ -> None)
+    (fun () -> Timestamp_sub)
 
 let of_seconds s =
   try Some (of_seconds (Int64.of_string s))
@@ -52,3 +63,8 @@ let (+?) x y =
   (* TODO check overflow *)
   try ok (add x (Period_repr.to_seconds y))
   with _exn -> Error [ Timestamp_add ]
+
+let (-?) x y =
+  (* TODO check overflow *)
+  record_trace Timestamp_sub
+    (Period_repr.of_seconds (diff x y))

@@ -142,15 +142,16 @@ let earlier_predecessor_timestamp ctxt level =
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
   let timestamp = Alpha_context.Timestamp.current c in
-  fail_unless Timestamp.(minimal_time <= timestamp)
-    (Timestamp_too_early (minimal_time, timestamp))
+  Lwt.return
+    (record_trace (Timestamp_too_early (minimal_time, timestamp))
+       Timestamp.(timestamp -? minimal_time))
 
 let check_baking_rights c { Block_header.priority ; _ }
     pred_timestamp =
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority >>=? fun delegate ->
-  check_timestamp c priority pred_timestamp >>=? fun () ->
-  return delegate
+  check_timestamp c priority pred_timestamp >>=? fun block_delay ->
+  return (delegate, block_delay)
 
 type error += Incorrect_priority (* `Permanent *)
 
@@ -292,3 +293,28 @@ let dawn_of_a_new_cycle ctxt =
     return_some level.cycle
   else
     return_none
+
+let minimum_allowed_endorsements ctxt ~block_priority ~block_delay =
+  let rec find_constraint priority minimum =
+    match minimum with
+    | [] -> 0
+    | h :: minimum ->
+        if Compare.Int.(priority = 0) then
+          h
+        else
+          find_constraint (pred priority) minimum
+  in
+  let minimum =
+    find_constraint block_priority
+      (Constants.minimum_endorsements_per_priority ctxt)
+  in
+  let delay_per_missing_endorsement =
+    Int64.to_int
+      (Period.to_seconds
+         (Constants.delay_per_missing_endorsement ctxt))
+  in
+  let reduced_time_constrait =
+    Int64.to_int (Period.to_seconds block_delay) /
+    delay_per_missing_endorsement
+  in
+  Compare.Int.max 0 (minimum - reduced_time_constrait)

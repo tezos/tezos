@@ -972,14 +972,14 @@ let may_start_new_cycle ctxt =
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
-    ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
+    ctxt protocol_data pred_timestamp >>=? fun (delegate_pk, block_delay) ->
   let ctxt = Fitness.increase ctxt in
   match Level.pred ctxt (Level.current ctxt) with
   | None -> assert false (* genesis *)
   | Some pred_level ->
       Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
       let ctxt = init_endorsements ctxt rights in
-      return (ctxt, protocol_data, delegate_pk)
+      return (ctxt, protocol_data, delegate_pk, block_delay)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -995,7 +995,8 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.protocol_data.contents pred_timestamp >>=? fun delegate_pk ->
+    ctxt block_header.protocol_data.contents pred_timestamp
+  >>=? fun (delegate_pk, block_delay) ->
   Baking.check_signature block_header chain_id delegate_pk >>=? fun () ->
   let has_commitment =
     match block_header.protocol_data.contents.seed_nonce_hash with
@@ -1011,22 +1012,15 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   | Some pred_level ->
       Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
       let ctxt = init_endorsements ctxt rights in
-      return (ctxt, delegate_pk)
+      return (ctxt, delegate_pk, block_delay)
 
-let check_minimum_endorsements_constraint_for_priority ctxt
-    (protocol_data:Alpha_context.Block_header.contents) =
-  let rec find_constraint priority minimum =
-    match minimum with
-    | [] -> 0
-    | h :: minimum ->
-        if Compare.Int.(priority = 0) then
-          h
-        else
-          find_constraint (pred priority) minimum
-  in
+let check_minimum_endorsements_constraint_for_priority_and_time ctxt
+    (protocol_data:Alpha_context.Block_header.contents)
+    (block_delay:Period.t) =
   let minimum =
-    find_constraint protocol_data.priority
-      (Constants.minimum_endorsements_per_priority ctxt)
+    Baking.minimum_allowed_endorsements ctxt
+      ~block_priority:protocol_data.priority
+      ~block_delay
   in
   if Compare.Int.(included_endorsements ctxt >= minimum) then
     Ok ()
@@ -1036,8 +1030,10 @@ let check_minimum_endorsements_constraint_for_priority ctxt
                 priority = protocol_data.priority ;
                 endorsements = included_endorsements ctxt } )
 
-let finalize_application ctxt protocol_data delegate =
-  Lwt.return (check_minimum_endorsements_constraint_for_priority ctxt protocol_data) >>=? fun () ->
+let finalize_application ctxt protocol_data delegate ~block_delay =
+  Lwt.return
+    (check_minimum_endorsements_constraint_for_priority_and_time
+       ctxt protocol_data block_delay) >>=? fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit >>=? fun ctxt ->
   let reward = (Constants.block_reward ctxt) in

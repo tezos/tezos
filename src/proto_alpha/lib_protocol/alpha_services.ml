@@ -146,6 +146,40 @@ module Endorsing_power = struct
 
 end
 
+module Required_endorsements = struct
+
+  let required_endorsements ctxt block_priority block_delay =
+    let minimum =
+      Baking.minimum_allowed_endorsements
+        ctxt ~block_priority ~block_delay
+    in
+    return minimum
+
+  module S = struct
+    let required_endorsements =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:"Minimum number of endorsements for a block to be valid."
+        ~query: RPC_query.empty
+        ~input:
+          (obj2
+             (req "priority" int31)
+             (req "block_delay" Period.encoding))
+        ~output: int31
+        RPC_path.(open_root / "required_endorsements")
+  end
+
+  let register () =
+    let open Services_registration in
+    register0 S.required_endorsements begin fun ctxt () (priority, delay) ->
+      required_endorsements ctxt priority delay
+    end
+
+  let get ctxt block priority delay =
+    RPC_context.make_call0 S.required_endorsements ctxt block () (priority, delay)
+
+end
+
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
@@ -161,4 +195,5 @@ let register () =
   Helpers.register () ;
   Nonce.register () ;
   Voting.register () ;
-  Endorsing_power.register ()
+  Endorsing_power.register () ;
+  Required_endorsements.register ()

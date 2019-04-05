@@ -81,6 +81,7 @@ type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t ;
       baker : Alpha_context.public_key_hash ;
+      block_delay : Alpha_context.Period.t ;
     }
   | Partial_application of {
       block_header : Alpha_context.Block_header.t ;
@@ -93,6 +94,7 @@ type validation_mode =
       predecessor : Block_hash.t ;
       protocol_data : Alpha_context.Block_header.contents ;
       baker : Alpha_context.public_key_hash ;
+      block_delay : Alpha_context.Period.t ;
     }
 
 type validation_state =
@@ -116,7 +118,7 @@ let begin_partial_application
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
+    ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker, _block_delay) ->
   let mode =
     Partial_application
       { block_header ; baker = Signature.Public_key.hash baker } in
@@ -133,8 +135,9 @@ let begin_application
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker) ->
-  let mode = Application { block_header ; baker = Signature.Public_key.hash baker } in
+    ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker, block_delay) ->
+  let mode =
+    Application { block_header ; baker = Signature.Public_key.hash baker ; block_delay } in
   return { mode ; chain_id ; ctxt ; op_count = 0 }
 
 let begin_construction
@@ -159,10 +162,10 @@ let begin_construction
     | Some proto_header ->
         Apply.begin_full_construction
           ctxt pred_timestamp
-          proto_header.contents >>=? fun (ctxt, protocol_data, baker) ->
+          proto_header.contents >>=? fun (ctxt, protocol_data, baker, block_delay) ->
         let mode =
           let baker = Signature.Public_key.hash baker in
-          Full_construction { predecessor ; baker ; protocol_data } in
+          Full_construction { predecessor ; baker ; protocol_data ; block_delay } in
         return (mode, ctxt)
   end >>=? fun (mode, ctxt) ->
   return { mode ; chain_id ; ctxt ; op_count = 0 }
@@ -236,9 +239,9 @@ let finalize_block { mode ; ctxt ; op_count } =
                                     deactivated = [];
                                     balance_updates = []})
   | Application
-      { baker ;  block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
-  | Full_construction { protocol_data ; baker ; _ } ->
-      Apply.finalize_application ctxt protocol_data baker >>=? fun (ctxt, receipt) ->
+      { baker ; block_delay ; block_header = { protocol_data = { contents = protocol_data ; _ } ; _ } }
+  | Full_construction { protocol_data ; baker ; block_delay ; _ } ->
+      Apply.finalize_application ctxt protocol_data baker ~block_delay >>=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in
       let raw_level = Alpha_context.Raw_level.to_int32 level.level in

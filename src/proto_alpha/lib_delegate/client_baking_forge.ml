@@ -751,6 +751,11 @@ let forge_block
         ) >>= fun () ->
       Lwt.return error
 
+type 'a build_block_result =
+  | Good_block of 'a
+  | Not_enough_endorsements
+  | Nop
+
 let shell_prevalidation
     (cctxt : #Proto_alpha.full)
     ~chain
@@ -769,12 +774,12 @@ let shell_prevalidation
           f "Shell-side validation: error while prevalidating operations:@\n%a"
           -% t event "built_invalid_block_error"
           -% a errs_tag errs) >>= fun () ->
-      return_none
+      return Nop
   | Ok (shell_header, operations) ->
       let raw_ops =
         List.map (fun l ->
             List.map snd l.Preapply_result.applied) operations in
-      return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
+      return (Good_block (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
 
 let filter_outdated_endorsements expected_level ops =
   List.filter (function
@@ -918,11 +923,6 @@ let fetch_operations
         in
         loop nb_arrived_endorsements limits
 
-type 'a build_block_result =
-  | Good_block of 'a
-  | Not_enough_endorsements
-  | Nop
-
 (** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
     validation *)
@@ -975,9 +975,7 @@ let build_block
       if Protocol_hash.(Proto_alpha.hash <> next_version) then
         (* Let the shell validate this *)
         shell_prevalidation cctxt ~chain ~block seed_nonce_hash
-          operations slot >>=? function
-        | None -> return Nop
-        | Some b -> return (Good_block b)
+          operations slot
       else
         let endorsements = List.nth operations endorsements_index in
         Lwt_list.fold_left_s (fun sum op ->
@@ -986,19 +984,14 @@ let build_block
               op bi.Client_baking_blocks.chain_id >>=? fun power ->
             return (sum + power))
           (Ok 0) endorsements >>=? fun included_endorsements ->
-        Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
-        let minimum_endorsements =
-          let rec find_constraint priority minimum =
-            match minimum with
-            | [] -> 0
-            | h :: minimum ->
-                if priority = 0 then
-                  h
-                else
-                  find_constraint (pred priority) minimum
-          in
-          find_constraint priority constants.parametric.minimum_endorsements_per_priority
+        let zero_period =
+          match Alpha_context.Period.of_seconds 0L with
+          | Ok z -> z
+          | Error _ -> assert false
         in
+        Alpha_services.Required_endorsements.get cctxt (chain, block)
+          priority zero_period
+        >>=? fun minimum_endorsements ->
         if included_endorsements < minimum_endorsements then
           return Not_enough_endorsements
         else
@@ -1014,9 +1007,7 @@ let build_block
                   f "Building a block using shell validation"
                   -% t event "shell_prevalidation_notice") >>= fun () ->
               shell_prevalidation cctxt ~chain ~block seed_nonce_hash
-                operations slot >>=? (function
-                    | None -> return Nop
-                    | Some b -> return (Good_block b))
+                operations slot
           | Ok (final_context, (validation_result, _), operations) ->
               lwt_debug Tag.DSL.(fun f ->
                   f "Try forging locally the block header for %a (slot %d) for %s (%a)"

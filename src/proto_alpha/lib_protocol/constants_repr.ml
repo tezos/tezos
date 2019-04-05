@@ -81,7 +81,6 @@ type parametric = {
   blocks_per_voting_period: int32 ;
   time_between_blocks: Period_repr.t list ;
   endorsers_per_block: int ;
-  minimum_endorsements_per_priority: int list;
   hard_gas_limit_per_operation: Z.t ;
   hard_gas_limit_per_block: Z.t ;
   proof_of_work_threshold: int64 ;
@@ -98,6 +97,8 @@ type parametric = {
   endorsement_bonus_slope: int ;
   cost_per_byte: Tez_repr.t ;
   hard_storage_limit_per_operation: Z.t ;
+  minimum_endorsements_per_priority: int list ;
+  delay_per_missing_endorsement: Period_repr.t ;
 }
 
 let default = {
@@ -109,7 +110,6 @@ let default = {
   time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
   endorsers_per_block = 32 ;
-  minimum_endorsements_per_priority = [ 24; 16; 8; 0; ] ;
   hard_gas_limit_per_operation = Z.of_int 400_000 ;
   hard_gas_limit_per_block = Z.of_int 4_000_000 ;
   proof_of_work_threshold =
@@ -132,6 +132,8 @@ let default = {
   endorsement_bonus_slope = 16 ;
   hard_storage_limit_per_operation = Z.of_int 60_000 ;
   cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
+  minimum_endorsements_per_priority = [ 24; 17; 8; 0; ] ;
+  delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L ;
 }
 
 module CompareListInt = Compare.List (Compare.Int)
@@ -147,7 +149,6 @@ let parametric_encoding =
           c.blocks_per_voting_period,
           c.time_between_blocks,
           c.endorsers_per_block,
-          c.minimum_endorsements_per_priority,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block),
         ((c.proof_of_work_threshold,
@@ -163,7 +164,9 @@ let parametric_encoding =
           c.endorsement_bonus_intercept,
           c.endorsement_bonus_slope,
           c.cost_per_byte,
-          c.hard_storage_limit_per_operation))) )
+          c.hard_storage_limit_per_operation,
+          c.minimum_endorsements_per_priority,
+          c.delay_per_missing_endorsement))) )
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -171,7 +174,6 @@ let parametric_encoding =
             blocks_per_voting_period,
             time_between_blocks,
             endorsers_per_block,
-            minimum_endorsements_per_priority,
             hard_gas_limit_per_operation,
             hard_gas_limit_per_block),
           ((proof_of_work_threshold,
@@ -187,7 +189,9 @@ let parametric_encoding =
             endorsement_bonus_intercept,
             endorsement_bonus_slope,
             cost_per_byte,
-            hard_storage_limit_per_operation))) ->
+            hard_storage_limit_per_operation,
+            minimum_endorsements_per_priority,
+            delay_per_missing_endorsement))) ->
       { preserved_cycles ;
         blocks_per_cycle ;
         blocks_per_commitment ;
@@ -196,6 +200,7 @@ let parametric_encoding =
         time_between_blocks ;
         endorsers_per_block ;
         minimum_endorsements_per_priority ;
+        delay_per_missing_endorsement ;
         hard_gas_limit_per_operation ;
         hard_gas_limit_per_block ;
         proof_of_work_threshold ;
@@ -214,7 +219,7 @@ let parametric_encoding =
         hard_storage_limit_per_operation ;
       } )
     (merge_objs
-       (obj10
+       (obj9
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
@@ -222,7 +227,6 @@ let parametric_encoding =
           (req "blocks_per_voting_period" int32)
           (req "time_between_blocks" (list Period_repr.encoding))
           (req "endorsers_per_block" uint16)
-          (req "minimum_endorsements_per_priority" (list uint16))
           (req "hard_gas_limit_per_operation" z)
           (req "hard_gas_limit_per_block" z))
        (merge_objs
@@ -235,13 +239,15 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj6
+          (obj8
              (req "endorsement_reward" Tez_repr.encoding)
              (req "endorsement_reward_priority_bonus" Tez_repr.encoding)
              (req "endorsement_bonus_intercept" uint16)
              (req "endorsement_bonus_slope " uint16)
              (req "cost_per_byte" Tez_repr.encoding)
-             (req "hard_storage_limit_per_operation" z))))
+             (req "hard_storage_limit_per_operation" z)
+             (req "minimum_endorsements_per_priority" (list uint16))
+             (req "delay_per_missing_endorsement" Period_repr.encoding))))
 
 type t = {
   fixed : fixed ;

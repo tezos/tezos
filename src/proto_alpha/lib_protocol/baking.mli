@@ -47,7 +47,7 @@ val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 *)
 val check_baking_rights:
   context -> Block_header.contents -> Time.t ->
-  public_key tzresult Lwt.t
+  (public_key * Period.t) tzresult Lwt.t
 
 (** For a given level computes who has the right to
     include an endorsement in the next block.
@@ -106,3 +106,19 @@ val check_fitness_gap:
 val dawn_of_a_new_cycle: context -> Cycle.t option tzresult Lwt.t
 
 val earlier_predecessor_timestamp: context -> Level.t -> Timestamp.t tzresult Lwt.t
+
+(** Since Emmy B
+
+    Blocks are only valid if they contains a minimal amount of endorsments that
+    depends on their priority and the delay between the minimal time allowed for
+    baking that priority and the actual timestamp for the block.
+
+    This counterbalances the removal of fitness increase per endorsments. Combined,
+    those choices simplifies the optimal baking strategy. They used to have to choose
+    whether to wait for more endorsements to include in their block or publish it.
+    The incentive for including more endorsements was to increase the fitness and win
+    against unknown blocks, but when a block was produced too late in the priority
+    period, it took the risk of not reaching endorsers before the block of next
+    priority. Now the baker can't decide to publish it too early. *)
+
+val minimum_allowed_endorsements: context -> block_priority:int -> block_delay:Period.t -> int
