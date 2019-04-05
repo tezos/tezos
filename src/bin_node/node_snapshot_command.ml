@@ -24,192 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Genesis_chain
 open Node_logging
-
-type wrong_block_export_error =
-  | Pruned
-  | Too_few_predecessors
-  | Cannot_be_found
-
-let pp_wrong_block_export_error ppf = function
-  | Pruned ->
-      Format.fprintf ppf
-        "is pruned"
-  | Too_few_predecessors ->
-      Format.fprintf ppf
-        "has not enough predecessors"
-  | Cannot_be_found ->
-      Format.fprintf ppf
-        "cannot be found"
-
-let wrong_block_export_error_encoding =
-  let open Data_encoding in
-  union
-    [
-      case (Tag 0)
-        ~title:"Pruned"
-        (obj1
-           (req "error" (constant "Pruned")))
-        (function Pruned -> Some ()
-                | _ -> None)
-        (fun () -> Pruned) ;
-      case (Tag 1)
-        ~title:"Too_few_predecessors"
-        (obj1
-           (req "error" (constant "too_few_predecessors")))
-        (function Too_few_predecessors -> Some ()
-                | _ -> None)
-        (fun () -> Too_few_predecessors) ;
-      case (Tag 2)
-        ~title:"Connot_be_found"
-        (obj1
-           (req "error" (constant "Cannot_be_found")))
-        (function Cannot_be_found -> Some ()
-                | _ -> None)
-        (fun () -> Cannot_be_found) ;
-    ]
-
-type error += Wrong_block_export of Block_hash.t * wrong_block_export_error
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"WrongBlockExport"
-    ~title:"Wrong block export"
-    ~description:"The block to export in the snapshot is not valid."
-    ~pp:begin fun ppf (bh,kind) ->
-      Format.fprintf ppf
-        "Fails to export snapshot as the block with block hash %a %a."
-        Block_hash.pp bh pp_wrong_block_export_error kind
-    end
-    Data_encoding.(obj2
-                     (req "block_hash" Block_hash.encoding)
-                     (req "kind" wrong_block_export_error_encoding))
-    (function Wrong_block_export (bh, kind) -> Some (bh, kind) | _ -> None)
-    (fun (bh, kind) -> Wrong_block_export (bh, kind))
 
 let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
 let store_dir data_dir = data_dir // "store"
-
-let compute_export_limit
-    block_store _chain_data_store
-    block_header export_rolling =
-  let block_hash = Block_header.hash block_header in
-  Store.Block.Contents.read_opt
-    (block_store, block_hash) >>= begin function
-    | Some cnts -> return cnts
-    | None -> fail @@ Wrong_block_export (block_hash, Pruned)
-  end >>=? fun block_content ->
-  let max_op_ttl = block_content.max_operations_ttl in
-  begin
-    if not export_rolling then
-      return 1l
-    else
-      return (Int32.(sub block_header.Block_header.shell.level (of_int max_op_ttl)))
-  end >>=? fun export_limit ->
-  (* never include genesis *)
-  return (max 1l export_limit)
-
-
-let load_pruned_block index block_store limit = fun header ->
-  if header.Block_header.shell.level <= limit then
-    Context.get_protocol_data_from_header index header >>= fun protocol_data ->
-    return (None, Some protocol_data)
-  else
-    let pred_hash = header.Block_header.shell.predecessor in
-    Store.Block.Contents.read (block_store, pred_hash) >>=? fun { header = pred_header } ->
-    Store.Block.Operations.bindings (block_store, pred_hash) >>= fun pred_operations ->
-    Store.Block.Operation_hashes.bindings (block_store, pred_hash) >>= fun pred_operation_hashes ->
-    (* protocol data *)
-    let pruned_block = {
-      Context.Pruned_block.block_header = pred_header ;
-      operations = pred_operations ;
-      operation_hashes = pred_operation_hashes ;
-    } in
-    let header_proto_level = header.Block_header.shell.proto_level in
-    let pred_header_proto_level = pred_header.Block_header.shell.proto_level in
-    if header_proto_level <> pred_header_proto_level then
-      Context.get_protocol_data_from_header index header >>= fun proto_data ->
-      return (Some pruned_block, Some proto_data)
-    else
-      return (Some pruned_block, None)
-
-let export ?(export_rolling=false) data_dir filename block =
-  let data_dir =
-    match data_dir with
-    | None -> Node_config_file.default_data_dir
-    | Some dir -> dir
-  in
-  (* Node_data_version.ensure_data_dir data_dir >>=? fun () -> *)
-  let context_root = context_dir data_dir in
-  let store_root = store_dir data_dir in
-  let chain_id = Chain_id.of_block_hash genesis.block in
-  Store.init store_root >>=? fun store ->
-  let chain_store = Store.Chain.get store chain_id in
-  let chain_data_store = Store.Chain_data.get chain_store in
-  let block_store = Store.Block.get chain_store in
-  begin
-    match block with
-    | Some block_hash ->
-        return (Block_hash.of_b58check_exn block_hash)
-    | None ->
-        Store.Chain_data.Checkpoint.read_exn
-          (chain_data_store) >>= fun (last_checkpoint_level, last_checkpoint_hash) ->
-        if last_checkpoint_level = 0l then
-          fail @@ Wrong_block_export (genesis.block, Too_few_predecessors)
-        else
-          return last_checkpoint_hash >>=? fun last_checkpoint_hash ->
-          lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (last checkpoint)"
-            Block_hash.pp last_checkpoint_hash >>= fun () ->
-          return last_checkpoint_hash
-  end >>=? fun block_hash ->
-  Context.init ~readonly:true context_root
-  >>= fun context_index ->
-  Store.Block.Contents.read_opt (block_store, block_hash) >>=
-  begin function
-    | None ->
-        fail @@ Wrong_block_export (block_hash, Cannot_be_found)
-    | Some { header = block_header } ->
-        lwt_log_notice "Dumping: %a"
-          Block_hash.pp block_hash >>= fun () ->
-
-        (* Get block precessor's block header*)
-        Store.Block.Predecessors.read
-          (block_store, block_hash) 0 >>=? fun pred_block_hash ->
-        Store.Block.Contents.read
-          (block_store, pred_block_hash) >>=? fun { header = pred_block_header } ->
-        (* Get operation list*)
-        let validations_passes = block_header.shell.validation_passes in
-        Error_monad.map_s
-          (fun i -> Store.Block.Operations.read (block_store, block_hash) i)
-          (0 -- (validations_passes - 1)) >>=? fun operations ->
-
-        compute_export_limit
-          block_store
-          chain_data_store
-          block_header
-          export_rolling >>=? fun export_limit ->
-
-        let pruned_block_iterator header =
-          load_pruned_block context_index block_store export_limit header in
-
-        (* Context.get_protocol_data_from_headers
-         * context_index transition_block_headers >>= fun protocol_data -> *)
-
-        let block_data =
-          { Context.Block_data.block_header ; operations } in
-
-        return (pred_block_header, block_data, pruned_block_iterator, block_header)
-  end >>=? fun data_to_dump ->
-  Context.dump_contexts
-    context_index
-    [ data_to_dump ]
-    ~filename >>=? fun () ->
-  Store.close store ;
-  lwt_log_notice "Sucessful export (in file %s)" filename >>= fun () ->
-  return_unit
 
 (** Main *)
 
@@ -217,14 +36,29 @@ module Term = struct
 
   type subcommand = Export
 
-  let process subcommand config_file file blocks export_rolling =
+  let dir_cleaner data_dir =
+    lwt_log_notice "Cleaning directory %s" data_dir >>= fun () ->
+    Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
+    Lwt_utils_unix.remove_dir @@ context_dir data_dir
+
+  let process subcommand config_file file block export_rolling =
+    let data_dir =
+      match config_file with
+      | None -> Node_config_file.default_data_dir
+      | Some dir -> dir in
+    let genesis = Genesis_chain.genesis in
     let res =
       match subcommand with
-      | Export -> export ~export_rolling config_file file blocks
+      | Export ->
+          Node_data_version.ensure_data_dir data_dir >>=? fun () ->
+          Snapshots.export
+            ~export_rolling ~data_dir
+            ~genesis:genesis.block file block
     in
     match Lwt_main.run res with
     | Ok () -> `Ok ()
-    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Error err ->
+        `Error (false, Format.asprintf "%a" pp_print_error err)
 
   let subcommand_arg =
     let parser = function
