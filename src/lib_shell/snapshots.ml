@@ -321,7 +321,7 @@ let check_history_consistency
                   (fst history.(n - 1))) ;
         check (n - 1)
   in
-  check nb_blocks >>=? fun () ->
+  check (nb_blocks - 1) >>=? fun () ->
   Tezos_stdlib.Utils.display_progress_end () ;
   return_unit
 
