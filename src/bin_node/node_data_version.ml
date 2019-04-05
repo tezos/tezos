@@ -57,7 +57,7 @@ type error += Invalid_data_dir_version of t * t
 type error += Invalid_data_dir of string
 type error += No_data_dir_version_file of string
 type error += Could_not_read_data_dir_version of string
-type error += Data_dir_needs_upgrade of { expected: t ; actual: t }
+type error += Data_dir_outdated of { expected: t ; actual: t }
 
 let () =
   register_error_kind
@@ -120,23 +120,24 @@ let () =
     (fun path -> No_data_dir_version_file path) ;
   register_error_kind
     `Permanent
-    ~id: "dataDirNeedsUpgrade"
-    ~title: "The data directory needs to be upgraded"
-    ~description: "The data directory needs to be upgraded"
+    ~id: "dataDirOutdated"
+    ~title: "Outdated data directory"
+    ~description: "The data directory is outdated"
     ~pp:(fun ppf (exp, got) ->
         Format.fprintf ppf
           "The data directory version is too old.@,\
            Found '%s', expected '%s'.@,\
-           It needs to be upgraded with `tezos-node upgrade_storage`."
+           You may upgrade it by importing a snapshot or by syncing \
+           from the genesis block with an empty directory.@."
           got exp)
     Data_encoding.(obj2
                      (req "expected_version" string)
                      (req "actual_version" string))
     (function
-      | Data_dir_needs_upgrade { expected ; actual } ->
+      | Data_dir_outdated { expected ; actual } ->
           Some (expected, actual)
       | _ -> None)
-    (fun (expected, actual) -> Data_dir_needs_upgrade { expected ; actual })
+    (fun (expected, actual) -> Data_dir_outdated { expected ; actual })
 
 let version_file data_dir =
   (Filename.concat data_dir version_file_name)
@@ -206,5 +207,5 @@ let ensure_data_dir ?(bare = false ) data_dir =
   ensure_data_dir bare data_dir >>=? function
   | None -> return_unit
   | Some (version, _) ->
-      fail (Data_dir_needs_upgrade { expected = data_version ;
-                                     actual = version })
+      fail (Data_dir_outdated { expected = data_version ;
+                                actual = version })
