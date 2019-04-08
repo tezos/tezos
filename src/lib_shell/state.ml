@@ -1370,6 +1370,8 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
         protocol } in
     Chain.locked_create block.chain_state.global_state data
       chain_id ~expiration genesis genesis_header >>= fun testchain_state ->
+    Store.Chain.Protocol_hash.store
+      chain_store genesis_header.shell.proto_level protocol >>= fun () ->
     update_testchain block ~testchain_state >>= fun () ->
     return testchain_state
   end
