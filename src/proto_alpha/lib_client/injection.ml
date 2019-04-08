@@ -128,8 +128,54 @@ let check_fees
             Lwt.return_unit
         end
 
+let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
+  let open Format in
+  pp_open_vbox ppf 0 ;
+  let item f =
+    pp_open_hovbox ppf 4 ;
+    pp_print_string ppf "  * ";
+    f ppf () ;
+    pp_close_box ppf () ;
+    pp_print_cut ppf () in
+  let hash_pp l =
+    fprintf ppf "%s"
+      (Base58.raw_encode Blake2B.(hash_bytes l |> to_string)) in
+  item (fun ppf () ->
+      pp_print_text ppf "Branch: " ;
+      Block_hash.pp ppf branch ) ;
+  item (fun ppf () ->
+      fprintf ppf "Watermark: `%a` (0x%s)" 
+        Signature.pp_watermark watermark
+        (MBytes.to_hex (Signature.bytes_of_watermark watermark) |> Hex.show) ) ;
+  item (fun ppf () ->
+      pp_print_text ppf "Operation bytes: " ;
+      TzString.fold_left
+        (fun n c ->
+           pp_print_char ppf c ;
+           if n < 72
+           then  n + 1
+           else (pp_print_space ppf () ; 0) )
+        0
+        (MBytes.to_hex bytes |> Hex.show) |> ignore ) ;
+  item (fun ppf () ->
+      pp_print_text ppf "Blake 2B Hash (raw): " ;
+      hash_pp [bytes] ) ;
+  item (fun ppf () ->
+      pp_print_text ppf
+        "Blake 2B Hash (ledger-style, with operation watermark): " ;
+      hash_pp [Signature.bytes_of_watermark watermark ; bytes] ) ;
+  let json =
+    Data_encoding.Json.construct
+      Operation.unsigned_encoding
+      ({ branch }, Contents_list contents) in
+  item (fun ppf () ->
+      pp_print_text ppf "JSON encoding: " ;
+      Data_encoding.Json.pp ppf json ) ;
+  pp_close_box ppf ()
+
 let preapply (type t)
     (cctxt: #Proto_alpha.full) ~chain ~block
+    ?(verbose_signing = false)
     ?fee_parameter
     ?branch ?src_sk (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (chain_id, branch) ->
@@ -141,14 +187,18 @@ let preapply (type t)
     match src_sk with
     | None -> return_none
     | Some src_sk ->
-        begin match contents with
-          | Single (Endorsement _) ->
-              Client_keys.sign cctxt
-                ~watermark:Signature.(Endorsement chain_id) src_sk bytes
-          | _ ->
-              Client_keys.sign cctxt
-                ~watermark:Signature.Generic_operation src_sk bytes
-        end >>=? fun signature ->
+        let watermark =
+          match contents with
+          | Single (Endorsement _) -> Signature.(Endorsement chain_id)
+          | _ -> Signature.Generic_operation in
+        begin
+          if verbose_signing then
+            cctxt#message "Pre-signature information (verbose signing):@.%t%!"
+              (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
+          else Lwt.return_unit
+        end >>= fun () ->
+        Client_keys.sign cctxt ~watermark src_sk bytes
+        >>=? fun signature ->
         return_some signature
   end >>=? fun signature ->
   let op : _ Operation.t =
@@ -507,6 +557,7 @@ let inject_operation
     ?confirmations
     ?(dry_run = false)
     ?branch ?src_sk
+    ?verbose_signing
     ~fee_parameter
     ?compute_fee
     (contents: kind contents_list)  =
@@ -517,7 +568,7 @@ let inject_operation
     ?compute_fee
     contents >>=? fun contents ->
   preapply cctxt ~chain ~block ~fee_parameter
-    ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
+    ?verbose_signing ?branch ?src_sk contents >>=? fun (_oph, op, result) ->
   begin match detect_script_failure result with
     | Ok () -> return_unit
     | Error _ as res ->
@@ -603,7 +654,7 @@ let inject_operation
 
 
 let inject_manager_operation
-    cctxt ~chain ~block ?branch ?confirmations ?dry_run
+    cctxt ~chain ~block ?branch ?confirmations ?dry_run ?verbose_signing
     ~source ~src_pk ~src_sk ?fee ?(gas_limit = Z.minus_one) ?(storage_limit = (Z.of_int (-1))) ?counter ~fee_parameter
     (type kind) (operation : kind manager_operation)
   : (Operation_hash.t * kind Kind.manager contents *  kind Kind.manager contents_result) tzresult Lwt.t =
@@ -636,9 +687,8 @@ let inject_manager_operation
            Single (Manager_operation { source ; fee ; counter = Z.succ counter ;
                                        gas_limit ; storage_limit ; operation })) in
       inject_operation cctxt ~chain ~block ?confirmations ?dry_run
-        ~fee_parameter
-        ~compute_fee
-        ?branch ~src_sk contents >>=? fun (oph, op, result) ->
+        ~fee_parameter ~compute_fee
+        ?verbose_signing ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Cons_and_result (_, _, Single_and_result (op, result)) ->
           return (oph, op, result)
@@ -649,7 +699,7 @@ let inject_manager_operation
       let contents =
         Single (Manager_operation { source ; fee ; counter ;
                                     gas_limit ; storage_limit ; operation }) in
-      inject_operation cctxt ~chain ~block ?confirmations ?dry_run
+      inject_operation cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
         ~compute_fee ~fee_parameter ?branch ~src_sk contents >>=? fun (oph, op, result) ->
       match pack_contents_list op result with
       | Single_and_result (Manager_operation _ as op, result) ->

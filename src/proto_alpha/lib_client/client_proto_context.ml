@@ -48,7 +48,7 @@ let parse_expression arg =
 
 let transfer (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
     ~amount ?fee ?gas_limit ?storage_limit ?counter
     ~fee_parameter
@@ -63,7 +63,7 @@ let transfer (cctxt : #Proto_alpha.full)
   let contents = Transaction { amount ; parameters ; destination } in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ?fee ?gas_limit ?storage_limit ?counter
     ~src_pk ~src_sk
     ~fee_parameter
@@ -74,7 +74,7 @@ let transfer (cctxt : #Proto_alpha.full)
 
 let reveal cctxt
     ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ?fee
     ~fee_parameter
     () =
@@ -97,7 +97,7 @@ let reveal cctxt
                                gas_limit = Z.of_int ~- 1 ; storage_limit = Z.zero ;
                                operation = Reveal src_pk }) in
       Injection.inject_operation cctxt ~chain ~block ?confirmations
-        ?dry_run ?branch ~src_sk
+        ?dry_run ?verbose_signing ?branch ~src_sk
         ~compute_fee
         ~fee_parameter
         contents >>=? fun (oph, op, result) ->
@@ -109,14 +109,14 @@ let reveal cctxt
 
 let originate
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ?fee
     ?gas_limit ?storage_limit
     ~fee_parameter
     contents =
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ?fee ?gas_limit ?storage_limit
     ~src_pk ~src_sk
     ~fee_parameter
@@ -131,7 +131,7 @@ let originate
 
 let originate_account
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ~manager_pkh
     ?(delegatable = false) ?delegate ~balance ?fee
     ~fee_parameter
@@ -146,14 +146,14 @@ let originate_account
                   preorigination = None } in
   originate
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ?fee
     ~fee_parameter
     origination
 
 let delegate_contract cctxt
     ~chain ~block ?branch ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ~source ~src_pk ~src_sk
     ?fee
     ~fee_parameter
@@ -161,7 +161,7 @@ let delegate_contract cctxt
   let operation = Delegation delegate_opt in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ?fee ~storage_limit:Z.zero
     ~src_pk ~src_sk
     ~fee_parameter
@@ -208,27 +208,27 @@ let get_manager
 
 let set_delegate
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?fee contract ~src_pk ~manager_sk
     ~fee_parameter
     opt_delegate =
   delegate_contract
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ~source:contract ~src_pk ~src_sk:manager_sk ?fee
     ~fee_parameter
     opt_delegate
 
 let register_as_delegate
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?fee ~manager_sk
     ~fee_parameter
     src_pk =
   let source = Signature.Public_key.hash src_pk in
   delegate_contract
     cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ?fee
     ~fee_parameter
     (Some source)
@@ -248,6 +248,7 @@ let originate_contract
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations
     ?dry_run
+    ?verbose_signing
     ?branch
     ?fee
     ?gas_limit
@@ -277,7 +278,7 @@ let originate_contract
                   credit = balance ;
                   preorigination = None } in
   originate cctxt ~chain ~block ?confirmations
-    ?dry_run
+    ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ?fee ?gas_limit ?storage_limit
     ~fee_parameter
     origination
@@ -482,7 +483,7 @@ let get_proposals
   Alpha_services.Voting.proposals cctxt cb
 
 let submit_proposals
-    ?dry_run
+    ?dry_run ?verbose_signing
     (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposals =
   (* We need the next level, not the current *)
@@ -491,10 +492,10 @@ let submit_proposals
   let contents = Single ( Proposals { source ; period ; proposals } ) in
   Injection.inject_operation cctxt ~chain ~block ?confirmations
     ~fee_parameter:Injection.dummy_fee_parameter
-    ?dry_run ~src_sk contents
+    ?dry_run ~src_sk contents ?verbose_signing
 
 let submit_ballot
-    ?dry_run (cctxt : #Proto_alpha.full)
+    ?dry_run ?verbose_signing (cctxt : #Proto_alpha.full)
     ~chain ~block ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
@@ -503,7 +504,7 @@ let submit_ballot
   let contents = Single ( Ballot { source ; period ; proposal ; ballot } ) in
   Injection.inject_operation cctxt ~chain ~block ?confirmations
     ~fee_parameter:Injection.dummy_fee_parameter
-    ?dry_run ~src_sk contents
+    ?dry_run ~src_sk contents ?verbose_signing
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match a.receipt, a.protocol_data with

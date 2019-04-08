@@ -45,6 +45,7 @@ val preapply:
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  ?verbose_signing:bool ->
   ?fee_parameter:fee_parameter ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
@@ -62,6 +63,7 @@ val inject_operation:
   ?dry_run:bool ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
+  ?verbose_signing:bool ->
   fee_parameter:fee_parameter ->
   ?compute_fee:bool ->
   'kind contents_list ->
@@ -77,6 +79,7 @@ val inject_manager_operation:
   ?branch:int ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   source:Contract.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->

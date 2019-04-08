@@ -75,6 +75,7 @@ val set_delegate:
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing: bool ->
   ?fee:Tez.tez ->
   Contract.t ->
   src_pk:public_key ->
@@ -89,6 +90,7 @@ val register_as_delegate:
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -108,6 +110,7 @@ val originate_account :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -133,6 +136,7 @@ val originate_contract:
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?branch:int ->
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->
@@ -156,6 +160,7 @@ val transfer :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -177,6 +182,7 @@ val reveal :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?verbose_signing:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -252,6 +258,7 @@ val get_proposals :
 
 val submit_proposals:
   ?dry_run:bool ->
+  ?verbose_signing: bool ->
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -263,6 +270,7 @@ val submit_proposals:
 
 val submit_ballot:
   ?dry_run:bool ->
+  ?verbose_signing: bool ->
   #Proto_alpha.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->

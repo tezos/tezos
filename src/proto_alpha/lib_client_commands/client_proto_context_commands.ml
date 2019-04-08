@@ -43,6 +43,11 @@ let dry_run_switch =
     ~short:'D'
     ~doc:"don't inject the operation, just display it" ()
 
+let verbose_signing_switch =
+  Clic.switch
+    ~long:"verbose-signing"
+    ~doc:"display extra information before signing the operation" ()
+
 let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.printer) = function
   | Error errs ->
       cctxt#warning "%a"
@@ -229,8 +234,8 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Set the delegate of a contract."
-      (args8
-         fee_arg dry_run_switch
+      (args9
+         fee_arg dry_run_switch verbose_signing_switch
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -244,7 +249,7 @@ let commands version () =
          ~name: "mgr" ~desc: "new delegate of the contract"
        @@ stop)
       begin fun
-        (fee, dry_run, minimal_fees, minimal_nanotez_per_byte,
+        (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
          minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
         let fee_parameter = {
@@ -260,7 +265,7 @@ let commands version () =
           contract >>=? fun (src_pk, manager_sk) ->
         set_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run
+          ~dry_run ~verbose_signing
           ~fee_parameter
           ?fee
           contract (Some delegate) ~src_pk ~manager_sk >>=? fun _ ->
@@ -268,8 +273,8 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Withdraw the delegate from a contract."
-      (args8
-         fee_arg dry_run_switch
+      (args9
+         fee_arg dry_run_switch verbose_signing_switch
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -279,7 +284,7 @@ let commands version () =
       (prefixes [ "withdraw" ; "delegate" ; "from" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun (fee, dry_run, minimal_fees, minimal_nanotez_per_byte,
+      begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt
@@ -295,14 +300,15 @@ let commands version () =
         } in
         set_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run
+          ~dry_run ~verbose_signing
           ~fee_parameter
           contract None ?fee ~src_pk ~manager_sk >>=? fun _ ->
         return_unit
       end ;
 
     command ~group ~desc:"Open a new account."
-      (args11 fee_arg dry_run_switch delegate_arg delegatable_switch (Client_keys.force_switch ())
+      (args12 fee_arg dry_run_switch verbose_signing_switch
+         delegate_arg delegatable_switch (Client_keys.force_switch ())
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -322,7 +328,8 @@ let commands version () =
        @@ ContractAlias.destination_param
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
-      begin fun (fee, dry_run, delegate, delegatable, force, minimal_fees, minimal_nanotez_per_byte,
+      begin fun (fee, dry_run, verbose_signing, delegate, delegatable, force,
+                 minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         new_contract manager_pkh balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
@@ -339,7 +346,7 @@ let commands version () =
         } in
         originate_account cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run
+          ~dry_run ~verbose_signing
           ?fee ?delegate ~delegatable ~manager_pkh ~balance
           ~fee_parameter
           ~source ~src_pk ~src_sk () >>=? fun (_res, contract) ->
@@ -351,9 +358,10 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
-      (args16
+      (args17
          fee_arg
-         dry_run_switch gas_limit_arg storage_limit_arg delegate_arg (Client_keys.force_switch ())
+         dry_run_switch verbose_signing_switch
+         gas_limit_arg storage_limit_arg delegate_arg (Client_keys.force_switch ())
          delegatable_switch spendable_switch init_arg no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
@@ -378,7 +386,10 @@ let commands version () =
          ~name:"prg" ~desc: "script of the account\n\
                              Combine with -init if the storage type is not unit."
        @@ stop)
-      begin fun (fee, dry_run, gas_limit, storage_limit, delegate, force, delegatable, spendable, initial_storage, no_print_source, minimal_fees, minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
+      begin fun (fee, dry_run, verbose_signing, gas_limit, storage_limit,
+                 delegate, force, delegatable, spendable, initial_storage,
+                 no_print_source, minimal_fees, minimal_nanotez_per_byte,
+                 minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
@@ -395,7 +406,7 @@ let commands version () =
         } in
         originate_contract cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run
+          ~dry_run ~verbose_signing
           ?fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
           ~manager ~balance ~source ~src_pk ~src_sk ~code
           ~fee_parameter
@@ -411,7 +422,8 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
-      (args13 fee_arg dry_run_switch gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag
+      (args14 fee_arg dry_run_switch verbose_signing_switch
+         gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -428,7 +440,11 @@ let commands version () =
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      begin fun (fee, dry_run, gas_limit, storage_limit, counter, arg, no_print_source, minimal_fees, minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) amount (_, source) (_, destination) cctxt ->
+      begin fun (fee, dry_run, verbose_signing, gas_limit, storage_limit,
+                 counter, arg, no_print_source, minimal_fees,
+                 minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
+                 force_low_fee, fee_cap, burn_cap)
+        amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
@@ -442,7 +458,7 @@ let commands version () =
         } in
         transfer cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run
+          ~dry_run ~verbose_signing
           ~fee_parameter
           ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
@@ -452,7 +468,8 @@ let commands version () =
       end;
 
     command ~group ~desc: "Reveal the public key of the contract manager."
-      (args7 fee_arg
+      (args9 fee_arg
+         dry_run_switch verbose_signing_switch
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -463,7 +480,7 @@ let commands version () =
        @@ ContractAlias.alias_param
          ~name: "src" ~desc: "name of the source contract"
        @@ stop)
-      begin fun (fee, minimal_fees, minimal_nanotez_per_byte,
+      begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) (_, source) cctxt ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
@@ -476,7 +493,7 @@ let commands version () =
           fee_cap ;
           burn_cap ;
         } in
-        reveal cctxt
+        reveal cctxt ~dry_run ~verbose_signing
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~source ?fee ~src_pk ~src_sk
           ~fee_parameter
@@ -485,7 +502,7 @@ let commands version () =
       end;
 
     command ~group ~desc: "Register the public key hash as a delegate."
-      (args8 fee_arg dry_run_switch
+      (args9 fee_arg dry_run_switch verbose_signing_switch
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -497,7 +514,7 @@ let commands version () =
          ~name: "mgr" ~desc: "the delegate key"
        @@ prefixes [ "as" ; "delegate" ]
        @@ stop)
-      begin fun (fee, dry_run, minimal_fees, minimal_nanotez_per_byte,
+      begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)  src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         let fee_parameter = {
@@ -510,7 +527,7 @@ let commands version () =
         } in
         register_as_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~fee_parameter
+          ~dry_run ~fee_parameter ~verbose_signing
           ?fee ~manager_sk:src_sk src_pk
         >>= function
         | Ok _ -> return_unit
@@ -603,9 +620,9 @@ let commands version () =
                | Some hash -> return hash))
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
-      begin fun (confirmations, predecessors, branch) operation_hash (cctxt : Proto_alpha.full) ->
-        Client_confirmations.wait_for_operation_inclusion cctxt
-          ~chain:cctxt#chain ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
+      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Proto_alpha.full) ->
+        Client_confirmations.wait_for_operation_inclusion ctxt
+          ~chain:ctxt#chain ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
         return_unit
       end ;
 
@@ -627,9 +644,9 @@ let commands version () =
                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                | Some hash -> return hash))
        @@ stop)
-      begin fun predecessors operation_hash (cctxt : Proto_alpha.full) ->
-        display_receipt_for_operation cctxt
-          ~chain:cctxt#chain ~predecessors operation_hash >>=? fun _ ->
+      begin fun predecessors operation_hash (ctxt : Proto_alpha.full) ->
+        display_receipt_for_operation ctxt
+          ~chain:ctxt#chain ~predecessors operation_hash >>=? fun _ ->
         return_unit
       end ;
 
@@ -656,8 +673,9 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Submit protocol proposals"
-      (args2
+      (args3
          dry_run_switch
+         verbose_signing_switch
          (switch
             ~doc:"Do not fail when the checks that try to prevent the user \
                   from shooting themselves in the foot do."
@@ -675,7 +693,8 @@ let commands version () =
                   match Protocol_hash.of_b58check_opt x with
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
-      begin fun (dry_run, force) (_name, source) proposals (cctxt : Proto_alpha.full) ->
+      begin fun (dry_run, verbose_signing, force)
+        (_name, source) proposals (cctxt : Proto_alpha.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -683,9 +702,9 @@ let commands version () =
         end >>=? fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun known_proposals ->
-        Alpha_services.Voting.listings cctxt (`Main, cctxt#block) >>=? fun listings ->
+        Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block) >>=? fun listings ->
         Client_proto_context.get_manager
-          cctxt ~chain:`Main ~block:cctxt#block
+          cctxt ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_name, src_pkh, _src_pk, src_sk) ->
         (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
@@ -759,7 +778,7 @@ let commands version () =
           else
             cctxt#error "Submission failed because of invalid proposals."
         end >>= fun () ->
-        submit_proposals ~dry_run
+        submit_proposals ~dry_run ~verbose_signing
           cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           proposals >>= function
         | Ok _res -> return_unit
