@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -110,16 +111,9 @@ module System : sig
   type t = Ptime.t
   val epoch : t
 
-  val now : unit -> t
-  (** The current time according to the system clock *)
-
   module Span : sig
     type t = Ptime.Span.t
     (** A representation of spans of time between two timestamps. *)
-
-    val sleep : t -> unit Lwt.t
-    (** [sleep t] is an Lwt promise that resolves after [t] time has elapsed.
-        If [t] is negative, [sleep t] resolves immediately. *)
 
     val multiply_exn : float -> t -> t
     (** [multiply_exn factor t] is a time spans that lasts [factor] time as long
@@ -167,10 +161,9 @@ module System : sig
   (** Data with an associated time stamp. *)
 
   val stamped_encoding : 'a Data_encoding.t -> 'a stamped Data_encoding.t
-  (** [stamp d] is a timestamped version of [d]. The optional [time] parameter
-      defaults to [now ()]. *)
 
-  val stamp : ?time:t -> 'a -> 'a stamped
+  val stamp : time:t -> 'a -> 'a stamped
+  (** [stamp d] is a timestamped version of [d]. *)
 
   val recent : ('a * t) option -> ('a * t) option -> ('a * t) option
   (** [recent a b] is either [a] or [b] (which ever carries the most recent

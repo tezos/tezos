@@ -61,10 +61,10 @@ let operations_index_tag = Tag.def ~doc:"Operations index" "operations_index" Fo
 let assert_acceptable_header pipeline
     hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
-  let time_now = Time.System.now () in
+  let time_now = Systime_os.now () in
   fail_unless
     (Time.Protocol.compare
-       (Time.Protocol.add Time.System.(to_protocol (now ())) 15L)
+       (Time.Protocol.add (Time.System.to_protocol (Systime_os.now ())) 15L)
        header.shell.timestamp
      >= 0)
     (Future_block_header { block = hash; time = time_now;

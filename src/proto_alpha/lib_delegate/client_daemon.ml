@@ -81,7 +81,7 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
             exit 0 in
         let canceler = Lwt_canceler.create () in
         Lwt_canceler.on_cancel canceler (fun () -> abort_daemon () >>= function _ -> Lwt.return_unit) ;
-        let now = Time.System.(to_protocol (now ())) in
+        let now = Time.System.(to_protocol (Systime_os.now ())) in
         let delay = Int64.to_int (Time.Protocol.diff expiration_date now) in
         if delay <= 0 then
           (* Testchain already expired... Retrying. *)

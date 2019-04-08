@@ -50,7 +50,7 @@ let block_forged ?prev ops =
   let pred = match prev with None -> genesis_block_hashed | Some x -> x in
   let block ops = Store.Block_header.{ chain_id = network ;
                                        predecessor = pred ;
-                                       timestamp = Time.System.now () ;
+                                       timestamp = Systime_os.now () ;
                                        fitness = from_int64 1L;
                                        operations = ops } in
   let open Proto in

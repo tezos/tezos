@@ -189,7 +189,7 @@ let allowed_to_endorse cctxt bi delegate  =
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
   let past =
     Time.Protocol.diff
-      Time.System.(to_protocol (now ()))
+      (Time.System.to_protocol (Systime_os.now ()))
       bi.Client_baking_blocks.timestamp in
   if past > max_past then
     lwt_log_info Tag.DSL.(fun f ->
@@ -202,7 +202,10 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
         f "Received new block %a"
         -% t event "endorsement_got_block"
         -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
-    let time = Time.Protocol.add Time.System.(to_protocol (now ())) state.delay in
+    let time =
+      Time.Protocol.add
+        (Time.System.to_protocol (Systime_os.now ()))
+        state.delay in
     get_delegates cctxt state >>=? fun delegates ->
     filter_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {
@@ -221,7 +224,7 @@ let compute_timeout state =
       | Some timeout ->
           let timespan =
             let timespan =
-              Ptime.diff (Time.System.of_protocol_exn time) (Time.System.now ()) in
+              Ptime.diff (Time.System.of_protocol_exn time) (Systime_os.now ()) in
             if Ptime.Span.compare timespan Ptime.Span.zero > 0 then
               timespan
             else

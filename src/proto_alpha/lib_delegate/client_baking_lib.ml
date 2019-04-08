@@ -61,7 +61,7 @@ let bake_block
     if minimal_timestamp then
       None
     else
-      Some Time.System.(to_protocol (now ())) in
+      Some Time.System.(to_protocol (Systime_os.now ())) in
   Client_baking_forge.forge_block cctxt
     ?force
     ?minimal_fees

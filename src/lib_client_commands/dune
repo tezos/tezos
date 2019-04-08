@@ -5,6 +5,7 @@
             tezos-client-base
             tezos-rpc
             tezos-shell-services
+            tezos-stdlib-unix
             tezos-signer-backends)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives

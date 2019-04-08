@@ -8,8 +8,8 @@
             tezos-client-base
             tezos-client-alpha
             tezos-client-commands
-            tezos-storage
             tezos-stdlib-unix
+            tezos-storage
             tezos-rpc-http
             tezos-rpc)
  (library_flags (:standard -linkall))
@@ -21,6 +21,7 @@
                    -open Tezos_client_base
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
+                   -open Tezos_stdlib_unix
                    -open Tezos_storage
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))

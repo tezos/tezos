@@ -7,9 +7,11 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
+  "base-unix"
   "dune" { build & >= "1.7" }
   "tezos-base"
   "lwt" { >= "3.0.0" }
+  "ptime" { >= "0.8.4" }
   "conf-libev"
   "ipaddr" { >= "3.0.0" }
 ]

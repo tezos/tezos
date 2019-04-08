@@ -314,7 +314,7 @@ let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool)
       let current_size = P2p_point.Table.length known_points in
       if current_size > target then
         let to_remove_target = current_size - target in
-        let now = Time.System.now () in (* TODO: maybe time of discovery? *)
+        let now = Systime_os.now () in (* TODO: maybe time of discovery? *)
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter (fun p point_info ->
             if P2p_point_state.is_disconnected point_info then
@@ -685,7 +685,7 @@ module Connection = struct
 end
 
 let greylist_addr pool addr =
-  P2p_acl.IPGreylist.add pool.acl addr (Time.System.now ())
+  P2p_acl.IPGreylist.add pool.acl addr (Systime_os.now ())
 
 let greylist_peer pool peer =
   Option.iter (get_addr pool peer) ~f:begin fun (addr, _port) ->
@@ -743,7 +743,7 @@ let rec connect ?timeout pool point =
     (active_connections pool <= pool.config.max_connections)
     P2p_errors.Too_many_connections >>=? fun () ->
   let canceler = Lwt_canceler.create () in
-  with_timeout ~canceler (Time.System.Span.sleep timeout) begin fun canceler ->
+  with_timeout ~canceler (Systime_os.sleep timeout) begin fun canceler ->
     let point_info =
       register_point pool pool.config.identity.peer_id point in
     let addr, port as point = P2p_point_state.Info.point point_info in
@@ -1106,7 +1106,7 @@ and swap_request pool conn new_point _new_peer_id =
      than <swap_linger> seconds ago. *)
   let span_since_last_swap =
     Ptime.diff
-      (Time.System.now ())
+      (Systime_os.now ())
       (Time.System.max pool.latest_succesfull_swap pool.latest_accepted_swap) in
   let new_point_info = register_point pool source_peer_id new_point in
   if Ptime.Span.compare span_since_last_swap pool.config.swap_linger < 0
@@ -1150,10 +1150,10 @@ and swap_ack pool conn new_point _new_peer_id =
 
 and swap pool conn current_peer_id new_point =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
-  pool.latest_accepted_swap <- Time.System.now () ;
+  pool.latest_accepted_swap <- Systime_os.now () ;
   connect pool new_point >>= function
   | Ok _new_conn -> begin
-      pool.latest_succesfull_swap <- Time.System.now () ;
+      pool.latest_succesfull_swap <- Systime_os.now () ;
       log pool (Swap_success { source = source_peer_id }) ;
       lwt_log_info "Swap to %a succeeded" P2p_point.Id.pp new_point >>= fun () ->
       match Connection.find_by_peer_id pool current_peer_id with
@@ -1192,7 +1192,7 @@ let accept pool fd point =
     P2p_point.Table.add pool.incoming point canceler ;
     Lwt.async begin fun () ->
       with_timeout
-        ~canceler (Time.System.Span.sleep pool.config.authentication_timeout)
+        ~canceler (Systime_os.sleep pool.config.authentication_timeout)
         (fun canceler -> authenticate pool canceler fd point)
     end
 
@@ -1209,7 +1209,7 @@ let send_swap_request pool =
       | Some (proposed_point, proposed_peer_id, _proposed_conn) ->
           log pool (Swap_request_sent { source = recipient_peer_id }) ;
           recipient.last_sent_swap_request <-
-            Some (Time.System.now (), proposed_peer_id) ;
+            Some (Systime_os.now (), proposed_peer_id) ;
           ignore (P2p_socket.write_now recipient.conn
                     (Swap_request (proposed_point, proposed_peer_id)))
     end

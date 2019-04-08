@@ -488,7 +488,7 @@ module P2p_reader = struct
 
 
   let soon () =
-    let now = Time.System.now () in
+    let now = Systime_os.now () in
     match Ptime.add_span now (Ptime.Span.of_int_s 15) with
     | Some s -> s
     | None -> invalid_arg "Distributed_db.handle_msg: end of time"

@@ -63,7 +63,7 @@ module Info = struct
 
   let log_size = 100
 
-  let create ?(created = Time.System.now ()) ?(trusted = false) ~peer_metadata peer_id =
+  let create ?(created = Systime_os.now ()) ?(trusted = false) ~peer_metadata peer_id =
     { peer_id ;
       created ;
       state = Disconnected ;
@@ -137,7 +137,7 @@ module Info = struct
       s.last_failed_connection
       (Time.System.recent s.last_rejected_connection s.last_disconnection)
 
-  let log { events ; watchers ; _ } ?(timestamp = Time.System.now ()) point kind =
+  let log { events ; watchers ; _ } ?(timestamp = Systime_os.now ()) point kind =
     let event = { Pool_event.kind ; timestamp ; point } in
     Ring.add events event ;
     Lwt_watcher.notify watchers event
@@ -176,7 +176,7 @@ let is_disconnected { Info.state ; _ } =
   | Accepted _ | Running _ -> false
 
 let set_accepted
-    ?(timestamp = Time.System.now ())
+    ?(timestamp = Systime_os.now ())
     peer_info current_point cancel =
   assert begin
     match peer_info.Info.state with
@@ -187,7 +187,7 @@ let set_accepted
   Info.log peer_info ~timestamp current_point Accepting_request
 
 let set_running
-    ?(timestamp = Time.System.now ())
+    ?(timestamp = Systime_os.now ())
     peer_info point data conn_metadata =
   assert begin
     match peer_info.Info.state with
@@ -201,7 +201,7 @@ let set_running
   Info.log peer_info ~timestamp point Connection_established
 
 let set_disconnected
-    ?(timestamp = Time.System.now ()) ?(requested = false) peer_info =
+    ?(timestamp = Systime_os.now ()) ?(requested = false) peer_info =
   let current_point, (event : Pool_event.kind) =
     match peer_info.Info.state with
     | Accepted { current_point ; _ } ->

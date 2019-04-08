@@ -99,11 +99,9 @@ module System = struct
 
   type t = Ptime.t
   let epoch = Ptime.epoch
-  let now () = Ptime_clock.now ()
 
   module Span = struct
     type t = Ptime.Span.t
-    let sleep s = Lwt_unix.sleep (Ptime.Span.to_float_s s)
     let multiply_exn f s =
       let open Ptime.Span in
       Option.unopt_exn
@@ -226,11 +224,8 @@ module System = struct
       (fun {stamp; data} -> (stamp, data))
       (fun (stamp, data) -> {stamp; data})
       (tup2 encoding arg_encoding)
-  let stamp ?time data =
-    let stamp = match time with
-      | None -> now ()
-      | Some t -> t in
-    { data ; stamp }
+  let stamp ~time data =
+    { data ; stamp = time }
   let recent a1 a2 =
     match a1, a2 with
     | (None, None) -> None

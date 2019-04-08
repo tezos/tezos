@@ -567,7 +567,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       let on_request = on_request
     end in
     Chain.data chain_state >>= fun { current_head = predecessor ; _ } ->
-    let timestamp = Time.System.(to_protocol (now ())) in
+    let timestamp = Time.System.to_protocol (Systime_os.now ()) in
     create ~predecessor ~timestamp () >>=? fun validation_state ->
     Worker.launch
       table

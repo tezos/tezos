@@ -106,7 +106,7 @@ module Info = struct
   let last_failed_connection s = s.last_failed_connection
   let last_rejected_connection s = s.last_rejected_connection
   let known_public s = s.known_public
-  let greylisted ?(now = Time.System.now ()) s =
+  let greylisted ?(now = Systime_os.now ()) s =
     Time.System.compare now s.greylisting_end <= 0
   let greylisted_until s = s.greylisting_end
 
@@ -125,7 +125,8 @@ module Info = struct
         if Time.System.compare t1 t2 < 0 then a2 else a1
 
   let log { events ; watchers ; _ } ?timestamp kind =
-    let event = Time.System.stamp ?time:timestamp kind in
+    let time = Option.unopt ~default:(Systime_os.now ()) timestamp in
+    let event = Time.System.stamp ~time kind in
     Ring.add events event ;
     Lwt_watcher.notify watchers event
 
@@ -157,7 +158,7 @@ let set_requested ?timestamp point_info cancel =
   Info.log point_info ?timestamp Outgoing_request
 
 let set_accepted
-    ?(timestamp = Time.System.now ())
+    ?(timestamp = Systime_os.now ())
     point_info current_peer_id cancel =
   (* log_notice "SET_ACCEPTED %a@." P2p_point.pp point_info.point ; *)
   assert begin
@@ -169,7 +170,7 @@ let set_accepted
   Info.log point_info ~timestamp (Accepting_request current_peer_id)
 
 let set_running
-    ?(timestamp = Time.System.now ())
+    ?(timestamp = Systime_os.now ())
     ~known_private point_info peer_id data  =
   assert begin
     match point_info.Info.state with
@@ -196,7 +197,7 @@ let set_greylisted timestamp point_info =
       point_info.greylisting_delay
 
 let set_disconnected
-    ?(timestamp = Time.System.now ()) ?(requested = false) point_info =
+    ?(timestamp = Systime_os.now ()) ?(requested = false) point_info =
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->

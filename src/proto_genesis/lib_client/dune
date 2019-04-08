@@ -6,7 +6,8 @@
             tezos-client-base
             tezos-client-commands
             tezos-protocol-environment
-            tezos-protocol-genesis)
+            tezos-protocol-genesis
+            tezos-stdlib-unix)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services

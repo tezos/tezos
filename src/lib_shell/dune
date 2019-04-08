@@ -7,16 +7,18 @@
             tezos-p2p
             tezos-stdlib-unix
             tezos-shell-services
+            tezos-stdlib-unix
             tezos-protocol-updater
-	    tezos-validation)
+            tezos-validation)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
                    -open Tezos_rpc_http
                    -open Tezos_p2p
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
+                   -open Tezos_stdlib_unix
                    -open Tezos_protocol_updater
-		   -open Tezos_validation)))
+                   -open Tezos_validation)))
 
 (alias
  (name runtest_indent)

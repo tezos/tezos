@@ -13,6 +13,7 @@ depends: [
   "tezos-rpc"
   "tezos-shell-services"
   "tezos-signer-backends"
+  "tezos-stdlib-unix"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

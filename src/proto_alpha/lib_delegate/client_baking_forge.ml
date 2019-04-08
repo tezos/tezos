@@ -427,7 +427,7 @@ let decode_priority cctxt chain block = function
 
 let unopt_timestamp timestamp minimal_timestamp =
   match timestamp, minimal_timestamp with
-  | None, None -> return Time.System.(to_protocol (now ()))
+  | None, None -> return (Time.System.to_protocol (Systime_os.now ()))
   | None, Some timestamp -> return timestamp
   | Some timestamp, None -> return timestamp
   | Some timestamp, Some minimal_timestamp ->
@@ -875,7 +875,7 @@ let fetch_operations
         let timespan =
           let timespan =
             Ptime.diff
-              (Time.System.of_protocol_exn limit_date) (Time.System.now ()) in
+              (Time.System.of_protocol_exn limit_date) (Systime_os.now ()) in
           if Ptime.Span.compare timespan Ptime.Span.zero > 0 then
             timespan
           else
@@ -910,7 +910,10 @@ let fetch_operations
               operations := op_list @ !operations ;
               count_slots_endorsements inc slot op_list >>= fun new_endorsements ->
               let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
-              let limits = filter_limits Time.System.(to_protocol (now ())) limits in
+              let limits =
+                filter_limits
+                  (Time.System.to_protocol (Systime_os.now ()))
+                  limits in
               let required =
                 match limits with
                 | [] -> 0 (* If we are late, we do not require endorsements *)

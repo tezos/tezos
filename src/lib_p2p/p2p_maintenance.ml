@@ -59,7 +59,7 @@ type 'meta t = {
     Non-trusted points are also ignored if option --private-mode is set. *)
 let connectable st start_time expected seen_points =
   let Pool pool = st.pool in
-  let now = Time.System.now () in
+  let now = Systime_os.now () in
   let module Bounded_point_info =
     List.Bounded(struct
       type t = (Time.System.t option * P2p_point.Id.t)
@@ -106,7 +106,7 @@ let connectable st start_time expected seen_points =
     than [max_to_contact]. But, if after trying once all disconnected
     peers, it returns [false]. *)
 let rec try_to_contact
-    st ?(start_time = Time.System.now ()) ~seen_points
+    st ?(start_time = Systime_os.now ()) ~seen_points
     min_to_contact max_to_contact =
   let Pool pool = st.pool in
   if min_to_contact <= 0 then
@@ -140,7 +140,7 @@ let rec maintain st =
   let older_than =
     Option.unopt_exn
       (Failure "P2p_maintenance.maintain: time overflow")
-      (Ptime.add_span (Time.System.now ()) (Ptime.Span.neg st.config.greylist_timeout))
+      (Ptime.add_span (Systime_os.now ()) (Ptime.Span.neg st.config.greylist_timeout))
   in
   P2p_pool.gc_greylist pool ~older_than ;
   if n_connected < st.bounds.min_threshold then
@@ -204,7 +204,7 @@ let rec worker_loop st =
   begin
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        Time.System.Span.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
+        Systime_os.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool ;

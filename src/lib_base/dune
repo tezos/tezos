@@ -22,7 +22,6 @@
             tezos-micheline
             re.str
             ptime
-            ptime.clock.os
             ezjsonm
             lwt.unix
             mtime.clock.os

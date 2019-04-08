@@ -32,7 +32,7 @@ let protocol =
 let bake cctxt ?timestamp block command sk =
   let timestamp = match timestamp with
     | Some t -> t
-    | None -> Time.System.(to_protocol (now ())) in
+    | None -> Time.System.(to_protocol (Tezos_stdlib_unix.Systime_os.now ())) in
   let protocol_data = { command ; signature = Signature.zero } in
   Genesis_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~protocol_data

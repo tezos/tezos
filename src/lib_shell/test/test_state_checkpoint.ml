@@ -120,7 +120,7 @@ let build_valid_chain state vtbl pred names =
              Proto.finalize_block vstate
            end >>=? fun (result, _metadata) ->
            Context.commit
-             ~time:Time.System.(to_protocol (now ()))
+             ~time:(Time.System.to_protocol (Systime_os.now ()))
              ?message:result.message
              result.context >>= fun context_hash ->
            let validation_store =
@@ -378,7 +378,7 @@ let test_reach_checkpoint s =
   let checkpoint = level, block_hash in
   State.Chain.set_checkpoint s.chain checkpoint >>= fun () ->
   State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
-  let time_now = Time.System.(to_protocol (now ())) in
+  let time_now = (Time.System.to_protocol (Systime_os.now ())) in
   if Time.Protocol.compare (Time.Protocol.add time_now 15L) header.shell.timestamp >= 0
   then
     if Int32.equal header.shell.level c_level &&

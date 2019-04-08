@@ -39,7 +39,7 @@ let assert_equal_bool = assert_equal
 let a = Ipaddr.V6.of_string_exn
 let p = Ipaddr.V6.Prefix.of_string_exn
 
-let timenow = Time.System.now ()
+let timenow = Systime_os.now ()
 
 let of_list l =
   List.fold_left (fun acc k ->

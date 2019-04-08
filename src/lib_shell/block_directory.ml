@@ -244,7 +244,7 @@ let build_raw_rpc_directory
   register0 S.Helpers.Preapply.block begin fun block q p ->
     let timestamp =
       match q#timestamp with
-      | None -> Time.System.(to_protocol (now ()))
+      | None -> Time.System.to_protocol (Systime_os.now ())
       | Some time -> time in
     let protocol_data =
       Data_encoding.Binary.to_bytes_exn
@@ -278,7 +278,7 @@ let build_raw_rpc_directory
       ~predecessor_level:header.level
       ~predecessor_fitness:header.fitness
       ~predecessor
-      ~timestamp:Time.System.(to_protocol (now ())) () >>=? fun state ->
+      ~timestamp:(Time.System.to_protocol (Systime_os.now ())) () >>=? fun state ->
     fold_left_s
       (fun (state, acc) op ->
          Next_proto.apply_operation state op >>=? fun (state, result) ->

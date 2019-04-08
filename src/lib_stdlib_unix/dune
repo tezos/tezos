@@ -5,6 +5,8 @@
  (libraries tezos-base
             lwt.unix
             ipaddr.unix
+            ptime
+            ptime.clock.os
             str))
 
 (alias

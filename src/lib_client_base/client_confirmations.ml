@@ -53,7 +53,7 @@ let wait_for_bootstrapped (ctxt : #Client_context.full) =
          ctxt#message "Current head: %a (timestamp: %a, validation: %a)"
            Block_hash.pp_short hash
            Time.System.pp_hum (Time.System.of_protocol_exn time)
-           Time.System.pp_hum (Time.System.now ())
+           Time.System.pp_hum (Tezos_stdlib_unix.Systime_os.now ())
        else Lwt.return_unit) stream >>= fun () ->
   display := true ;
   ctxt#answer "Node is bootstrapped, ready for injecting operations." >>= fun () ->

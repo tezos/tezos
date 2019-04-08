@@ -119,7 +119,7 @@ class unix_prompter = object
 end
 
 class unix_logger ~base_dir =
-  let startup = Format.asprintf "%a" Time.System.pp_hum (Time.System.now ()) in
+  let startup = Format.asprintf "%a" Time.System.pp_hum (Systime_os.now ()) in
   let log channel msg = match channel with
     | "stdout" ->
         print_endline msg ;

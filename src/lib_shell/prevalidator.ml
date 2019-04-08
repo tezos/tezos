@@ -567,7 +567,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         ~from_block:pv.predecessor ~to_block:predecessor
         (Preapply_result.operations (validation_result pv))
       >>= fun (pending, new_live_blocks, new_live_operations) ->
-      let timestamp_system = Time.System.now () in
+      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       debug w "%d operations were not washed by the flush"
@@ -635,7 +635,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       Chain.data chain_state >>= fun
         { current_head = predecessor ; current_mempool = mempool ;
           live_blocks ; live_operations ; _ } ->
-      let timestamp_system = Time.System.now () in
+      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       let fetching =
