@@ -576,13 +576,13 @@ publish:docker:
     DOCKER_DRIVER: overlay2
   stage: publish
   only:
-    - master
-    - alphanet
-    - zeronet
-    - mainnet
-    - alphanet-staging
-    - zeronet-staging
-    - mainnet-staging
+    - master@tezos/tezos
+    - alphanet@tezos/tezos
+    - zeronet@tezos/tezos
+    - mainnet@tezos/tezos
+    - alphanet-staging@tezos/tezos
+    - zeronet-staging@tezos/tezos
+    - mainnet-staging@tezos/tezos
   before_script:
     - apk add git
     - mkdir ~/.docker || true
@@ -601,10 +601,10 @@ publish:doc:
   image: ${build_deps_image_name}:${build_deps_image_version}
   stage: doc
   only:
-    - master
-    - alphanet
-    - zeronet
-    - mainnet
+    - master@tezos/tezos
+    - alphanet@tezos/tezos
+    - zeronet@tezos/tezos
+    - mainnet@tezos/tezos
   before_script:
     - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
     - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
