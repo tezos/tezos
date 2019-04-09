@@ -506,13 +506,13 @@ module Pruned_block = struct
     let open Data_encoding in
     conv
       (fun { block_header ; operations ; operation_hashes} ->
-         (block_header, operations, operation_hashes))
-      (fun (block_header, operations, operation_hashes) ->
+         (operations, operation_hashes, block_header))
+      (fun (operations, operation_hashes, block_header) ->
          { block_header ; operations ; operation_hashes})
       (obj3
-         (req "block_header" (dynamic_size Block_header.encoding))
          (req "operations" (list (tup2 int31 (list (dynamic_size Operation.encoding)))))
-         (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
+         (req "operation_hashes" (list (tup2 int31 (list (dynamic_size Operation_hash.encoding)))))
+         (req "block_header" Block_header.encoding)
       )
 
   let to_bytes =
@@ -537,17 +537,16 @@ module Block_data = struct
     conv
       (fun { block_header  ;
              operations} ->
-        (block_header,
-         operations))
-      (fun (block_header,
-            operations) ->
+        (operations,
+         block_header))
+      (fun (operations,
+            block_header) ->
         { block_header ;
           operations})
       (obj2
-         (req "block_header" (dynamic_size Block_header.encoding))
-         (req "operations"
-            (list (list (dynamic_size Operation.encoding))))
-      )
+         (req "operations" (list (list (dynamic_size Operation.encoding))))
+         (req "block_header" Block_header.encoding
+         ))
 
   let to_bytes =
     Data_encoding.Binary.to_bytes_exn encoding
@@ -669,6 +668,46 @@ module Dumpable_context = struct
     | `Contents ( h1, () ), `Contents ( h2, () )
     | `Node h1, `Node h2 -> Context_hash.( h1 = h2 )
     | `Contents _, `Node _ | `Node _, `Contents _ -> false
+
+  let commit_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun irmin_info ->
+         let author = Irmin.Info.author irmin_info in
+         let message = Irmin.Info.message irmin_info in
+         let date = Irmin.Info.date irmin_info in
+         (author, message, date))
+      (fun (author, message, date) ->
+         Irmin.Info.v ~author ~date message)
+      (obj3
+         (req "author" string)
+         (req "message" string)
+         (req "date" int64))
+
+  let blob_encoding =
+    let open Data_encoding in
+    conv
+      (fun (`Blob h) -> h)
+      (fun h -> `Blob h)
+      (obj1 (req "blob" bytes))
+
+  let node_encoding =
+    let open Data_encoding in
+    conv
+      (fun (`Node h) -> h)
+      (fun h -> `Node h)
+      (obj1 (req "node" bytes))
+
+  let hash_encoding : hash Data_encoding.t =
+    let open Data_encoding in
+    let kind_encoding = string_enum [("node", `Node) ; ("blob", `Blob) ] in
+    conv
+      begin fun hash -> hash_export hash end
+      begin function
+        | (`Node, h) -> `Node (Context_hash.of_bytes_exn h)
+        | (`Blob, h) -> `Contents (Context_hash.of_bytes_exn h, ())
+      end
+      (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
   let context_parents ctxt =
     match ctxt with
