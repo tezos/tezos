@@ -35,30 +35,6 @@ let in_block operation_hash operations =
     None
   with Found (i,j) -> Some (i, j)
 
-let wait_for_bootstrapped (ctxt : #Client_context.full) =
-  let display = ref false in
-  Lwt.async begin fun () ->
-    ctxt#sleep 0.3 >>= fun () ->
-    if not !display then
-      ctxt#answer "Waiting for the node to be bootstrapped before injection..." >>= fun () ->
-      display := true ;
-      Lwt.return_unit
-    else
-      Lwt.return_unit
-  end ;
-  Monitor_services.bootstrapped ctxt >>=? fun (stream, _stop) ->
-  Lwt_stream.iter_s
-    (fun (hash, time) ->
-       if !display then
-         ctxt#message "Current head: %a (timestamp: %a, validation: %a)"
-           Block_hash.pp_short hash
-           Time.System.pp_hum (Time.System.of_protocol_exn time)
-           Time.System.pp_hum (Tezos_stdlib_unix.Systime_os.now ())
-       else Lwt.return_unit) stream >>= fun () ->
-  display := true ;
-  ctxt#answer "Node is bootstrapped, ready for injecting operations." >>= fun () ->
-  return_unit
-
 type operation_status =
   | Confirmed of (Block_hash.t * int * int)
   | Pending

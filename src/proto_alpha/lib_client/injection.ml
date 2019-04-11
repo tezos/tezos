@@ -557,7 +557,7 @@ let inject_operation
     ~fee_parameter
     ?compute_fee
     (contents: kind contents_list)  =
-  Client_confirmations.wait_for_bootstrapped cctxt >>=? fun () ->
+  Tezos_client_base_unix.Client_confirmations_unix.wait_for_bootstrapped cctxt >>=? fun () ->
   may_patch_limits
     cctxt ~chain ~block ?branch
     ~fee_parameter

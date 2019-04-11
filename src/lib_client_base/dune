@@ -3,7 +3,6 @@
  (public_name tezos-client-base)
  (libraries tezos-base
             tezos-shell-services
-            tezos-stdlib-unix
             tezos-rpc)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [wait_for_operation_inclusion chain ~predecessors ~confirmations
-    oph] waits for `oph` to appears in the main chain with at least
-    `confirmations`. It returns the hash of the block that contains
-    the operation and the operation position in the block.
-
-    This functions also looks for the operations in the `predecessors`
-    of the intial chain head. *)
-val wait_for_operation_inclusion:
-  #Client_context.full ->
-  chain:Chain_services.chain ->
-  ?predecessors:int ->
-  ?confirmations:int ->
-  ?branch:Block_hash.t ->
-  Operation_hash.t ->
-  (Block_hash.t * int * int) tzresult Lwt.t
-
-(** lookup an operation in [predecessors] previous blocks, starting 
-    from head *)
-val lookup_operation_in_previous_blocks:
-  #Client_context.full ->
-  chain:Block_services.chain ->
-  predecessors:int ->
-  Operation_list_hash.elt ->
-  (Block_hash.t * int * int) option tzresult Lwt.t
+let wait_for_bootstrapped (ctxt : #Client_context.full) =
+  let display = ref false in
+  Lwt.async begin fun () ->
+    Lwt_unix.sleep 0.3 >>= fun () ->
+    if not !display then
+      ctxt#answer "Waiting for the node to be bootstrapped before injection..." >>= fun () ->
+      display := true ;
+      Lwt.return_unit
+    else
+      Lwt.return_unit
+  end ;
+  Monitor_services.bootstrapped ctxt >>=? fun (stream, _stop) ->
+  Lwt_stream.iter_s
+    (fun (hash, time) ->
+       if !display then
+         ctxt#message "Current head: %a (timestamp: %a, validation: %a)"
+           Block_hash.pp_short hash
+           Time.System.pp_hum (Time.System.of_protocol_exn time)
+           Time.System.pp_hum (Tezos_stdlib_unix.Systime_os.now ())
+       else Lwt.return_unit) stream >>= fun () ->
+  display := true ;
+  ctxt#answer "Node is bootstrapped, ready for injecting operations." >>= fun () ->
+  return_unit

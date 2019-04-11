@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [wait_for_operation_inclusion chain ~predecessors ~confirmations
-    oph] waits for `oph` to appears in the main chain with at least
-    `confirmations`. It returns the hash of the block that contains
-    the operation and the operation position in the block.
+val wait_for_bootstrapped:
+  #Client_context.full -> unit tzresult Lwt.t
 
-    This functions also looks for the operations in the `predecessors`
-    of the intial chain head. *)
-val wait_for_operation_inclusion:
-  #Client_context.full ->
-  chain:Chain_services.chain ->
-  ?predecessors:int ->
-  ?confirmations:int ->
-  ?branch:Block_hash.t ->
-  Operation_hash.t ->
-  (Block_hash.t * int * int) tzresult Lwt.t
-
-(** lookup an operation in [predecessors] previous blocks, starting 
-    from head *)
-val lookup_operation_in_previous_blocks:
-  #Client_context.full ->
-  chain:Block_services.chain ->
-  predecessors:int ->
-  Operation_list_hash.elt ->
-  (Block_hash.t * int * int) option tzresult Lwt.t
