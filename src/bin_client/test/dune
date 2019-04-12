@@ -100,7 +100,7 @@
  (deps sandbox.json
        protocol_parameters.json
        test_lib.inc.sh
-       (glob_files demo/*))
+       (glob_files proto_test_injection/*))
  (action
   (run bash %{dep:test_injection.sh}
             %{bin:tezos-sandboxed-node.sh}
@@ -116,7 +116,7 @@
         /tcp-port/19731)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files demo/*))
+       (glob_files proto_test_injection/*))
  (action
   (run bash %{dep:test_tls.sh}
             %{bin:tezos-sandboxed-node.sh}
@@ -131,7 +131,7 @@
         /tcp-port/19731)
  (deps sandbox.json
        test_lib.inc.sh
-       (glob_files demo/*))
+       (glob_files proto_test_injection/*))
  (action
   (run bash %{dep:test_cors.sh}
             %{bin:tezos-sandboxed-node.sh}
@@ -147,7 +147,7 @@
  (deps sandbox.json
        protocol_parameters.json
        test_lib.inc.sh
-       (glob_files demo/*))
+       (glob_files proto_test_injection/*))
  (action
   (run bash %{dep:test_voting.sh}
             %{bin:tezos-sandboxed-node.sh}

@@ -1,7 +1,5 @@
 #! /usr/bin/env bash
 
-## from genesis to demo
-
 set -e
 
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
