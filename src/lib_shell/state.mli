@@ -94,6 +94,10 @@ module Chain : sig
   val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
   val caboose: chain_state -> (Int32.t * Block_hash.t) Lwt.t
 
+  val index: chain_state -> Context.index Lwt.t
+
+  val store: chain_state -> Store.t Lwt.t
+
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
       through the checkpoint). In the process all the blocks from

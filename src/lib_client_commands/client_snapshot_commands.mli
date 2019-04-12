@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,29 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val export:
-  ?export_rolling:bool ->
-  context_index:Context.index ->
-  store:Store.t ->
-  genesis:Block_hash.t ->
-  string ->
-  string option ->
-  unit tzresult Lwt.t
-
-val import:
-  ?reconstruct:bool ->
-  data_dir:string ->
-  dir_cleaner:(string -> unit Lwt.t) ->
-  patch_context:('a option -> Context.t -> Context.t Lwt.t) ->
-  genesis:State.Chain.genesis ->
-  string ->
-  string option ->
-  unit tzresult Lwt.t
-
-val snapshot_export_rpc:
-  export_rolling:bool ->
-  chain_state:State.Chain.t ->
-  genesis:Block_hash.t ->
-  string ->
-  string option ->
-  string tzresult Lwt.t
+val commands: unit -> Client_commands.command list

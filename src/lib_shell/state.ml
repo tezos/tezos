@@ -839,6 +839,15 @@ module Chain = struct
       Store.Chain.destroy global_store (id chain)
     end
 
+  let index ( chain_state : t) =
+    Shared.use chain_state.global_state.global_data
+      begin fun c -> Lwt.return c.context_index end
+
+  let store (chain_state : t) =
+    let global_state = chain_state.global_state in
+    Shared.use global_state.global_data
+      begin fun global_data -> Lwt.return global_data.global_store end
+
 end
 
 type error += Missing_block of Block_hash.t

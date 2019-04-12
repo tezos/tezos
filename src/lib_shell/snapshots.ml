@@ -284,6 +284,38 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
     ) >>= fun () ->
   return_unit
 
+type snapshot_state =
+  | Running of string
+  | Idle
+
+let snapshots_state = ref Idle
+
+let snapshot_export_rpc ~export_rolling ~chain_state ~genesis filename block_hash_str =
+  begin
+    match !snapshots_state with
+    | Idle ->
+        begin
+          Lwt.async (fun () ->
+              Lwt.finalize
+                (fun () ->
+                   snapshots_state := Running filename;
+                   State.Chain.index chain_state >>= fun context_index ->
+                   State.Chain.store chain_state >>= fun store ->
+                   export
+                     ~export_rolling
+                     ~context_index
+                     ~store
+                     ~genesis
+                     filename
+                     block_hash_str)
+                (fun () ->
+                   Lwt.return (snapshots_state := Idle))
+            );
+          return ("Snapshot export started for " ^ filename)
+        end
+    | Running filename -> return ("Snapshot export already running for " ^ filename)
+  end
+
 let check_operations_consistency pruned_block =
   let { Context.Pruned_block.block_header ;
         operations ;

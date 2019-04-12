@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,29 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val export:
-  ?export_rolling:bool ->
-  context_index:Context.index ->
-  store:Store.t ->
-  genesis:Block_hash.t ->
-  string ->
-  string option ->
-  unit tzresult Lwt.t
+let group =
+  { Clic.name = "snapshot" ;
+    title = "Commands for managing storage snapshots" }
 
-val import:
-  ?reconstruct:bool ->
-  data_dir:string ->
-  dir_cleaner:(string -> unit Lwt.t) ->
-  patch_context:('a option -> Context.t -> Context.t Lwt.t) ->
-  genesis:State.Chain.genesis ->
-  string ->
-  string option ->
-  unit tzresult Lwt.t
+let rolling_mode =
+  Clic.switch
+    ~long:"rolling"
+    ~doc:("export a snapshot in rolling mode") ()
 
-val snapshot_export_rpc:
-  export_rolling:bool ->
-  chain_state:State.Chain.t ->
-  genesis:Block_hash.t ->
-  string ->
-  string option ->
-  string tzresult Lwt.t
+let exported_block =
+  Clic.arg
+    ~doc: "block to export"
+    ~long: "block"
+    ~placeholder: "<BLOCK_HASH>"
+    (Clic.parameter (fun _ s -> return s))
+
+let commands () =
+  let open Clic in
+  [
+    command ~group ~desc: "Export a snapshot"
+      (args2 rolling_mode exported_block)
+      (prefixes [ "snapshot" ; "export" ]
+       @@ stop)
+      (fun (export_mode, block_hash) (ctxt : #Client_context.full) ->
+         let export_mode =
+           (function | true -> "rolling" | false -> "full") export_mode in
+         (function
+           | Some block_hash ->
+               Shell_services.Chain.snapshot_export_block
+                 ctxt
+                 ~chain:ctxt#chain
+                 ~export_mode
+                 ~block_hash
+           | None ->
+               Shell_services.Chain.snapshot_export_last_checkpoint
+                 ctxt
+                 ~chain:ctxt#chain
+                 ~export_mode
+         ) block_hash  >>=? fun status ->
+         ctxt#message "%s" status >>= return
+      ) ;
+  ]

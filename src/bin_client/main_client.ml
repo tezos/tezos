@@ -134,6 +134,7 @@ let select_commands ctxt { chain ; block ; protocol ; _ } =
   Tezos_signer_backends.Ledger.commands () @
   Client_keys_commands.commands network @
   Client_helpers_commands.commands () @
+  Client_snapshot_commands.commands () @
   commands_for_version
 
 let () = Client_main_run.run (module Client_config) ~select_commands
