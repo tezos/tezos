@@ -26,7 +26,8 @@
 
 val export:
   ?export_rolling:bool ->
-  data_dir:string ->
+  context_index:Context.index ->
+  store:Store.t ->
   genesis:Block_hash.t ->
   string ->
   string option ->

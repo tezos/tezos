@@ -222,11 +222,8 @@ let filename_tag =
 let block_level_tag =
   Tag.def "block_level" Format.pp_print_int
 
-let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
-  let context_root = context_dir data_dir in
-  let store_root = store_dir data_dir in
+let export ?(export_rolling=false) ~context_index ~store ~genesis filename block  =
   let chain_id = Chain_id.of_block_hash genesis in
-  Store.init store_root >>=? fun store ->
   let chain_store = Store.Chain.get store chain_id in
   let chain_data_store = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
@@ -251,7 +248,6 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
             ) >>= fun () ->
           return last_checkpoint_hash
   end >>=? fun checkpoint_block_hash ->
-  Context.init ~readonly:true context_root >>= fun context_index ->
   begin Store.Block.Header.read_opt
       (block_store, checkpoint_block_hash) >>= function
     | None ->
@@ -282,9 +278,8 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
   end >>=? fun data_to_dump ->
   lwt_log_notice (fun f -> f "Now loading data") >>= fun () ->
   Context.dump_contexts context_index [ data_to_dump ] ~filename >>=? fun () ->
-  Store.close store ;
   lwt_log_notice Tag.DSL.(fun f ->
-      f "Sucessful export in file \"%a\""
+      f "Sucessful export (from file %a)"
       -%a filename_tag filename
     ) >>= fun () ->
   return_unit
@@ -715,7 +710,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
     (function
       | Ok () ->
           lwt_log_notice Tag.DSL.(fun f ->
-              f "Sucessfull import (from file %a)"
+              f "Sucessful import (from file %a)"
               -%a filename_tag filename
             ) >>= fun () ->
           return_unit

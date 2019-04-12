@@ -52,9 +52,16 @@ module Term = struct
       | Export ->
           Internal_event_unix.init () >>= fun () ->
           Node_data_version.ensure_data_dir data_dir >>=? fun () ->
+          let context_root = context_dir data_dir in
+          let store_root = store_dir data_dir in
+          Store.init store_root >>=? fun store ->
+          Context.init ~readonly:true context_root >>= fun context_index ->
           Snapshots.export
-            ~export_rolling ~data_dir
-            ~genesis:genesis.block file block
+            ~export_rolling
+            ~context_index
+            ~store
+            ~genesis:genesis.block file block >>=? fun () ->
+          Store.close store |> return
       | Import ->
           Internal_event_unix.init () >>= fun () ->
           Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
