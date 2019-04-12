@@ -322,6 +322,13 @@ let on_error w r st errs =
           Worker.record_event w (Event.Request (r, st, Some errs)) ;
           Lwt.return (Error errs)
     end
+  | [ Validation_errors.Too_short_locator _ ] ->
+      debug w
+        "Terminating the validation worker for peer %a (kick)."
+        P2p_peer.Id.pp_short pv.peer_id ;
+      Worker.trigger_shutdown w ;
+      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      return_unit
   | _ ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       Lwt.return (Error errs)
