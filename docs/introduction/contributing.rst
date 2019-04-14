@@ -98,3 +98,134 @@ the branch name.
 
 -  If your MR impacts OPAM packaging, use ``opam`` in the branch name.
 -  If your MR updates documentation, use ``doc`` in the branch name.
+
+Code Review
+-----------
+
+At tezos all the code is peer reviewed before getting committed in the
+master branch. Briefly, a code review is a discussion between two or
+more developers about changes to the code to address an issue.
+
+Author Perspective
+~~~~~~~~~~~~~~~~~~
+
+Code review is a tool among others to enhance the quality of the code and to
+reduce the likelihood of introducing new bugs in the code base. It is a
+technical discussion, it is not an exam, but it is a common effort to learn from
+each other.
+
+These are a few common suggestions we often give while reviewing new code.
+Addressing these points beforehand makes the reviewing process easier and less
+painful for everybody. The reviewer is your ally, not your enemy.
+
+- Commented code: Did I remove any commented out lines?
+  Did I leave a ``TODO`` or an old comment?
+
+- Docstrings: Did I exported a new function? Each exported
+  function should be documented in the corresponding ``mli`` .
+
+- Readability: Is the code easy to understand? Is it worth to add
+  a comment to the code to explain a particular operation and its
+  repercussion on the rest of the code?
+
+- Variable and function names: These should be meaningful and in line
+  with the convention adopted in the code base.
+
+- Testing: Are the tests thoughtful? Do they cover the failure conditions? Are
+  they easy to read? How fragile are they? How big are the tests? Are they slow?
+
+- Are your Commit messages meaningful? (i.e., https://chris.beams.io/posts/git-commit/ )
+
+Review your own code before calling for a peer review from a college.
+
+Reviewer Perspective
+~~~~~~~~~~~~~~~~~~~~
+
+Code review can be challenging at times. These are suggestions and common
+pitfalls a code reviewer should avoid.
+
+- Ask questions: How does this function work? If this requirement changes,
+  what else would have to change? How could we make this more maintainable?
+
+- Discuss in person for more detailed points: Online comments are useful for
+  focused technical questions. In many occasions it is more productive to
+  discuss it in person rather than in the comments. Similarly, if discussion
+  about a point goes back and forth, It will be often more productive to pick
+  it up in person and finish out the discussion.
+
+- Explain reasoning: Sometimes it is best to both ask if there is a better
+  alternative and at the same time justify why a problem in the code is worth
+  fixing. Sometimes it can feel like the changes suggested are nit-picky
+  without context or explanation.
+
+- Make it about the code: It is easy to take notes from code reviews
+  personally, especially if we take pride in our work. It is best to make
+  discussions about the code than about the developer. It lowers resistance and
+  it is not about the developer anyway, it is about improving the quality of
+  the code.
+
+- Suggest importance of fixes: While offering many suggestions at once, it is
+  important to also clarify that not all of them need to be acted upon and some
+  are more important than others. It gives an important guidance to the developer
+  to improve its work incrementally.
+
+- Take the developer opinion into consideration: Imposing a particular design
+  choice out of personal preferences and without a real explanation will
+  incentivize the developer to be a passive executor instead of a creative agent.
+
+- Do not re-write, remove or re-do all the work: Sometimes it is easier to
+  re-do the work yourself discarding the work of the developer. This can give
+  the impression that the work of the developer is worthless and adds
+  additional work for the reviewer that effectively takes responsibility for
+  the code.
+
+- Consider the person you are reviewing: Each developer is a person. If you
+  know the person, consider their personality and experience while reviewing their
+  code. Sometime it is possible with somebody to be more direct and terse, while
+  other people require to better explain a suggestion.
+
+- Avoid confrontational and authoritative language: The way we communicate has
+  an impact on the receiver. If communicating a problem in the code or a
+  suggestion is the goal, making an effort to remove all possible noise from
+  the message is important. Consider these two statements to communicate about
+  a problem in the code : "This operation is wrong. Please fix it." and
+  "Doing this operation might result in an error, can you please
+  review it?". The first one implies you made an error (confrontational), and
+  you should fix it (authority). The second suggest to review the code because
+  there might be a mistake. Despite the message being the same, the recipient might
+  have a different reactions to it and impact on the quality of this work. This
+  general remark is valid for any comment.
+
+Practicalities : how to ask for a code review.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Our code review process uses GitLab. First a developer creates a new
+branch (it is often useful to prefix the name of the branch with the name of
+the developer to make it clear at glance who is working on what : e.g.
+``john@new-feature``). This is a private new branch, the developer is free to
+rebase, squash commits, rewrite history (``git push --force``), etc. at will.
+
+Once the code is ready to be shared with the rest of the team, the developer
+opens a Merge Request. It is useful to add a precise description of the code
+changes while opening the MR and check if those are in line with the initial
+requirements.
+
+If the code is still not ready to be peer reviewed, but it is merely a
+RFC, we prefix the MR with ``WIP:`` (work in progress). This will tell everybody
+they can look at the code, comment, but there is still work to be done and the
+branch can change and history be rewritten.
+
+Finally, when the code is ready to be audited, we remove the WIP status of the
+MR and we freeze the branch. From this moment on, the developer will refrain to
+rewrite history (but he/she can add new commits) and to rebase the branch
+without notice. At this point the developer waits for the reviewer to add his
+comments and suggestions.
+
+Gitlab allows to comment both on the code and to add general comments on the
+MR.  Each comment should be addressed by the developer. He/she can add
+additional commits to address each comment. This incremental approach will make
+it easier for the reviewer to keep interacting till each discussion is
+resolved. When the reviewer is satisfied, he/she will mark the discussion resolved.
+
+When all discussions are resolved, the reviewer will rebase the branch,
+possibly squash commits and merge the MR in the master branch.
