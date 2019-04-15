@@ -20,3 +20,4 @@ build: [
 build-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos event logging library"
