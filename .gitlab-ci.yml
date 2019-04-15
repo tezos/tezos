@@ -45,6 +45,11 @@ check_opam_deps:
     - ./scripts/opam-check.sh
     - ./scripts/check_opam_test.sh
 
+check_opam_lint:
+  <<: *build_definition
+  script:
+    - find . ! -path "./_opam/*" -name *.opam -exec opam lint {} +;
+
 check_indentation:
   <<: *build_definition
   script:
