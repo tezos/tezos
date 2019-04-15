@@ -149,10 +149,10 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
         (MBytes.to_hex (Signature.bytes_of_watermark watermark) |> Hex.show) ) ;
   item (fun ppf () ->
       pp_print_text ppf "Operation bytes: " ;
-      TzString.fold_left
+      TzString.fold_left (* We split the bytes into lines for display: *)
         (fun n c ->
            pp_print_char ppf c ;
-           if n < 72
+           if n < 72 (* is the email-body standard width, ideal for copy-pasting. *)
            then  n + 1
            else (pp_print_space ppf () ; 0) )
         0
