@@ -113,7 +113,6 @@ module Fake_operation_storage = struct
   let known _ _ = Lwt.return_false
   let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
   let read_opt _ _ = Lwt.return_none
-  let read_exn _ _ = raise Not_found
 end
 
 module Raw_operation =
@@ -326,7 +325,6 @@ module Protocol_storage = struct
   let known = State.Protocol.known
   let read = State.Protocol.read
   let read_opt = State.Protocol.read_opt
-  let read_exn _ _ = raise Not_found
 end
 
 module Raw_protocol =
@@ -983,7 +981,6 @@ module Make
   type error += Timeout = Table.Timeout
   let read t k = Table.read (Kind.proj t) k
   let read_opt t k = Table.read_opt (Kind.proj t) k
-  let read_exn t k = Table.read_exn (Kind.proj t) k
   let prefetch t ?peer ?timeout k p =
     Table.prefetch (Kind.proj t) ?peer ?timeout k p
   let fetch t ?peer ?timeout k p =

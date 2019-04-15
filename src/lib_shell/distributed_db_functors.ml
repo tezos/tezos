@@ -38,7 +38,6 @@ module type DISTRIBUTED_DB = sig
 
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
-  val read_exn: t -> key -> value Lwt.t
 
   val prefetch:
     t ->
@@ -68,7 +67,6 @@ module type DISK_TABLE = sig
   val known: store -> key -> bool Lwt.t
   val read: store -> key -> value tzresult Lwt.t
   val read_opt: store -> key -> value option Lwt.t
-  val read_exn: store -> key -> value Lwt.t
 end
 
 module type MEMORY_TABLE = sig
@@ -155,12 +153,6 @@ end = struct
     | None -> Disk_table.read_opt s.disk k
     | Some (Found v) -> Lwt.return_some v
     | Some (Pending _) -> Lwt.return_none
-
-  let read_exn s k =
-    match Memory_table.find_opt s.memory k with
-    | None -> Disk_table.read_exn s.disk k
-    | Some (Found v) -> Lwt.return v
-    | Some (Pending _) -> Lwt.fail Not_found
 
   type error += Missing_data of key
   type error += Canceled of key
