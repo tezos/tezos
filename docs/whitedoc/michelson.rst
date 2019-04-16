@@ -749,6 +749,9 @@ Bitwise logical operators are also available on unsigned integers.
     :: nat : nat : 'S   ->   nat : 'S
 
     > LSR / x : s : S  =>  (x >> s) : S
+        iff   s <= 256
+    > LSR / x : s : S  =>  [FAILED]
+        iff   s > 256
 
 -  ``COMPARE``: Integer/natural comparison
 
