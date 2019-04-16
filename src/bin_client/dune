@@ -4,7 +4,6 @@
  (libraries tezos-base
             tezos-rpc-http
             tezos-shell-services
-            tezos-shell
             tezos-client-base
             tezos-client-commands
             tezos-client-genesis
