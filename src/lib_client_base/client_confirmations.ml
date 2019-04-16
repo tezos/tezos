@@ -221,7 +221,7 @@ let wait_for_operation_inclusion
       end
       >>=? fun block_hook ->
       Block_services.Empty.hash
-        ctxt ~block:(`Hash (head, block_hook+1)) () >>=? fun oldest ->
+        ctxt ~chain ~block:(`Hash (head, block_hook+1)) () >>=? fun oldest ->
       Block_hash.Table.add blocks oldest None ;
       loop block_hook
 

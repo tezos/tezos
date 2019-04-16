@@ -23,37 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Output : sig
-  type t =
-    | Null
-    | Stdout
-    | Stderr
-    | File of string
-    | Syslog of Lwt_log.syslog_facility
-
-  val encoding : t Data_encoding.t
-  val of_string : string -> t option
-  val to_string : t -> string
-  val pp : Format.formatter -> t -> unit
-end
-
-type cfg = {
-  output : Output.t ;
-  default_level : Logging.level ;
-  rules : string option ;
-  template : Logging.template ;
-}
-
-val default_cfg : cfg
-
-val create_cfg :
-  ?output:Output.t ->
-  ?default_level:Logging.level ->
-  ?rules:string ->
-  ?template:Logging.template -> unit -> cfg
-
-val level_encoding : Logging.level Data_encoding.t
-val cfg_encoding : cfg Data_encoding.t
-
-val init: ?cfg:cfg -> unit -> unit Lwt.t
-val close: unit -> unit Lwt.t
+val commands: unit -> Client_commands.command list

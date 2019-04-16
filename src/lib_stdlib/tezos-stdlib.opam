@@ -7,12 +7,13 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" & < "1.7" } ## Incompatible with lwt<4
+  "dune" { build & >= "1.7" & < "1.9" }
   "bigstring"
   "hex"
   "ocplib-endian"
   "re"
-  "lwt" { < "4" }
+  "lwt"
+  "lwt_log"
   "zarith"
   "alcotest" { with-test }
   "ocp-indent" { with-test & = "1.6.1" }

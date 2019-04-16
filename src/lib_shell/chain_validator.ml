@@ -26,7 +26,8 @@
 
 open Chain_validator_worker_state
 
-module Log = Tezos_stdlib.Logging.Make(struct let name = "node.chain_validator" end)
+module Log =
+  Internal_event.Legacy_logging.Make(struct let name = "node.chain_validator" end)
 
 module Name = struct
   type t = Chain_id.t

@@ -36,8 +36,8 @@ let pp_source ppf = function
   | Some peer -> Format.fprintf ppf " from peer %a" pp peer
 
 module Logging = struct
-  open Tezos_stdlib.Logging
-  include Make_semantic(struct let name = "node.distributed_db.p2p_reader" end)
+  include Internal_event.Legacy_logging.Make_semantic
+      (struct let name = "node.distributed_db.p2p_peer_id" end)
   let mk_tag pp = Tag.def ~doc:"P2P peer ID" "p2p_peer_id" pp
   let tag = mk_tag pp_short
   let tag_opt = mk_tag (fun ppf -> function

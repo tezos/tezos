@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "base" end)
+include Internal_event.Legacy_logging.Make_semantic(struct let name = "base" end)
 
 let pp_exn_trace ppf backtrace =
   if String.length backtrace <> 0 then

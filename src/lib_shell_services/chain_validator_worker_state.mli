@@ -41,7 +41,7 @@ module Event : sig
           update : update ;
           fitness : Fitness.t }
     | Could_not_switch_testchain of error list
-  val level : t -> Logging.level
+  val level : t -> Internal_event.level
   val encoding : t Data_encoding.encoding
   val pp : Format.formatter -> t -> unit
 end

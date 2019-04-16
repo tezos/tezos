@@ -92,9 +92,8 @@ let main
                  (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
   ignore Clic.(setup_formatter Format.err_formatter
                  (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
-  Logging_unix.init () >>= fun () ->
-  Lwt.catch begin fun () ->
-    begin
+  Internal_event_unix.init () >>= fun () ->
+  Lwt.catch begin fun () -> begin
       C.parse_config_args
         (new unix_full
           ~chain:C.default_chain
@@ -260,7 +259,7 @@ let main
   end >>= fun retcode ->
   Format.pp_print_flush Format.err_formatter () ;
   Format.pp_print_flush Format.std_formatter () ;
-  Logging_unix.close () >>= fun () ->
+  Internal_event_unix.close () >>= fun () ->
   Lwt.return retcode
 
 

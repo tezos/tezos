@@ -28,7 +28,8 @@ type t = {
   data_dir : string ;
   p2p : p2p ;
   rpc : rpc ;
-  log : Logging_unix.cfg ;
+  log : Lwt_log_sink_unix.cfg ;
+  internal_events : Internal_event_unix.Configuration.t ;
   shell : shell ;
 }
 
@@ -88,7 +89,7 @@ val update:
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
-  ?log_output:Logging_unix.Output.t ->
+  ?log_output:Lwt_log_sink_unix.Output.t ->
   ?bootstrap_threshold:int ->
   t -> t tzresult Lwt.t
 

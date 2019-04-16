@@ -34,7 +34,7 @@ end
 module type EVENT = sig
   type t
 
-  val level : t -> Logging.level
+  val level : t -> Internal_event.level
   val encoding : t Data_encoding.t
   val pp : Format.formatter -> t -> unit
 end
@@ -228,7 +228,7 @@ module type T = sig
   val state : _ t -> Types.state
 
   (** Access the event backlog. *)
-  val last_events : _ t -> (Logging.level * Event.t list) list
+  val last_events : _ t -> (Internal_event.level * Event.t list) list
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.t * Request.view) list
@@ -291,8 +291,8 @@ module Make
     mutable (* only for init *) worker : unit Lwt.t ;
     mutable (* only for init *) state : Types.state option ;
     buffer : 'kind buffer ;
-    event_log : (Logging.level * Event.t Ring.t) list ;
-    logger : (module Logging.LOG) ;
+    event_log : (Internal_event.level * Event.t Ring.t) list ;
+    logger : (module Internal_event.Legacy_logging.LOG) ;
     canceler : Lwt_canceler.t ;
     name : Name.t ;
     id : int ;
@@ -537,12 +537,12 @@ module Make
       let name_s =
         Format.asprintf "%a" Name.pp name in
       let full_name =
-        if name_s = "" then base_name else Format.asprintf "%s(%s)" base_name name_s in
+        if name_s = "" then base_name else Format.asprintf "%s_%s" base_name name_s in
       let id =
         table.last_id <- table.last_id + 1 ;
         table.last_id in
       let id_name =
-        if name_s = "" then base_name else Format.asprintf "%s(%d)" base_name id in
+        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id in
       if Hashtbl.mem table.instances name then
         invalid_arg (Format.asprintf "Worker.launch: duplicate worker %s" full_name) ;
       let canceler = Lwt_canceler.create () in
@@ -556,9 +556,14 @@ module Make
             Dropbox_buffer (Lwt_dropbox.create ()) in
       let event_log =
         let levels =
-          [ Logging.Debug ; Info ; Notice ; Warning ; Error ; Fatal ] in
+          Internal_event.[
+            Debug ; Info ; Notice ; Warning ; Error ; Fatal
+          ] in
         List.map (fun l -> l, Ring.create limits.backlog_size) levels in
-      let module Logger = Logging.Make_unregistered(struct let name = id_name end) in
+      let module Logger =
+        Internal_event.Legacy_logging.Make(struct
+          let name = id_name
+        end) in
       let w = { limits ; parameters ; name ; canceler ;
                 table ; buffer ; logger = (module Logger) ;
                 state = None ; id ;
@@ -579,6 +584,7 @@ module Make
       w.worker <-
         Lwt_utils.worker
           full_name
+          ~on_event:Internal_event.Lwt_worker_event.on_event
           ~run:(fun () -> worker_loop (module Handlers) w)
           ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
       return w

@@ -39,7 +39,8 @@ type t = {
   data_dir : string ;
   p2p : p2p ;
   rpc : rpc ;
-  log : Logging_unix.cfg ;
+  log : Lwt_log_sink_unix.cfg ;
+  internal_events : Internal_event_unix.Configuration.t ;
   shell : shell ;
 }
 
@@ -128,7 +129,8 @@ let default_config = {
   data_dir = default_data_dir ;
   p2p = default_p2p ;
   rpc = default_rpc ;
-  log = Logging_unix.default_cfg ;
+  log = Lwt_log_sink_unix.default_cfg ;
+  internal_events = Internal_event_unix.Configuration.default ;
   shell = default_shell ;
 }
 
@@ -365,7 +367,8 @@ let worker_limits_encoding
        { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
     (obj4
        (dft "worker_backlog_size" uint16 default_size)
-       (dft "worker_backlog_level" Logging_unix.level_encoding default_level)
+       (dft "worker_backlog_level"
+          Internal_event.Level.encoding default_level)
        (dft "worker_zombie_lifetime" float default_zombie_lifetime)
        (dft "worker_zombie_memory" float default_zombie_memory))
 
@@ -474,11 +477,11 @@ let shell =
 let encoding =
   let open Data_encoding in
   conv
-    (fun { data_dir ; rpc ; p2p ; log ; shell } ->
-       (data_dir, rpc, p2p, log, shell))
-    (fun (data_dir, rpc, p2p, log, shell) ->
-       { data_dir ; rpc ; p2p ; log ; shell })
-    (obj5
+    (fun { data_dir ; rpc ; p2p ; log ; internal_events ; shell } ->
+       (data_dir, rpc, p2p, log, internal_events, shell))
+    (fun (data_dir, rpc, p2p, log, internal_events, shell) ->
+       { data_dir ; rpc ; p2p ; log ; internal_events ; shell })
+    (obj6
        (dft "data-dir"
           ~description: "Location of the data dir on disk."
           string default_data_dir)
@@ -488,8 +491,13 @@ let encoding =
        (req "p2p"
           ~description: "Configuration of network parameters" p2p)
        (dft "log"
-          ~description: "Configuration of logging parameters"
-          Logging_unix.cfg_encoding Logging_unix.default_cfg)
+          ~description:
+            "Configuration of the Lwt-log sink (part of the logging framework)"
+          Lwt_log_sink_unix.cfg_encoding Lwt_log_sink_unix.default_cfg)
+       (dft "internal-events"
+          ~description: "Configuration of the structured logging framework"
+          Internal_event_unix.Configuration.encoding
+          Internal_event_unix.Configuration.default)
        (dft "shell"
           ~description: "Configuration of network parameters"
           shell default_shell))
@@ -593,7 +601,7 @@ let update
     tls =
       Option.first_some rpc_tls cfg.rpc.tls ;
   }
-  and log : Logging_unix.cfg = {
+  and log : Lwt_log_sink_unix.cfg = {
     cfg.log with
     output = Option.unopt ~default:cfg.log.output log_output ;
   }
@@ -610,7 +618,8 @@ let update
         bootstrap_threshold
   }
   in
-  return { data_dir ; p2p ; rpc ; log ; shell }
+  let internal_events = cfg.internal_events in
+  return { data_dir ; p2p ; rpc ; log ; internal_events ; shell }
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let addr, port = P2p_point.Id.parse_addr_port peer in

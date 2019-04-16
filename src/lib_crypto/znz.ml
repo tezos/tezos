@@ -96,7 +96,6 @@ module MakeZn (N : INT) (B : sig val b58_prefix : string end) : ZN = struct
 
   include Helpers.MakeB58(struct
       type nonrec t = t
-      let title = title
       let name = name
       let b58check_encoding = b58check_encoding
     end)

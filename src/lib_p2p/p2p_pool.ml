@@ -32,7 +32,7 @@
 
 (* TODO allow to track "requested peer_ids" when we reconnect to a point. *)
 
-include Logging.Make (struct let name = "p2p.connection-pool" end)
+include Internal_event.Legacy_logging.Make (struct let name = "p2p.connection-pool" end)
 
 type 'msg encoding = Encoding : {
     tag: int ;
@@ -175,6 +175,7 @@ module Answerer = struct
     } in
     st.worker <-
       Lwt_utils.worker "answerer"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
     st

@@ -74,5 +74,5 @@
 
 (alias
  (name runtest_sandbox)
- (deps .tezos_protocol_004_Pt24m4xi.objs/tezos_protocol_004_Pt24m4xi.cmx))
+ (deps .tezos_protocol_004_Pt24m4xi.objs/native/tezos_protocol_004_Pt24m4xi.cmx))
 

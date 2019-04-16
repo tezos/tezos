@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.signer" end)
+include Internal_event.Legacy_logging.Make_semantic
+    (struct let name = "client.signer" end)
 
 let host_name = Tag.def ~doc:"Host name" "host" Format.pp_print_text
 let service_name = Tag.def ~doc:"Service name" "service" Format.pp_print_text

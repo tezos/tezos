@@ -25,9 +25,6 @@
 
 open Proto_alpha
 open Alpha_context
-open Logging
-
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.blocks" end)
 
 type block_info = {
   hash: Block_hash.t ;
@@ -64,31 +61,78 @@ let info cctxt ?(chain = `Main) block =
     cctxt ~chain ~block () >>=? fun shell_header  ->
   raw_info cctxt ~chain hash shell_header
 
+
+module Block_seen_event = struct
+  type t = {
+    hash : Block_hash.t ;
+    header : Tezos_base.Block_header.t ;
+    occurrence : [ `Valid_blocks of Chain_id.t | `Heads ]
+  }
+  let make hash header occurrence () = { hash ; header ; occurrence }
+  module Definition = struct
+    let name = "block-seen"
+    type nonrec t = t
+    let encoding =
+      let open Data_encoding in
+      let v0_encoding =
+        conv
+          (function { hash ; header ; occurrence } ->
+             (hash, occurrence, header))
+          (fun (b, o, h) -> make b h o ())
+          (obj3
+             (req "hash" Block_hash.encoding)
+             (* Occurrence has to come before header, because:
+                (Invalid_argument
+                   "Cannot merge two objects when the left element is of
+                    variable length and the right one of dynamic
+                    length. You should use the reverse order, or wrap the
+                    second one with Data_encoding.dynamic_size.") *)
+             (req "occurrence"
+                (union [
+                    case ~title:"heads" (Tag 0)
+                      (obj1 (req "occurrence-kind" (constant "heads")))
+                      (function `Heads -> Some () | _ -> None)
+                      (fun () -> `Heads) ;
+                    case ~title:"valid-blocks" (Tag 1)
+                      (obj2
+                         (req "occurrence-kind" (constant "valid-blocks"))
+                         (req "chain-id" Chain_id.encoding))
+                      (function `Valid_blocks ch -> Some ((), ch) | _ -> None)
+                      (fun ((), ch) ->`Valid_blocks ch) ;
+                  ]))
+             (req "header" Tezos_base.Block_header.encoding)
+          )
+      in
+      With_version.(encoding ~name (first_version v0_encoding))
+    let pp ppf { hash ; _ } =
+      Format.fprintf ppf "Saw block %a" Block_hash.pp_short hash
+    let doc = "Block observed while monitoring a blockchain."
+    include Internal_event.Event_defaults
+  end
+  module Event = Internal_event.Make(Definition)
+end
+
+
 let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
   Monitor_services.valid_blocks cctxt
     ?chains ?protocols ?next_protocols () >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun ((chain, block), data) ->
-               log_info Tag.DSL.(fun f ->
-                   f "Saw block %a on chain %a"
-                   -% t event "monitor_saw_valid_block"
-                   -% a Block_hash.Logging.tag block
-                   -% a State_logging.chain_id chain
-                   -% t block_header_tag data) ;
-               raw_info cctxt ~chain:(`Hash chain) block data.Tezos_base.Block_header.shell)
+            (fun ((chain, block), header) ->
+               Block_seen_event.(Event.emit
+                                   (make block header (`Valid_blocks chain)))
+               >>=? fun () ->
+               raw_info cctxt ~chain:(`Hash chain) block
+                 header.Tezos_base.Block_header.shell)
             block_stream)
 
 let monitor_heads cctxt ~next_protocols chain =
   Monitor_services.heads
     cctxt ?next_protocols chain >>=? fun (block_stream, _stop) ->
   return (Lwt_stream.map_s
-            (fun (block, data) ->
-               log_info Tag.DSL.(fun f ->
-                   f "Saw head %a"
-                   -% t event "monitor_saw_head"
-                   -% a Block_hash.Logging.tag block
-                   -% t block_header_tag data) ;
-               raw_info cctxt ~chain block data.Tezos_base.Block_header.shell)
+            (fun (block, ({ Tezos_base.Block_header.shell } as header)) ->
+               Block_seen_event.(Event.emit (make block header `Heads))
+               >>=? fun () ->
+               raw_info cctxt ~chain block shell)
             block_stream)
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =

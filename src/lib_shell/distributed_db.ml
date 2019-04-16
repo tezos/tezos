@@ -26,8 +26,6 @@
 
 module Message = Distributed_db_message
 
-include Logging.Make(struct let name = "node.distributed_db" end)
-
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 type connection = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
 
@@ -514,7 +512,8 @@ module P2p_reader = struct
         f chain_db
 
   module Handle_msg_Logging =
-    Tezos_stdlib.Logging.Make_semantic(struct let name = "node.distributed_db.p2p_reader" end)
+    Internal_event.Legacy_logging.Make_semantic
+      (struct let name = "node.distributed_db.p2p_reader" end)
 
   let handle_msg global_db state msg =
 
@@ -799,6 +798,7 @@ module P2p_reader = struct
       Lwt_utils.worker
         (Format.asprintf "db_network_reader.%a"
            P2p_peer.Id.pp_short gid)
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop db state)
         ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
     P2p_peer.Table.add db.p2p_readers gid state

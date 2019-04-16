@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make(struct let name = "p2p" end)
+include Internal_event.Legacy_logging.Make(struct
+    let name = "p2p"
+  end)
 
 type 'peer_meta peer_meta_config = 'peer_meta P2p_pool.peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t ;

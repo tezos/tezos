@@ -38,7 +38,7 @@ module Event : sig
     | Validation_success of Request.view * Worker_types.request_status
     | Validation_failure of Request.view * Worker_types.request_status * error list
     | Debug of string
-  val level : t -> Logging.level
+  val level : t -> Internal_event.level
   val encoding : t Data_encoding.encoding
   val pp : Format.formatter -> t -> unit
 end

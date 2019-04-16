@@ -54,4 +54,4 @@ val running_workers: unit -> ((Chain_id.t * P2p_peer.Id.t) * t) list
 val status: t -> Worker_types.worker_status
 
 val current_request : t -> (Time.t * Time.t * Peer_validator_worker_state.Request.view) option
-val last_events : t -> (Lwt_log_core.level * Peer_validator_worker_state.Event.t list) list
+val last_events : t -> (Internal_event.level * Peer_validator_worker_state.Event.t list) list

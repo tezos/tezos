@@ -26,7 +26,7 @@
 
 (* TODO test `close ~wait:true`. *)
 
-include Logging.Make(struct let name = "p2p.connection" end)
+include Internal_event.Legacy_logging.Make(struct let name = "p2p.connection" end)
 
 module Crypto = struct
 
@@ -408,6 +408,7 @@ module Reader = struct
     end ;
     st.worker <-
       Lwt_utils.worker "reader"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st None)
         ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st
@@ -533,6 +534,7 @@ module Writer = struct
     end ;
     st.worker <-
       Lwt_utils.worker "writer"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st

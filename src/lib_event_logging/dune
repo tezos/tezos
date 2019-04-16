@@ -1,0 +1,16 @@
+(library
+ (name tezos_event_logging)
+ (public_name tezos-event-logging)
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_data_encoding
+                   -open Tezos_error_monad
+                   -safe-string))
+ (libraries tezos-stdlib
+            tezos-data-encoding
+            tezos-error-monad
+            lwt))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

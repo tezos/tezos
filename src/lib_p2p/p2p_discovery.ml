@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "p2p.discovery" end)
+include Internal_event.Legacy_logging.Make(struct
+    let name = "p2p.discovery"
+  end)
 
 type pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> pool
 
@@ -138,6 +140,7 @@ module Answer = struct
   let activate st =
     st.worker <-
       Lwt_utils.worker "discovery_answer"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
 
@@ -243,6 +246,7 @@ module Sender = struct
   let activate st =
     st.worker <-
       Lwt_utils.worker "discovery_sender"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:begin fun () -> worker_loop Config.initial st end
         ~cancel:begin fun () -> Lwt_canceler.cancel st.canceler end
 

@@ -25,7 +25,9 @@
 
 open Client_keys
 
-include Tezos_stdlib.Logging.Make(struct let name = "client.signer.ledger" end)
+include Internal_event.Legacy_logging.Make(struct
+    let name = "client.signer.ledger"
+  end)
 
 let scheme = "ledger"
 

@@ -31,4 +31,5 @@ let () =
     "read_failure", Read_failure.tests ;
     "write_failure", Write_failure.tests ;
     "randomized", Randomized.tests ;
+    "versioned", Versioned.tests ;
   ]

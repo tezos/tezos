@@ -25,7 +25,9 @@
 
 (* TODO decide whether we need to preallocate buffers or not. *)
 
-include Logging.Make (struct let name = "p2p.io-scheduler" end)
+include Internal_event.Legacy_logging.Make (struct
+    let name = "p2p.io-scheduler"
+  end)
 
 let alpha = 0.2
 
@@ -178,6 +180,7 @@ module Scheduler(IO : IO) = struct
     } in
     st.worker <-
       Lwt_utils.worker IO.name
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st

@@ -23,30 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let level_encoding =
-  let open Logging in
-  let open Data_encoding in
-  conv
-    (function
-      | Fatal -> "fatal"
-      | Error -> "error"
-      | Warning -> "warning"
-      | Notice -> "notice"
-      | Info -> "info"
-      | Debug -> "debug")
-    (function
-      | "error" -> Error
-      | "warn" -> Warning
-      | "notice" -> Notice
-      | "info" -> Info
-      | "debug" -> Debug
-      | "fatal" -> Fatal
-      | _ -> invalid_arg "Logging.level")
-    string
-
 type limits =
   { backlog_size : int ;
-    backlog_level : Logging.level ;
+    backlog_level : Internal_event.level ;
     zombie_lifetime : float ;
     zombie_memory : float }
 
@@ -119,7 +98,7 @@ let request_status_encoding =
 type ('req, 'evt) full_status =
   { status : worker_status ;
     pending_requests : (Time.t * 'req) list ;
-    backlog : (Logging.level * 'evt list) list ;
+    backlog : (Internal_event.level * 'evt list) list ;
     current_request : (Time.t * Time.t * 'req) option }
 
 let full_status_encoding req_encoding evt_encoding error_encoding =
@@ -132,7 +111,7 @@ let full_status_encoding req_encoding evt_encoding error_encoding =
   let events_encoding =
     list
       (obj2
-         (req "level" level_encoding)
+         (req "level" Internal_event.Level.encoding)
          (req "events" (dynamic_size (list (dynamic_size evt_encoding))))) in
   let current_request_encoding =
     obj3

@@ -23,4 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "node.worker" end)
+(** Configure the event-logging framework for UNIx-based applications. *)
+
+(** The JSON-file-friendly definition of the configuration of the
+    internal-events framework. It allows one to activate registered
+    event sinks.  *)
+module Configuration : sig
+  type t
+
+  (** The default configuration is empty (it doesn't activate any sink). *)
+  val default : t
+
+  (** The serialization format. *)
+  val encoding : t RPC_encoding.t
+
+  (** Parse a json file at [path] into a configuration. *)
+  val of_file : string -> t tzresult Lwt.t
+
+  val apply : t -> unit tzresult Lwt.t
+  (** Run {!Tezos_base.Internal_event.All_sinks.activate} for every
+      URI in the configuration. *)
+end
+
+val init :
+  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
+  ?configuration:Configuration.t ->
+  unit ->
+  unit Lwt.t
+(** Initialize the internal-event sinks by looking at the
+    [?configuration] argument and then at the (whitespace separated) list
+    of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI
+    does not have a scheme it is expected to be a path to a configuration
+    JSON file (cf. {!Configuration.of_file}), e.g.:
+    [export TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or
+    [export TEZOS_EVENTS_CONFIG="debug://  /path/to/config.json"].
+
+    The function also initializes the {!Lwt_log_sink_unix} module
+    (corresponding to the ["TEZOS_LOG"] environment variable).
+*)
+
+val close : unit -> unit Lwt.t
+(** Call [close] on all the sinks. *)

@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test-p2p-banned_ip" end)
+include
+  Internal_event.Legacy_logging.Make
+    (struct let name = "test-p2p-banned_ip" end)
 
 let assert_equal ?(eq = (=)) ?prn ~msg a b =
   let msg = match prn with

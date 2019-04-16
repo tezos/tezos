@@ -97,7 +97,8 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
           (function Mempool_result result -> Some result | _ -> None)
           (fun result -> Mempool_result result) ]
 
-  module Log = Tezos_stdlib.Logging.Make(struct
+  module Log =
+    Internal_event.Legacy_logging.Make (struct
       let name = "node.mempool.peer_worker"
     end)
 
@@ -277,10 +278,11 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
       | End_error of (Request.view * Worker_types.request_status * error list)
 
     let level req =
+      let open Internal_event in
       match req with
-      | Start _ -> Logging.Info
-      | End_ok _ -> Logging.Info
-      | End_error _ -> Logging.Error
+      | Start _ -> Info
+      | End_ok _ -> Info
+      | End_error _ -> Error
 
     let encoding =
       let open Data_encoding in

@@ -24,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make(struct let name = "node.snapshots" end)
+include
+  Internal_event.Legacy_logging.Make(struct let name = "node.snapshots" end)
 
 let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"

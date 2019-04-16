@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -810,6 +811,37 @@ let test_unexpand_map_cdadr () =
                     ]))
     (Prim (zero_loc, "MAP_CDADR", code, []))
 
+let test_unexpand_diip_duup1 () =
+  let single code = Seq (zero_loc, [code]) in
+  let cst str = Prim (zero_loc, str, [], []) in
+  let app str code = Prim (zero_loc, str, [code], []) in
+  let dip = app "DIP" in
+  let diip = app "DIIP" in
+  let dup = cst "DUP" in
+  let swap = cst "SWAP" in
+  let dip_dup_swap = Seq (zero_loc, [dip (single dup); swap]) in
+  assert_unexpansion
+    (* { DIP { DIP { DIP { DUP }; SWAP }}} *)
+    (single (dip (single (dip dip_dup_swap))))
+    (* DIIP { DIP { DUP }; SWAP } *)
+    (diip dip_dup_swap)
+
+let test_unexpand_diip_duup2 () =
+  let single code = Seq (zero_loc, [code]) in
+  let cst str = Prim (zero_loc, str, [], []) in
+  let app str code = Prim (zero_loc, str, [code], []) in
+  let dip = app "DIP" in
+  let diip = app "DIIP" in
+  let dup = cst "DUP" in
+  let duup = cst "DUUP" in
+  let swap = cst "SWAP" in
+  let dip_dup_swap = Seq (zero_loc, [dip (single dup); swap]) in
+  assert_unexpansion
+    (* { DIP { DIP {{ DIP { DUP }; SWAP }}}} *)
+    (single (dip (single (dip (single dip_dup_swap)))))
+    (* DIIP { DUUP } *)
+    (diip (single duup))
+
 (*****************************************************************************)
 (* Test           *)
 (*****************************************************************************)
@@ -885,6 +917,8 @@ let tests =
     "set_cdr annot unexpansion",  (fun _ -> Lwt.return (test_unexpand_set_cdr_annot ())) ;
 
     "map_car unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_car ())) ;
+    "diip_duup1 unexpansion", (fun _ -> Lwt.return (test_unexpand_diip_duup1 ())) ;
+    "diip_duup2 unexpansion", (fun _ -> Lwt.return (test_unexpand_diip_duup2 ())) ;
 
     (***********************************************************************)
     (*BUG

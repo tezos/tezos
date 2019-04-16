@@ -113,41 +113,22 @@ module Output = struct
     Format.fprintf fmt "%s" (to_string output)
 end
 
+let default_template = "$(date) - $(section): $(message)"
+
 type cfg = {
   output : Output.t ;
-  default_level : Logging.level ;
+  default_level : Internal_event.level ;
   rules : string option ;
-  template : Logging.template ;
+  template : Lwt_log_core.template ;
 }
 
 let create_cfg
     ?(output = Output.Stderr)
-    ?(default_level = Logging.Notice)
-    ?rules ?(template = Logging.default_template) () =
+    ?(default_level = Internal_event.Notice)
+    ?rules ?(template = default_template) () =
   { output ; default_level ; rules ; template }
 
 let default_cfg = create_cfg ()
-
-let level_encoding =
-  let open Logging in
-  let open Data_encoding in
-  conv
-    (function
-      | Fatal -> "fatal"
-      | Error -> "error"
-      | Warning -> "warning"
-      | Notice -> "notice"
-      | Info -> "info"
-      | Debug -> "debug")
-    (function
-      | "error" -> Error
-      | "warn" -> Warning
-      | "notice" -> Notice
-      | "info" -> Info
-      | "debug" -> Debug
-      | "fatal" -> Fatal
-      | _ -> invalid_arg "Logging.level")
-    string
 
 let cfg_encoding =
   let open Data_encoding in
@@ -164,7 +145,7 @@ let cfg_encoding =
        (dft "level"
           ~description: "Verbosity level: one of 'fatal', 'error', 'warn',\
                          'notice', 'info', 'debug'."
-          level_encoding default_cfg.default_level)
+          Internal_event.Level.encoding default_cfg.default_level)
        (opt "rules"
           ~description: "Fine-grained logging instructions. Same format as \
                          described in `tezos-node run --help`, DEBUG section. \
@@ -178,7 +159,7 @@ let cfg_encoding =
                          http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates."
           string default_cfg.template))
 
-let init ?(template = Logging.default_template) output =
+let init ?(template = default_template) output =
   let open Output in
   begin
     match output with
@@ -212,8 +193,9 @@ let find_log_rules default =
          defined, using TEZOS_LOG.@]@\n@." ;
       "environment varible TEZOS_LOG", Some rules
 
-let init ?(cfg = default_cfg) () =
-  Lwt_log_core.add_rule "*" cfg.default_level ;
+let initialize ?(cfg = default_cfg) () =
+  Lwt_log_core.add_rule "*"
+    (Internal_event.Level.to_lwt_log cfg.default_level) ;
   let origin, rules = find_log_rules cfg.rules in
   begin match rules with
     | None -> Lwt.return_unit
@@ -227,5 +209,4 @@ let init ?(cfg = default_cfg) () =
   end >>= fun () ->
   init ~template:cfg.template cfg.output
 
-let close () =
-  Lwt_log.close !Lwt_log.default
+

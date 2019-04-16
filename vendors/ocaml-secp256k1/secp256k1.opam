@@ -10,7 +10,7 @@ synopsis: "Bindings to secp256k1 internal functions"
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 depends: [
   "conf-gmp" {build}
-  "dune" {build & >= "1.0.1"}
+  "dune" {build & >= "1.7"}
   "cstruct" {>= "3.2.1"}
   "bigstring" {>= "0.1.1"}
 ]

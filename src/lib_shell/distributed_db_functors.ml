@@ -365,7 +365,8 @@ module Make_request_scheduler
 
 end = struct
 
-  include Logging.Make_semantic(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
+  include Internal_event.Legacy_logging.Make_semantic
+      (struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
 
   type key = Hash.t
 
@@ -604,6 +605,7 @@ end = struct
     } in
     state.worker <-
       Lwt_utils.worker "db_request_scheduler"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop state)
         ~cancel:(fun () -> Lwt_canceler.cancel state.canceler) ;
     state

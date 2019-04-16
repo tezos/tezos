@@ -25,7 +25,7 @@
 
 open Validation_errors
 
-include Logging.Make_semantic(struct let name = "node.validator.block" end)
+include Internal_event.Legacy_logging.Make_semantic(struct let name = "node.validator.block" end)
 
 type 'a request =
   | Request_validation: {
@@ -107,6 +107,7 @@ let create db =
   end ;
   bv.worker <-
     Lwt_utils.worker "block_validator"
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop bv)
       ~cancel:(fun () -> Lwt_canceler.cancel bv.canceler) ;
   bv

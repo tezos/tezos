@@ -23,6 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "node.state" end)
+include Internal_event.Legacy_logging.Make_semantic(struct let name = "node.state" end)
 
 let chain_id = Tag.def ~doc:"Chain ID" "chain_id" Chain_id.pp

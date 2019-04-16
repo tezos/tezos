@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test-p2p-io-scheduler" end)
+include Internal_event.Legacy_logging.Make (struct
+    let name = "test-p2p-io-scheduler"
+  end)
 
 exception Error of error list
 
@@ -157,7 +159,7 @@ let run
     ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size
     addr port time n =
-  Logging_unix.init () >>= fun () ->
+  Internal_event_unix.init () >>= fun () ->
   listen ?port addr >>= fun (main_socket, port) ->
   Process.detach ~prefix:"server: " begin fun _ ->
     server

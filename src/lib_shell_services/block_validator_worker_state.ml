@@ -58,9 +58,9 @@ module Event = struct
 
   let level req =
     match req with
-    | Debug _ -> Logging.Debug
+    | Debug _ -> Internal_event.Debug
     | Validation_success _
-    | Validation_failure _ -> Logging.Notice
+    | Validation_failure _ -> Internal_event.Notice
 
   let encoding =
     let open Data_encoding in

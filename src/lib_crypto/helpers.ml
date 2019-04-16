@@ -68,7 +68,6 @@ end
 
 module MakeB58(H : sig
     type t
-    val title: string
     val name: string
     val b58check_encoding: t Base58.encoding
   end) = struct
@@ -196,6 +195,23 @@ module MakeIterator(H : sig
         (fun l -> List.fold_left (fun m (k,v) -> add k v m) empty l)
         Data_encoding.(list (tup2 H.encoding arg_encoding))
   end
+
+  module WeakRingTable = struct
+    include WeakRingTable.Make(struct
+        type t = H.t
+        let hash = H.hash
+        let equal = H.equal
+      end)
+    let encoding arg_encoding =
+      Data_encoding.conv
+        (fun h -> fold (fun k v l -> (k, v) :: l) h [])
+        (fun l ->
+           let h = create (List.length l) in
+           List.iter (fun (k,v) -> add h k v) l ;
+           h)
+        Data_encoding.(list (tup2 H.encoding arg_encoding))
+  end
+
 
 end
 

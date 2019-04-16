@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test.p2p.connection-pool" end)
+include
+  Internal_event.Legacy_logging.Make
+    (struct let name = "test.p2p.connection-pool" end)
 
 type message =
   | Ping

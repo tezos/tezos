@@ -6,6 +6,7 @@
                    -open Tezos_stdlib
                    -open Tezos_error_monad))
  (libraries tezos-stdlib
+            lwt.unix
             tezos-error-monad))
 
 (alias

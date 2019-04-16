@@ -249,7 +249,8 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
     match verbosity with
     | None -> config.log
     | Some default_level -> { config.log with default_level } in
-  Logging_unix.init ~cfg:log_cfg () >>= fun () ->
+  Internal_event_unix.init ~lwt_log_sink:log_cfg
+    ~configuration:config.internal_events () >>= fun () ->
   Updater.init (protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node ?sandbox ?checkpoint config >>=? fun node ->
@@ -261,15 +262,16 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
   Lwt_list.iter_s RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
-  Logging_unix.close () >>= fun () ->
+  Internal_event_unix.close () >>= fun () ->
   return_unit
 
 let process sandbox verbosity checkpoint args =
   let verbosity =
+    let open Internal_event in
     match verbosity with
     | [] -> None
-    | [_] -> Some Logging.Info
-    | _ -> Some Logging.Debug in
+    | [_] -> Some Info
+    | _ -> Some Debug in
   let run =
     Node_shared_arg.read_and_patch_config_file
       ~ignore_bootstrap_peers:(match sandbox with
@@ -384,7 +386,9 @@ module Manpage = struct
   ]
 
   let debug =
-    let log_sections = String.concat " " (List.rev !Logging.sections) in
+    let log_sections =
+      String.concat " "
+        (List.rev !Internal_event.Legacy_logging.sections) in
     [
       `S "DEBUG" ;
       `P ("The environment variable $(b,TEZOS_LOG) is used to fine-tune \

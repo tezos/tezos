@@ -60,8 +60,8 @@ module Event = struct
 
   let level req =
     match req with
-    | Debug _ -> Logging.Debug
-    | Request _ -> Logging.Info
+    | Debug _ -> Internal_event.Debug
+    | Request _ -> Internal_event.Info
 
   let encoding =
     let open Data_encoding in

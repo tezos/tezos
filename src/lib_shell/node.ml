@@ -25,7 +25,49 @@
 (*****************************************************************************)
 
 open Lwt.Infix
-open Worker_logging
+open Tezos_base
+
+module Initialization_event = struct
+  type t = {
+    time_stamp : float ;
+    status : [ `P2p_layer_disabled | `Bootstrapping | `P2p_maintain_started ] ;
+  }
+  let status_names = [
+    "p2p_layer_disabled", `P2p_layer_disabled ;
+    "bootstrapping", `Bootstrapping ;
+    "p2p_maintain_started", `P2p_maintain_started ;
+  ]
+  module Definition = struct
+    let name = "shell-node"
+    type nonrec t = t
+    let encoding =
+      let open Data_encoding in
+      let v0_encoding =
+        conv
+          (function { time_stamp ; status } -> time_stamp, status)
+          (fun (time_stamp, status) -> { time_stamp ; status } )
+          (obj2
+             (req "time-stamp" float)
+             (req "status"
+                (string_enum status_names))) in
+      With_version.(encoding ~name (first_version v0_encoding))
+    let pp ppf { status ; _ } =
+      Format.fprintf ppf "%s initialization: %s"
+        name (List.find (fun (_, s) -> s = status) status_names |> fst)
+    let doc = "Status of the initialization of the P2P layer."
+    let legacy_section _ = Lwt_log_core.Section.make "node.worker"
+    let level _ = Internal_event.Notice
+  end
+  module Event = Internal_event.Make(Definition)
+  let lwt_emit status =
+    let time_stamp = Unix.gettimeofday () in
+    Event.emit (fun () -> { time_stamp ; status }) >>= function
+    | Ok () -> Lwt.return_unit
+    | Error el ->
+        Format.kasprintf Lwt.fail_with "Initialization_event.emit: %a"
+          pp_print_error el
+end
+
 
 type t = {
   state: State.t ;
@@ -63,14 +105,12 @@ let init_p2p ?(sandboxed = false) p2p_params =
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None in
-      lwt_log_notice Tag.DSL.(fun f ->
-          f "P2P layer is disabled" -% t event "p2p_disabled") >>= fun () ->
+      Initialization_event.lwt_emit `P2p_layer_disabled >>= fun () ->
       return (P2p.faked_network Distributed_db_message.cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      lwt_log_notice Tag.DSL.(fun f ->
-          f "bootstrapping chain..." -% t event "bootstrapping_chain") >>= fun () ->
+      Initialization_event.lwt_emit `Bootstrapping >>= fun () ->
       let message_cfg =
         if sandboxed then
           { Distributed_db_message.cfg with
@@ -83,6 +123,7 @@ let init_p2p ?(sandboxed = false) p2p_params =
         conn_metadata_cfg
         message_cfg >>=? fun p2p ->
       Lwt.async (fun () -> P2p.maintain p2p) ;
+      Initialization_event.lwt_emit `P2p_maintain_started >>= fun () ->
       return p2p
 
 type config = {
@@ -123,7 +164,7 @@ let default_block_validator_limits = {
   protocol_timeout = 120. ;
   worker_limits = {
     backlog_size = 1000 ;
-    backlog_level = Logging.Debug ;
+    backlog_level = Internal_event.Debug ;
     zombie_lifetime = 3600. ;
     zombie_memory = 1800. ;
   }
@@ -133,7 +174,7 @@ let default_prevalidator_limits = {
   max_refused_operations = 1000 ;
   worker_limits = {
     backlog_size = 1000 ;
-    backlog_level = Logging.Info ;
+    backlog_level = Internal_event.Info ;
     zombie_lifetime = 600. ;
     zombie_memory = 120. ;
   }
@@ -145,7 +186,7 @@ let default_peer_validator_limits = {
   new_head_request_timeout = 90. ;
   worker_limits = {
     backlog_size = 1000 ;
-    backlog_level = Logging.Info ;
+    backlog_level = Internal_event.Info ;
     zombie_lifetime = 600. ;
     zombie_memory = 120. ;
   }
@@ -154,7 +195,7 @@ let default_chain_validator_limits = {
   bootstrap_threshold = 4 ;
   worker_limits = {
     backlog_size = 1000 ;
-    backlog_level = Logging.Info ;
+    backlog_level = Internal_event.Info ;
     zombie_lifetime = 600. ;
     zombie_memory = 120. ;
   }
@@ -170,7 +211,12 @@ let may_update_checkpoint chain_state checkpoint =
       Chain.set_head chain_state new_head >>= fun _old_head ->
       State.Chain.set_checkpoint chain_state checkpoint
 
+module Local_logging =
+  Internal_event.Legacy_logging.Make_semantic
+    (struct let name = "node.worker" end)
+
 let store_known_protocols state =
+  let open Local_logging in
   let embedded_protocols = Registered_protocol.list_embedded () in
   Lwt_list.iter_s
     (fun protocol_hash ->

@@ -8,7 +8,7 @@
             re
             zarith
             lwt
-            lwt.log)
+            lwt_log)
  (flags (:standard -safe-string)))
 
 (alias

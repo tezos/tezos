@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.denunciation" end)
+include Internal_event.Legacy_logging.Make_semantic(struct
+    let name = Proto_alpha.Name.name ^ ".client.denunciation"
+  end)
 
 open Proto_alpha
 open Alpha_context

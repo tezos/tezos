@@ -146,7 +146,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          (req "protocol_data" Proto.operation_data_encoding)
       )
 
-  module Log = Tezos_stdlib.Logging.Make(struct
+  module Log = Internal_event.Legacy_logging.Make(struct
       let name = "node.mempool_validator"
     end)
 
@@ -188,8 +188,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
     let level req =
       match req with
-      | Debug _ -> Logging.Debug
-      | Request _ -> Logging.Info
+      | Debug _ -> Internal_event.Debug
+      | Request _ -> Internal_event.Info
 
     let encoding =
       let open Data_encoding in
