@@ -19,7 +19,7 @@ depends: [
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-build-test: [
+run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
 synopsis: "Tezos/Protocol: demo (protocol-specific commands for `tezos-client`)"
