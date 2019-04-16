@@ -100,9 +100,10 @@ Build from sources
    source ./src/bin_client/bash-completion.sh
    export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 
-Numerous shell scripts also rely on jq:
+For development, numerous shell scripts also rely on jq:
 
 ::
+
    sudo apt install -y jq
 
 
