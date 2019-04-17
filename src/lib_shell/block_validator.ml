@@ -28,7 +28,7 @@ open Block_validator_worker_state
 open Block_validator_errors
 
 type limits = {
-  protocol_timeout: float ;
+  protocol_timeout: Ptime.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 

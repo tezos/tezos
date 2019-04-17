@@ -169,7 +169,7 @@ module type T = sig
   (** Creates a new worker instance.
       Parameter [queue_size] not passed means unlimited queue. *)
   val launch :
-    'kind table -> ?timeout:float ->
+    'kind table -> ?timeout:Ptime.Span.t ->
     Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
     'kind t tzresult Lwt.t
@@ -296,7 +296,7 @@ module Make
 
   and 'kind t = {
     limits : Worker_types.limits ;
-    timeout : float option ;
+    timeout : Ptime.Span.t option ;
     parameters : Types.parameters ;
     mutable (* only for init *) worker : unit Lwt.t ;
     mutable (* only for init *) state : Types.state option ;
@@ -453,21 +453,21 @@ module Make
           return_some m
       | Some timeout ->
           Lwt_pipe.pop_with_timeout
-            (Lwt_unix.sleep timeout) message_queue >>= fun m ->
-          return m in
-    let pop_dropbox message_box =
-      match w.timeout with
-      | None ->
-          Lwt_dropbox.take message_box >>= fun m ->
-          return_some m
-      | Some timeout ->
-          Lwt_dropbox.take_with_timeout
-            (Lwt_unix.sleep timeout) message_box >>= fun m ->
+            (Systime_os.sleep timeout) message_queue >>= fun m ->
           return m in
     match w.buffer with
     | Queue_buffer message_queue -> pop_queue message_queue
     | Bounded_buffer message_queue -> pop_queue message_queue
-    | Dropbox_buffer message_box -> pop_dropbox message_box
+    | Dropbox_buffer message_box ->
+        match w.timeout with
+        | None ->
+            Lwt_dropbox.take message_box >>= fun m ->
+            return_some m
+        | Some timeout ->
+            Lwt_dropbox.take_with_timeout
+              (Systime_os.sleep timeout) message_box >>= fun m ->
+            return m
+
   let trigger_shutdown w =
     Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
@@ -594,7 +594,7 @@ module Make
 
   let launch
     : type kind.
-      kind table -> ?timeout:float ->
+      kind table -> ?timeout:Ptime.Span.t ->
       Worker_types.limits -> Name.t -> Types.parameters ->
       (module HANDLERS with type self = kind t) ->
       kind t tzresult Lwt.t

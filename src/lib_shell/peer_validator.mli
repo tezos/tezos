@@ -27,10 +27,10 @@
 type t
 
 type limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Ptime.Span.t ;
+  block_header_timeout: Ptime.Span.t ;
+  block_operations_timeout: Ptime.Span.t ;
+  protocol_timeout: Ptime.Span.t ;
   worker_limits: Worker_types.limits
 }
 

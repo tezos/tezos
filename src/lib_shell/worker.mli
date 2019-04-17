@@ -214,7 +214,7 @@ module type T = sig
   (** Creates a new worker instance.
       Parameter [queue_size] not passed means unlimited queue. *)
   val launch :
-    'kind table -> ?timeout:float ->
+    'kind table -> ?timeout:Ptime.Span.t ->
     Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
     'kind t tzresult Lwt.t

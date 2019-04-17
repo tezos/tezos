@@ -53,7 +53,7 @@ type t
 
 type limits = {
   max_refused_operations : int ;
-  operation_timeout : float ;
+  operation_timeout : Ptime.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 

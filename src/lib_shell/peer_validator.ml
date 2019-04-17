@@ -55,10 +55,10 @@ module Request = struct
 end
 
 type limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Ptime.Span.t ;
+  block_header_timeout: Ptime.Span.t ;
+  block_operations_timeout: Ptime.Span.t ;
+  protocol_timeout: Ptime.Span.t ;
   worker_limits: Worker_types.limits
 }
 
@@ -261,7 +261,7 @@ let on_no_request w =
   let pv = Worker.state w in
   debug w "no new head from peer %a for %g seconds."
     P2p_peer.Id.pp_short pv.peer_id
-    pv.parameters.limits.new_head_request_timeout ;
+    (Ptime.Span.to_float_s pv.parameters.limits.new_head_request_timeout) ;
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
   return_unit
 

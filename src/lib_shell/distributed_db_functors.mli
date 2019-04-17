@@ -69,7 +69,7 @@ module type DISTRIBUTED_DB = sig
   val prefetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Ptime.Span.t ->
     key -> param -> unit
 
   (** Return the value if it is known locally, or block until the data
@@ -89,7 +89,7 @@ module type DISTRIBUTED_DB = sig
   val fetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Ptime.Span.t ->
     key -> param -> value tzresult Lwt.t
 
   (** Remove the data from the local index or cancel all pending
@@ -180,7 +180,7 @@ end
 module type REQUEST = sig
   type key
   type param
-  val initial_delay : float
+  val initial_delay : Ptime.Span.t
   val active : param -> P2p_peer.Set.t
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end

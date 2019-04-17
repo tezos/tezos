@@ -370,7 +370,7 @@ let worker_limits_encoding
           Internal_event.Level.encoding default_level))
 
 let timeout_encoding =
-  Data_encoding.ranged_float 0. 500.
+  Time.System.Span.encoding
 
 let block_validator_limits_encoding =
   let open Data_encoding in

@@ -37,18 +37,18 @@ val shutdown: t -> unit Lwt.t
 val fetch_and_compile_protocol:
   t ->
   ?peer:P2p_peer.Id.t ->
-  ?timeout:float ->
+  ?timeout:Ptime.Span.t ->
   Protocol_hash.t -> Registered_protocol.t tzresult Lwt.t
 
 val fetch_and_compile_protocols:
   t ->
   ?peer:P2p_peer.Id.t ->
-  ?timeout:float ->
+  ?timeout:Ptime.Span.t ->
   State.Block.t -> unit tzresult Lwt.t
 
 val prefetch_and_compile_protocols:
   t ->
   ?peer:P2p_peer.Id.t ->
-  ?timeout:float ->
+  ?timeout:Ptime.Span.t ->
   State.Block.t -> unit
 

@@ -54,7 +54,7 @@ module Make_raw
     (Request_message : sig
        type param
        val max_length : int
-       val initial_delay : float
+       val initial_delay : Ptime.Span.t
        val forge : param -> Hash.t list -> Message.t
      end)
     (Precheck : Distributed_db_functors.PRECHECK
@@ -123,7 +123,7 @@ module Raw_operation =
     (struct
       type param = unit
       let max_length = 10
-      let initial_delay = 0.5
+      let initial_delay = Time.System.Span.of_seconds_exn 0.5
       let forge () keys = Message.Get_operations keys
     end)
     (struct
@@ -152,7 +152,7 @@ module Raw_block_header =
     (struct
       type param = unit
       let max_length = 10
-      let initial_delay = 0.5
+      let initial_delay = Time.System.Span.of_seconds_exn 0.5
       let forge () keys = Message.Get_block_headers keys
     end)
     (struct
@@ -205,7 +205,7 @@ module Raw_operation_hashes = struct
       (struct
         type param = unit
         let max_length = 10
-        let initial_delay = 1.
+        let initial_delay = Time.System.Span.of_seconds_exn 1.
         let forge () keys =
           Message.Get_operation_hashes_for_blocks keys
       end)
@@ -266,7 +266,7 @@ module Raw_operations = struct
       (struct
         type param = unit
         let max_length = 10
-        let initial_delay = 1.
+        let initial_delay = Time.System.Span.of_seconds_exn 1.
         let forge () keys =
           Message.Get_operations_for_blocks keys
       end)
@@ -307,7 +307,7 @@ module Raw_protocol =
     (Protocol_hash.Table)
     (struct
       type param = unit
-      let initial_delay = 10.
+      let initial_delay = Time.System.Span.of_seconds_exn 10.
       let max_length = 10
       let forge () keys = Message.Get_protocols keys
     end)

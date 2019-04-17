@@ -138,21 +138,21 @@ type config = {
 }
 
 and peer_validator_limits = Peer_validator.limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Ptime.Span.t ;
+  block_header_timeout: Ptime.Span.t ;
+  block_operations_timeout: Ptime.Span.t ;
+  protocol_timeout: Ptime.Span.t ;
   worker_limits: Worker_types.limits
 }
 
 and prevalidator_limits = Prevalidator.limits = {
   max_refused_operations: int ;
-  operation_timeout: float ;
+  operation_timeout: Ptime.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 
 and block_validator_limits = Block_validator.limits = {
-  protocol_timeout: float ;
+  protocol_timeout: Ptime.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 
@@ -162,14 +162,14 @@ and chain_validator_limits = Chain_validator.limits = {
 }
 
 let default_block_validator_limits = {
-  protocol_timeout = 120. ;
+  protocol_timeout = Time.System.Span.of_seconds_exn 120. ;
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Debug ;
   }
 }
 let default_prevalidator_limits = {
-  operation_timeout = 10. ;
+  operation_timeout = Time.System.Span.of_seconds_exn 10. ;
   max_refused_operations = 1000 ;
   worker_limits = {
     backlog_size = 1000 ;
@@ -177,10 +177,10 @@ let default_prevalidator_limits = {
   }
 }
 let default_peer_validator_limits = {
-  block_header_timeout = 60. ;
-  block_operations_timeout = 60. ;
-  protocol_timeout = 120. ;
-  new_head_request_timeout = 90. ;
+  block_header_timeout = Time.System.Span.of_seconds_exn 60. ;
+  block_operations_timeout = Time.System.Span.of_seconds_exn 60. ;
+  protocol_timeout = Time.System.Span.of_seconds_exn 120. ;
+  new_head_request_timeout = Time.System.Span.of_seconds_exn 90. ;
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
