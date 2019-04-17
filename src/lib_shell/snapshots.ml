@@ -190,26 +190,26 @@ let compute_export_limit
 let pruned_block_iterator index block_store limit
   : (Block_header.t -> (Context.Pruned_block.t option * Context.Protocol_data.t option) tzresult Lwt.t) =
   fun header ->
-  if header.Block_header.shell.level <= limit then
-    Context.get_protocol_data_from_header index header >>= fun protocol_data ->
-    return (None, Some protocol_data)
-  else
-    let pred_hash = header.Block_header.shell.predecessor in
-    Store.Block.Header.read (block_store, pred_hash) >>=? fun pred_header ->
-    Store.Block.Operations.bindings (block_store, pred_hash) >>= fun pred_operations ->
-    Store.Block.Operation_hashes.bindings (block_store, pred_hash) >>= fun pred_operation_hashes ->
-    let pruned_block = {
-      Context.Pruned_block.block_header = pred_header ;
-      operations = pred_operations ;
-      operation_hashes = pred_operation_hashes ;
-    } in
-    let header_proto_level = header.Block_header.shell.proto_level in
-    let pred_header_proto_level = pred_header.Block_header.shell.proto_level in
-    if header_proto_level <> pred_header_proto_level then
-      Context.get_protocol_data_from_header index header >>= fun proto_data ->
-      return (Some pruned_block, Some proto_data)
+    if header.Block_header.shell.level <= limit then
+      Context.get_protocol_data_from_header index header >>= fun protocol_data ->
+      return (None, Some protocol_data)
     else
-      return (Some pruned_block, None)
+      let pred_hash = header.Block_header.shell.predecessor in
+      Store.Block.Header.read (block_store, pred_hash) >>=? fun pred_header ->
+      Store.Block.Operations.bindings (block_store, pred_hash) >>= fun pred_operations ->
+      Store.Block.Operation_hashes.bindings (block_store, pred_hash) >>= fun pred_operation_hashes ->
+      let pruned_block = {
+        Context.Pruned_block.block_header = pred_header ;
+        operations = pred_operations ;
+        operation_hashes = pred_operation_hashes ;
+      } in
+      let header_proto_level = header.Block_header.shell.proto_level in
+      let pred_header_proto_level = pred_header.Block_header.shell.proto_level in
+      if header_proto_level <> pred_header_proto_level then
+        Context.get_protocol_data_from_header index header >>= fun proto_data ->
+        return (Some pruned_block, Some proto_data)
+      else
+        return (Some pruned_block, None)
 
 let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
   let context_root = context_dir data_dir in
