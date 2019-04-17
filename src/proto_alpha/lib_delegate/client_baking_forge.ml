@@ -974,8 +974,8 @@ let build_block
       in
       if Protocol_hash.(Proto_alpha.hash <> next_version) then
         (* Let the shell validate this *)
-        shell_prevalidation cctxt ~chain ~block seed_nonce_hash
-          operations slot
+        shell_prevalidation
+          cctxt ~chain ~block seed_nonce_hash operations slot
       else
         let endorsements = List.nth operations endorsements_index in
         Lwt_list.fold_left_s (fun sum op ->
@@ -1006,8 +1006,8 @@ let build_block
               lwt_log_notice Tag.DSL.(fun f ->
                   f "Building a block using shell validation"
                   -% t event "shell_prevalidation_notice") >>= fun () ->
-              shell_prevalidation cctxt ~chain ~block seed_nonce_hash
-                operations slot
+              shell_prevalidation
+                cctxt ~chain ~block seed_nonce_hash operations slot
           | Ok (final_context, (validation_result, _), operations) ->
               lwt_debug Tag.DSL.(fun f ->
                   f "Try forging locally the block header for %a (slot %d) for %s (%a)"
@@ -1031,8 +1031,9 @@ let build_block
                 lwt_log_notice Tag.DSL.(fun f ->
                     f "New protocol detected: using shell validation"
                     -% t event "shell_prevalidation_notice") >>= fun () ->
-                shell_prevalidation cctxt ~chain ~block seed_nonce_hash
-                  operations slot end
+                shell_prevalidation
+                  cctxt ~chain ~block seed_nonce_hash operations slot
+              end
 
 type bake_result =
   | Continue

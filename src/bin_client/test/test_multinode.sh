@@ -5,6 +5,41 @@ set -e
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/test_lib.inc.sh "$@"
 
+parameters_file=$test_dir/protocol_parameters.json
+
+if ! [ -f "$parameters_file" ]; then
+	cat > "$parameters_file" <<EOF
+{ "bootstrap_accounts":
+  [
+      [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
+      [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
+      [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
+      [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
+      [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
+  ],
+  "commitments": [
+    [ "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
+    [ "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
+    [ "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
+    [ "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
+    [ "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
+    [ "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
+    [ "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
+    [ "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
+    [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
+    [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
+  ],
+  "time_between_blocks" : [ "1", "0" ],
+  "blocks_per_cycle" : 128,
+  "blocks_per_roll_snapshot" : 32,
+  "blocks_per_voting_period" : 256,
+  "preserved_cycles" : 1,
+  "proof_of_work_threshold": "-1",
+  "minimum_endorsements_per_priority": []
+}
+EOF
+fi
+
 expected_connections=4
 max_peer_id=8
 for i in $(seq 1 $max_peer_id); do

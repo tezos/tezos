@@ -107,7 +107,8 @@ let protocol_parameters =
   "blocks_per_cycle" : 4,
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
-  "proof_of_work_threshold": "-1"
+  "proof_of_work_threshold": "-1",
+  "minimum_endorsements_per_priority": []
 }
 |json} in
   match json_result with
@@ -130,7 +131,8 @@ let vote_protocol_parameters =
   "blocks_per_roll_snapshot" : 2,
   "preserved_cycles" : 1,
   "blocks_per_voting_period": 2,
-  "proof_of_work_threshold": "-1"
+  "proof_of_work_threshold": "-1",
+  "minimum_endorsements_per_priority": []
 }
 |json} in
   match json_result with
@@ -574,23 +576,35 @@ end
 
 module Endorse = struct
 
+  let signing_slots
+      block
+      delegate
+      level =
+    Alpha_services.Delegate.Endorsing_rights.get
+      !rpc_ctxt ~delegates:[delegate] ~levels:[level]
+      (`Main, block) >>=? function
+    | [{ slots ; _ }] -> return slots
+    | _ -> return_nil
+
   let forge_endorsement
       block
+      src_pk
       src_sk
     =
     Shell_services.Blocks.hash !rpc_ctxt ~block () >>=? fun hash ->
     Alpha_block_services.metadata
       !rpc_ctxt ~chain:`Main ~block () >>=? fun { protocol_data = { level ; _ } ; _ } ->
     let level = level.level in
+    signing_slots block src_pk level >>=? fun slots ->
     let shell = { Tezos_base.Operation.branch = hash } in
     let contents =
-      Single (Endorsement { level }) in
+      Single (Endorsement { slot = List.hd slots; level }) in
     sign ~watermark:(Endorsement Chain_id.zero) src_sk shell (Contents_list contents)
 
   let endorse
       (contract : Account.t)
       block =
-    forge_endorsement block contract.sk
+    forge_endorsement block contract.pkh contract.sk
 
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block =

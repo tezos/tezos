@@ -45,17 +45,17 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
   begin
     match delegate with
     | None ->
-        Context.get_endorser ctxt >>=? fun (delegate, _slots) ->
-        return delegate
-    | Some delegate -> return delegate
-  end >>=? fun delegate_pkh ->
+        Context.get_endorser ctxt >>=? fun (delegate, slots) ->
+        return (delegate, List.hd slots)
+    | Some (delegate, slot) -> return (delegate, slot)
+  end >>=? fun (delegate_pkh, slot) ->
   Account.find delegate_pkh >>=? fun delegate ->
   begin
     match level with
     | None -> Context.get_level ctxt
     | Some level -> return level
   end >>=? fun level ->
-  let op = Single (Endorsement { level }) in
+  let op = Single (Endorsement { slot ; level }) in
   return (sign ~watermark:Signature.(Endorsement Chain_id.zero) delegate.sk signing_context op)
 
 let sign ?watermark sk ctxt (Contents_list contents) =
@@ -221,9 +221,9 @@ let miss_signed_endorsement ?level ctxt  =
     | None -> Context.get_level ctxt
     | Some level -> return level
   end >>=? fun level ->
-  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, _slots) ->
+  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, slots) ->
   let delegate = Account.find_alternate real_delegate_pkh in
-  endorsement ~delegate:delegate.pkh ~level ctxt ()
+  endorsement ~delegate:(delegate.pkh, List.hd slots) ~level ctxt ()
 
 let transaction ?fee ?gas_limit ?storage_limit ?parameters ctxt
     (src:Contract.t) (dst:Contract.t)

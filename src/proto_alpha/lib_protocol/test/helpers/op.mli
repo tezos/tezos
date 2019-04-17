@@ -27,7 +27,7 @@ open Proto_alpha
 open Alpha_context
 
 val endorsement:
-  ?delegate:public_key_hash ->
+  ?delegate: (public_key_hash * int) ->
   ?level:Raw_level.t ->
   Context.t -> ?signing_context:Context.t -> unit ->
   Kind.endorsement Operation.t tzresult Lwt.t

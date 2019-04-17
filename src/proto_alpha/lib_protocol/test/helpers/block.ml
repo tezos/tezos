@@ -256,6 +256,10 @@ let genesis
     ?(commitments = [])
     ?(security_deposit_ramp_up_cycles = None)
     ?(no_reward_cycles = None)
+    ?(endorsement_reward_priority_bonus = Constants_repr.default.endorsement_reward_priority_bonus)
+    ?(endorsement_bonus_intercept = Constants_repr.default.endorsement_bonus_intercept)
+    ?(endorsement_bonus_slope = Constants_repr.default.endorsement_bonus_slope)
+    ?(delay_per_missing_endorsement = Constants_repr.default.delay_per_missing_endorsement)
     (initial_accounts : (Account.t * Tez_repr.t) list)
   =
   if initial_accounts = [] then
@@ -297,6 +301,11 @@ let genesis
     endorsement_reward ;
     cost_per_byte ;
     hard_storage_limit_per_operation ;
+    endorsement_reward_priority_bonus ;
+    endorsement_bonus_intercept ;
+    endorsement_bonus_slope ;
+    delay_per_missing_endorsement ;
+
   } in
   check_constants_consistency constants >>=? fun () ->
 

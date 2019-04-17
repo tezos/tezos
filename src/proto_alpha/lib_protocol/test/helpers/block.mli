@@ -114,6 +114,10 @@ val genesis:
   ?commitments:Commitment_repr.t list ->
   ?security_deposit_ramp_up_cycles: int option ->
   ?no_reward_cycles: int option ->
+  ?endorsement_reward_priority_bonus : Proto_alpha.Tez_repr.tez ->
+  ?endorsement_bonus_intercept : int ->
+  ?endorsement_bonus_slope : int ->
+  ?delay_per_missing_endorsement : Proto_alpha.Period_repr.t ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and

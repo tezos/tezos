@@ -68,9 +68,9 @@ let valid_double_endorsement_evidence () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
 
-  Context.get_endorser (B blk_a) >>=? fun (delegate, _slots) ->
-  Op.endorsement ~delegate (B blk_a) () >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, slots) ->
+  Op.endorsement ~delegate:(delegate, List.hd slots) (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate:(delegate, List.hd slots) (B blk_b) () >>=? fun endorsement_b ->
   Block.bake ~operations:[Operation.pack endorsement_a] blk_a >>=? fun blk_a ->
   (* Block.bake ~operations:[endorsement_b] blk_b >>=? fun _ -> *)
 
@@ -113,9 +113,9 @@ let too_early_double_endorsement_evidence () =
   Context.init 2 >>=? fun (b, _) ->
   block_fork b >>=? fun (blk_a, blk_b) ->
 
-  Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
-  Op.endorsement ~delegate (B blk_a) () >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, slots) ->
+  Op.endorsement ~delegate:(delegate, List.hd slots) (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate:(delegate, List.hd slots) (B blk_b) () >>=? fun endorsement_b ->
 
   Op.double_endorsement (B b) endorsement_a endorsement_b >>=? fun operation ->
   Block.bake ~operation b >>= fun res ->
@@ -132,9 +132,9 @@ let too_late_double_endorsement_evidence () =
 
   block_fork b >>=? fun (blk_a, blk_b) ->
 
-  Context.get_endorser (B blk_a) >>=? fun (delegate, _slots) ->
-  Op.endorsement ~delegate (B blk_a) () >>=? fun endorsement_a ->
-  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, slots) ->
+  Op.endorsement ~delegate:(delegate, List.hd slots) (B blk_a) () >>=? fun endorsement_a ->
+  Op.endorsement ~delegate:(delegate, List.hd slots) (B blk_b) () >>=? fun endorsement_b ->
 
   fold_left_s (fun blk _ -> Block.bake_until_cycle_end blk)
     blk_a (1 -- (preserved_cycles + 1)) >>=? fun blk ->
@@ -152,16 +152,16 @@ let different_delegates () =
 
   Block.bake b >>=? fun b ->
   block_fork b >>=? fun (blk_a, blk_b) ->
-  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
+  Context.get_endorser (B blk_a) >>=? fun (endorser_a, a_slots) ->
   get_first_different_endorsers (B blk_b) >>=? fun (endorser_b1c, endorser_b2c) ->
-  let endorser_b =
+  let (endorser_b, b_slots) =
     if Signature.Public_key_hash.(=) endorser_a endorser_b1c.delegate
-    then endorser_b2c.delegate
-    else endorser_b1c.delegate
+    then (endorser_b2c.delegate, endorser_b2c.slots)
+    else (endorser_b1c.delegate, endorser_b1c.slots)
   in
 
-  Op.endorsement ~delegate:endorser_a (B blk_a) () >>=? fun e_a ->
-  Op.endorsement ~delegate:endorser_b (B blk_b) () >>=? fun e_b ->
+  Op.endorsement ~delegate:(endorser_a, List.hd a_slots) (B blk_a) () >>=? fun e_a ->
+  Op.endorsement ~delegate:(endorser_b, List.hd b_slots)  (B blk_b) () >>=? fun e_b ->
   Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun _ ->
   Op.double_endorsement (B blk_b) e_a e_b >>=? fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
@@ -178,15 +178,15 @@ let wrong_delegate () =
   let pkh2 = (List.nth accounts 1).Account.pkh in
 
   block_fork b >>=? fun (blk_a, blk_b) ->
-  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _) ->
-  Op.endorsement ~delegate:endorser_a (B blk_a) () >>=? fun endorsement_a ->
-  Context.get_endorser (B blk_b) >>=? fun (endorser_b, _) ->
+  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
+  Op.endorsement ~delegate:(endorser_a, 0) (B blk_a) () >>=? fun endorsement_a ->
+  Context.get_endorser (B blk_b) >>=? fun (endorser_b, _b_slots) ->
   let delegate =
     if Signature.Public_key_hash.equal pkh1 endorser_b
     then pkh2
     else pkh1
   in
-  Op.endorsement ~delegate (B blk_b) () >>=? fun endorsement_b ->
+  Op.endorsement ~delegate:(delegate, 1) (B blk_b) () >>=? fun endorsement_b ->
 
   Op.double_endorsement (B blk_b) endorsement_a endorsement_b >>=? fun operation ->
   Block.bake ~operation blk_b >>= fun e ->
