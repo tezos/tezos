@@ -48,7 +48,7 @@ check_opam_deps:
 check_opam_lint:
   <<: *build_definition
   script:
-    - find . ! -path "./_opam/*" -name *.opam -exec opam lint {} +;
+    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 
 check_indentation:
   <<: *build_definition
