@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make(struct let name = "node.snapshots" end)
+include Internal_event.Legacy_logging.Make_semantic(struct
+    let name = "node.snapshots"
+  end)
 
 let (//) = Filename.concat
 let context_dir data_dir = data_dir // "context"
@@ -211,6 +213,15 @@ let pruned_block_iterator index block_store limit
       else
         return (Some pruned_block, None)
 
+let block_hash_tag =
+  Tag.def "block_hash" Block_hash.pp_short
+
+let filename_tag =
+  Tag.def "filename" Format.pp_print_string
+
+let block_level_tag =
+  Tag.def "block_level" Format.pp_print_int
+
 let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
@@ -233,8 +244,10 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
           fail (Wrong_block_export (genesis, `Too_few_predecessors))
         else
           let last_checkpoint_hash = Block_header.hash last_checkpoint in
-          lwt_log_notice "No block hash specified with the `--block` option. Using %a by default (last checkpoint)"
-            Block_hash.pp last_checkpoint_hash >>= fun () ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "No block hash specified with the `--block` option. Using %a by default (last checkpoint)"
+              -%a block_hash_tag last_checkpoint_hash
+            ) >>= fun () ->
           return last_checkpoint_hash
   end >>=? fun checkpoint_block_hash ->
   Context.init ~readonly:true context_root >>= fun context_index ->
@@ -243,7 +256,12 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
     | None ->
         fail (Wrong_block_export (checkpoint_block_hash, `Cannot_be_found))
     | Some block_header ->
-        lwt_log_notice "Dumping: %a" Block_hash.pp checkpoint_block_hash >>= fun () ->
+        lwt_log_notice Tag.DSL.(fun f ->
+            f "Dumping a %a snapshot with block hash \"%a\" and level %a"
+            -%a History_mode.tag (if export_rolling then Rolling else Full)
+            -%a block_hash_tag checkpoint_block_hash
+            -%a block_level_tag (Int32.to_int block_header.shell.level)
+          ) >>= fun () ->
         (* Get block precessor's block header*)
         Store.Block.Predecessors.read
           (block_store, checkpoint_block_hash) 0 >>=? fun pred_block_hash ->
@@ -261,9 +279,13 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
         let starting_block_header = block_header in
         return (pred_block_header, block_data, iterator, starting_block_header)
   end >>=? fun data_to_dump ->
+  lwt_log_notice (fun f -> f "Now loading data") >>= fun () ->
   Context.dump_contexts context_index [ data_to_dump ] ~filename >>=? fun () ->
   Store.close store ;
-  lwt_log_notice "Sucessful export (in file %s)" filename >>= fun () ->
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "Sucessful export in file \"%a\""
+      -%a filename_tag filename
+    ) >>= fun () ->
   return_unit
 
 let check_operations_consistency pruned_block =
@@ -347,7 +369,7 @@ let store_pruned_blocks
     ~genesis
     (history: (Block_hash.t * Context.Pruned_block.t) array) =
   let nb_blocks = Array.length history in
-  lwt_log_notice "Computing predecessor tables" >>= fun () ->
+  lwt_log_notice (fun f -> f "Computing predecessor tables") >>= fun () ->
   let predecessors = compute_predecessors_tables ~genesis history in
   let rec loop_on_chunks cpt =
     Store.with_atomic_rw store begin fun () ->
@@ -469,7 +491,9 @@ let update_caboose chain_data ~genesis block_header oldest_header max_op_ttl =
 let reconstruct_contexts
     store context_index chain_id block_store
     (history : (Block_hash.t * Context.Pruned_block.t) array) =
-  lwt_log_notice "Reconstructing all the contexts from the genesis." >>= fun () ->
+  lwt_log_notice (fun f ->
+      f "Reconstructing all the contexts from the genesis."
+    ) >>= fun () ->
   let limit = Array.length history in
   let rec reconstruct_chunks level =
     Store.with_atomic_rw store begin fun () ->
@@ -595,9 +619,11 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
                    (Block_hash.equal bh block_hash)
                    (Inconsistent_imported_block (bh,block_hash))
              | None ->
-                 lwt_log_notice "You should consider using the --block <block_hash> \
-                                 argument to check that the block imported using the \
-                                 snapshot is the one you expect." >>= fun () -> return ()
+                 lwt_log_notice (fun f ->
+                     f "You should consider using the --block <block_hash> \
+                        argument to check that the block imported using the \
+                        snapshot is the one you expect."
+                   ) >>= fun () -> return ()
            end >>=? fun () ->
            Store.Block.Contents.known (block_store, block_hash) >>= fun known ->
            if known then
@@ -605,8 +631,10 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
              assert false
            else
              begin
-               lwt_log_notice "Importing block %a"
-                 Block_hash.pp (Block_header.hash block_header) >>= fun () ->
+               lwt_log_notice Tag.DSL.(fun f ->
+                   f "Importing block %a"
+                   -%a block_hash_tag (Block_header.hash block_header)
+                 ) >>= fun () ->
                (* To validate block_header we need ... *)
                (* ... its predecessor context ... *)
                let pred_context_hash = predecessor_block_header.shell.context in
@@ -634,7 +662,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
                    old_blocks in
                let history = Array.of_list old_blocks in
 
-               lwt_log_notice "Checking history consistency" >>= fun () ->
+               lwt_log_notice (fun f -> f "Checking history consistency") >>= fun () ->
                check_history_consistency
                  ~genesis:genesis.block block_header history >>=? fun () ->
 
@@ -683,7 +711,10 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
        return_unit)
     (function
       | Ok () ->
-          lwt_log_notice "Sucessfull import (from file %s)" filename >>= fun () ->
+          lwt_log_notice Tag.DSL.(fun f ->
+              f "Sucessfull import (from file %a)"
+              -%a filename_tag filename
+            ) >>= fun () ->
           return_unit
       | Error errors ->
           dir_cleaner data_dir >>= fun () ->

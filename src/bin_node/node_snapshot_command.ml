@@ -50,11 +50,13 @@ module Term = struct
     let res =
       match subcommand with
       | Export ->
+          Internal_event_unix.init () >>= fun () ->
           Node_data_version.ensure_data_dir data_dir >>=? fun () ->
           Snapshots.export
             ~export_rolling ~data_dir
             ~genesis:genesis.block file block
       | Import ->
+          Internal_event_unix.init () >>= fun () ->
           Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
           Lwt_lock_file.create ~unlink_on_exit:true
             (Node_data_version.lock_file data_dir) >>=? fun () ->

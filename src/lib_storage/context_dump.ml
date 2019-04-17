@@ -568,7 +568,7 @@ module Make (I:Dump_interface) = struct
                     begin
                       Tezos_stdlib.Utils.display_progress
                         ~refresh_rate:(!cpt, 1_000)
-                        "Context: %dK elements, %dMiB written%!"
+                        "Loading context: %dK elements, %dMiB written%!"
                         (!cpt / 1_000) (!written / 1_048_576) ;
                       incr cpt ;
                       set_visit hash; (* There cannot be a cycle *)
@@ -614,7 +614,7 @@ module Make (I:Dump_interface) = struct
                let dump_pruned cpt pruned =
                  Tezos_stdlib.Utils.display_progress
                    ~refresh_rate:(cpt, 1_000)
-                   "History: %dK block, %dMiB written"
+                   "Loading history: %dK blocks, %dMiB written"
                    (cpt / 1_000) (!written / 1_048_576) ;
                  set_command buf Proot ;
                  let mbhash = I.Pruned_block.to_bytes pruned in

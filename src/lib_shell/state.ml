@@ -1561,9 +1561,6 @@ let () = register_error_kind `Permanent
             | _ -> None)
     (fun (previous_mode, next_mode) -> Incorrect_history_mode_switch { previous_mode; next_mode })
 
-let history_mode_tag =
-  Tag.def "history_mode" History_mode.pp
-
 let check_and_save_history_mode
     ~previous_mode
     ~next_mode
@@ -1580,7 +1577,7 @@ let check_and_save_history_mode
       lwt_log_notice Tag.DSL.(fun f ->
           f "Cleaning up the state to switch to %a mode..."
           -% t event "cleanup_state"
-          -% a history_mode_tag Full) >>= fun () ->
+          -% a History_mode.tag Full) >>= fun () ->
       Store.Configuration.History_mode.store
         global_store Full >>= fun () ->
       Chain.all state >>= fun chains ->
@@ -1600,7 +1597,7 @@ let check_and_save_history_mode
       lwt_log_notice Tag.DSL.(fun f ->
           f "Cleaning up the state to switch to %a mode..."
           -% t event "cleanup_state"
-          -% a history_mode_tag Rolling) >>= fun () ->
+          -% a History_mode.tag Rolling) >>= fun () ->
       Store.Configuration.History_mode.store
         global_store Rolling >>= fun () ->
       Chain.all state >>= fun chains ->

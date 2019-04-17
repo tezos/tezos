@@ -41,3 +41,6 @@ let pp ppf = function
   | Archive -> Format.fprintf ppf "archive"
   | Full -> Format.fprintf ppf "full"
   | Rolling -> Format.fprintf ppf "rolling"
+
+let tag =
+  Tag.def "history_mode" pp

@@ -36,3 +36,5 @@ val encoding : t RPC_encoding.t
 val equal : t * t -> bool
 
 val pp : Format.formatter -> t -> unit
+
+val tag : t Tag.def
