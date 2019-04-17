@@ -422,12 +422,15 @@ let is_snapshot_full history =
   (snd history.(0)).Context.Pruned_block.block_header.shell.level = 1l
 
 let set_history_mode store history =
-  if is_snapshot_full history then
-    lwt_log_notice "Setting history-mode to %a" History_mode.pp Full >>= fun () ->
-    Store.Configuration.History_mode.store store Full
-  else
-    lwt_log_notice "Setting history-mode to %a" History_mode.pp Rolling >>= fun () ->
-    Lwt.return ()
+  let history_mode =
+    if is_snapshot_full history
+    then History_mode.Full
+    else History_mode.Rolling in
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "Setting history-mode to %a"
+      -%a History_mode.tag history_mode
+    ) >>= fun () ->
+  Store.Configuration.History_mode.store store history_mode
 
 let store_new_head
     chain_state chain_data
@@ -588,8 +591,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
 
   (* FIXME: use config value ?*)
   State.init
-    ~context_root ~store_root
-    ~history_mode:Rolling genesis
+    ~context_root ~store_root genesis
     ~patch_context:(patch_context None) >>=? fun (_state, chain_state, context_index, _history_mode) ->
 
   Store.init ~mapsize:40_960_000_000L store_root >>=? fun store ->
