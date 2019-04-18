@@ -37,7 +37,7 @@ module Term = struct
   type subcommand = Export | Import
 
   let dir_cleaner data_dir =
-    lwt_log_notice "Cleaning directory %s" data_dir >>= fun () ->
+    lwt_log_notice "Cleaning directory %s because of failure" data_dir >>= fun () ->
     Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
     Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
