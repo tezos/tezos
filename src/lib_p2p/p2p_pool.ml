@@ -199,8 +199,8 @@ type config = {
   min_connections : int ;
   max_connections : int ;
   max_incoming_connections : int ;
-  connection_timeout : Ptime.Span.t ;
-  authentication_timeout : Ptime.Span.t ;
+  connection_timeout : Time.System.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;
@@ -211,7 +211,7 @@ type config = {
   max_known_points : (int * int) option ; (* max, gc target *)
   max_known_peer_ids : (int * int) option ; (* max, gc target *)
 
-  swap_linger : Ptime.Span.t ;
+  swap_linger : Time.System.Span.t ;
 
   binary_chunks_size : int option ;
 }

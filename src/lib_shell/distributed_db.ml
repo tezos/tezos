@@ -54,7 +54,7 @@ module Make_raw
     (Request_message : sig
        type param
        val max_length : int
-       val initial_delay : Ptime.Span.t
+       val initial_delay : Time.System.Span.t
        val forge : param -> Hash.t list -> Message.t
      end)
     (Precheck : Distributed_db_functors.PRECHECK

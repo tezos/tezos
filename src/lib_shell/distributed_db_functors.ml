@@ -42,13 +42,13 @@ module type DISTRIBUTED_DB = sig
   val prefetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:Ptime.Span.t ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> unit
 
   val fetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:Ptime.Span.t ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> value tzresult Lwt.t
 
   val clear_or_cancel: t -> key -> unit

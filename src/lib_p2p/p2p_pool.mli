@@ -97,10 +97,10 @@ type config = {
       Above this number, [accept] will start dropping incoming
       connections. *)
 
-  connection_timeout : Ptime.Span.t ;
+  connection_timeout : Time.System.Span.t ;
   (** Maximum time allowed to the establishment of a connection. *)
 
-  authentication_timeout : Ptime.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
   incoming_app_message_queue_size : int option ;
@@ -132,7 +132,7 @@ type config = {
   max_known_peer_ids : (int * int) option ;
   (** Like [max_known_points], but for known peer_ids. *)
 
-  swap_linger : Ptime.Span.t ;
+  swap_linger : Time.System.Span.t ;
   (** Peer swapping does not occur more than once during a timespan of
       [spap_linger] seconds. *)
 
@@ -226,7 +226,7 @@ type ('msg, 'peer_meta,'conn_meta) connection
     fine-grained logical state of the connection. *)
 
 val connect:
-  ?timeout:Ptime.Span.t ->
+  ?timeout:Time.System.Span.t ->
   ('msg, 'peer_meta,'conn_meta) pool -> P2p_point.Id.t ->
   ('msg, 'peer_meta,'conn_meta) connection tzresult Lwt.t
 (** [connect ?timeout pool point] tries to add a connection to [point]

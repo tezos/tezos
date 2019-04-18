@@ -48,8 +48,8 @@ module Info = struct
 
   type greylisting_config = {
     factor: float ;
-    initial_delay: Ptime.Span.t ;
-    disconnection_delay: Ptime.Span.t ;
+    initial_delay: Time.System.Span.t ;
+    disconnection_delay: Time.System.Span.t ;
   }
 
   type 'data t = {
@@ -62,7 +62,7 @@ module Info = struct
     mutable known_public : bool ;
     mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option ;
     greylisting : greylisting_config ;
-    mutable greylisting_delay : Ptime.Span.t ;
+    mutable greylisting_delay : Time.System.Span.t ;
     mutable greylisting_end : Time.System.t ;
     events : Pool_event.t Ring.t ;
     watchers : Pool_event.t Lwt_watcher.input ;
@@ -93,7 +93,7 @@ module Info = struct
     events = Ring.create log_size ;
     greylisting = greylisting_config ;
     greylisting_delay = Ptime.Span.of_int_s 1 ;
-    greylisting_end = Ptime.epoch ;
+    greylisting_end = Time.System.epoch ;
     watchers = Lwt_watcher.create_input () ;
   }
 

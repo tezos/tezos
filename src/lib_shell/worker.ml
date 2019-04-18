@@ -169,7 +169,7 @@ module type T = sig
   (** Creates a new worker instance.
       Parameter [queue_size] not passed means unlimited queue. *)
   val launch :
-    'kind table -> ?timeout:Ptime.Span.t ->
+    'kind table -> ?timeout:Time.System.Span.t ->
     Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
     'kind t tzresult Lwt.t
@@ -296,7 +296,7 @@ module Make
 
   and 'kind t = {
     limits : Worker_types.limits ;
-    timeout : Ptime.Span.t option ;
+    timeout : Time.System.Span.t option ;
     parameters : Types.parameters ;
     mutable (* only for init *) worker : unit Lwt.t ;
     mutable (* only for init *) state : Types.state option ;
@@ -594,7 +594,7 @@ module Make
 
   let launch
     : type kind.
-      kind table -> ?timeout:Ptime.Span.t ->
+      kind table -> ?timeout:Time.System.Span.t ->
       Worker_types.limits -> Name.t -> Types.parameters ->
       (module HANDLERS with type self = kind t) ->
       kind t tzresult Lwt.t

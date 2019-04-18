@@ -28,7 +28,7 @@ open Prevalidator_worker_state
 
 type limits = {
   max_refused_operations : int ;
-  operation_timeout : Ptime.Span.t ;
+  operation_timeout : Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 

@@ -27,7 +27,7 @@
 type t
 
 type limits = {
-  protocol_timeout: Ptime.Span.t ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 
@@ -51,7 +51,7 @@ val validate:
 val fetch_and_compile_protocol:
   t ->
   ?peer:P2p_peer.Id.t ->
-  ?timeout:Ptime.Span.t ->
+  ?timeout:Time.System.Span.t ->
   Protocol_hash.t -> Registered_protocol.t tzresult Lwt.t
 
 val shutdown: t -> unit Lwt.t

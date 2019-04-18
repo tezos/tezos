@@ -34,8 +34,8 @@ type bounds = {
 }
 
 type config = {
-  maintenance_idle_time: Ptime.Span.t ;
-  greylist_timeout: Ptime.Span.t ;
+  maintenance_idle_time: Time.System.Span.t ;
+  greylist_timeout: Time.System.Span.t ;
   private_mode: bool ;
 }
 

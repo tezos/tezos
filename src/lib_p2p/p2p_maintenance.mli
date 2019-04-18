@@ -52,10 +52,10 @@ type bounds = {
 
 type config = {
 
-  maintenance_idle_time: Ptime.Span.t ;
+  maintenance_idle_time: Time.System.Span.t ;
   (** How long to wait at most, in seconds, before running a maintenance loop. *)
 
-  greylist_timeout: Ptime.Span.t ;
+  greylist_timeout: Time.System.Span.t ;
   (** GC delay for the greylists tables, in seconds. *)
 
   private_mode: bool ;

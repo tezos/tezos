@@ -38,8 +38,8 @@ open Validation_errors
 
 type t = {
   canceler: Lwt_canceler.t ;
-  block_header_timeout: Ptime.Span.t ;
-  block_operations_timeout: Ptime.Span.t ;
+  block_header_timeout: Time.System.Span.t ;
+  block_operations_timeout: Time.System.Span.t ;
   mutable headers_fetch_worker: unit Lwt.t ;
   mutable operations_fetch_worker: unit Lwt.t ;
   mutable validation_worker: unit Lwt.t ;

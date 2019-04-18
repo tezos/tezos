@@ -50,8 +50,8 @@ module Info : sig
 
   type greylisting_config = {
     factor: float ;
-    initial_delay: Ptime.Span.t ;
-    disconnection_delay: Ptime.Span.t ;
+    initial_delay: Time.System.Span.t ;
+    disconnection_delay: Time.System.Span.t ;
   }
 
   val create :
