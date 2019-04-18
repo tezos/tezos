@@ -54,7 +54,7 @@ module Protocol = struct
   let to_notation t =
     match Ptime.of_span (Ptime.Span.of_int_s (Int64.to_int t)) with
     | None -> invalid_arg ("Time.Protocol.to_notation")
-    | Some ptime -> Ptime.to_rfc3339 ptime
+    | Some ptime -> Ptime.to_rfc3339 ~frac_s:0 ~tz_offset_s:0 ptime
 
   let of_seconds x = x
   let to_seconds x = x
