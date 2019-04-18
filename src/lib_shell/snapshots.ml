@@ -297,10 +297,10 @@ let check_operations_consistency pruned_block =
   (* Compute operations hashes and compare*)
   List.iter2
     (fun (_,op) (_,oph) ->
-       let expeced_op_hash = List.map Operation.hash op in
-       List.iter2 (fun excpected found ->
-           assert (Operation_hash.equal excpected found)
-         ) expeced_op_hash oph;
+       let expected_op_hash = List.map Operation.hash op in
+       List.iter2 (fun expected found ->
+           assert (Operation_hash.equal expected found)
+         ) expected_op_hash oph ;
     )
     operations operation_hashes ;
   (* Check header hashes based on merkel tree*)
