@@ -250,10 +250,11 @@ module type T = sig
   (** Introspect the state of a worker. *)
   val view : _ t -> Types.view
 
-  (** Lists the running workers in this group.
-      After they are killed, workers are kept in the table
-      for a number of seconds given in the {!Worker_types.limits}. *)
+  (** Lists the running workers in this group. *)
   val list : 'a table -> (Name.t * 'a t) list
+
+  (** [find_opt table n] is [Some worker] if the [worker] is in the [table] and
+      has name [n]. *)
   val find_opt : 'a table -> Name.t -> 'a t option
 end
 
