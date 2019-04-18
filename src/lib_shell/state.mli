@@ -35,7 +35,7 @@
 type t
 type global_state = t
 
-(** {2 Network} ************************************************************)
+(** {2 Network} *)
 
 (** Data specific to a given chain (e.g the main chain or the current
     test chain).  *)
@@ -111,10 +111,10 @@ module Chain : sig
 
 end
 
-(** {2 Block header manipulation} ******************************************)
+(** {2 Block header manipulation} *)
 
 
-(** {2 Block database} *****************************************************)
+(** {2 Block database} *)
 
 module Block : sig
 
@@ -284,7 +284,7 @@ val update_chain_data:
   (Store.Chain_data.store -> chain_data -> (chain_data option * 'a) Lwt.t) ->
   'a Lwt.t
 
-(** {2 Protocol database} ***************************************************)
+(** {2 Protocol database} *)
 
 module Protocol : sig
 

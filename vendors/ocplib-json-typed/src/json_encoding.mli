@@ -1,5 +1,3 @@
-(** JSON structure description using dependently typed combinators. *)
-
 (************************************************************************)
 (*  ocplib-json-typed                                                   *)
 (*                                                                      *)
@@ -17,7 +15,9 @@
 (*                                                                      *)
 (************************************************************************)
 
-(** {2 Dependent types describing JSON document structures} *) (***************)
+(** JSON structure description using dependently typed combinators. *)
+
+(** {2 Dependent types describing JSON document structures} *)
 
 (** An encoding between an OCaml data type (the parameter) and a
     JSON representation. To be built using the predefined
@@ -48,7 +48,8 @@
     See functor {!Make} and module {!Json_repr} for using another format. *)
 type 'a encoding
 
-(** {2 Constructors and destructors for {!Json_repr.ezjsonm}} *) (***************)
+(** {2 Constructors and destructors for Json_repr.ezjsonm} *) (***************)
+(** see {!Json_repr.ezjsonm} *)
 
 (** Builds a json value from an OCaml value and an encoding.
 

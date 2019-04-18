@@ -168,7 +168,7 @@ module Sign : sig
   (** [sign sk msg buf] writes the signature of [msg] with [sk] at
       [buf].
 
-      @raises Invalid_argument if [buf] is smaller than [bytes]
+      @raise Invalid_argument if [buf] is smaller than [bytes]
       bytes long. *)
 
   val verify :

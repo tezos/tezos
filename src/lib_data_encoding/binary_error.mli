@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** This is for use *within* the data encoding library only. Instead, you should
-    use the corresponding module intended for use: {Data_encoding.Binary}. *)
+    use the corresponding module intended for use: {!Data_encoding.Binary}. *)
 
 type read_error =
   | Not_enough_data

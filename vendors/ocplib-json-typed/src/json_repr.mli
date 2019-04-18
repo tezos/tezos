@@ -1,5 +1,3 @@
-(** Representations of JSON documents *)
-
 (************************************************************************)
 (*  ocplib-json-typed                                                   *)
 (*                                                                      *)
@@ -17,7 +15,9 @@
 (*                                                                      *)
 (************************************************************************)
 
-(** {2 Abstraction over JSON representations} *) (*****************************)
+(** Representations of JSON documents *)
+
+(** {2 Abstraction over JSON representations} *)
 
 (** The internal format used by the library. A common format to view
     JSON structures from different representations. It only shows the
@@ -86,7 +86,7 @@ val pp :
   Format.formatter -> 'tf -> unit
 
 
-(** {2 Third party in-memory JSON document representations} *) (****************)
+(** {2 Third party in-memory JSON document representations} *)
 
 (** A JSON value compatible with {!Ezjsonm.value}. *)
 type ezjsonm =
@@ -132,7 +132,7 @@ type yojson =
 (** A view over the {!yojson} representation.*)
 module Yojson : Repr with type value = yojson
 
-(** {2 Representation-agnostic JSON format} *) (********************************)
+(** {2 Representation-agnostic JSON format} *)
 
 (** A meta-representation for JSON values that can unify values of
     different representations by boxing them with their corresponding
@@ -152,7 +152,8 @@ val pp_any :
   ?compact: bool -> ?pp_string: (Format.formatter -> string -> unit) -> unit ->
   Format.formatter -> any -> unit
 
-(** {2 Predefined converters for {!type:ezjsonm}} *) (********************************)
+(** {2 Predefined converters for ezjsonm } *)
+(** see {!type:ezjsonm} *)
 
 (** Conversion helper. *)
 val from_yojson : [< yojson ] -> [> ezjsonm ]

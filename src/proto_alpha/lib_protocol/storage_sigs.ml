@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {1 Entity Accessor Signatures} ****************************************)
+(** {1 Entity Accessor Signatures} *)
 
 (** The generic signature of a single data accessor (a single value
     bound to a specific key in the hierarchical (key x value)

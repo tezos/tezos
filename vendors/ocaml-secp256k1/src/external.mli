@@ -133,7 +133,7 @@ module Sign : sig
   (** [read_recoverable_exn ctx buf] reads a recoverable signature in
       [buf].
 
-      @raises [Invalid_argument] if [buf] is less than 65 bytes long
+      @raise [Invalid_argument] if [buf] is less than 65 bytes long
       or [buf] does not contain a valid recoverable signature. *)
 
   val write_exn : ?der:bool -> Context.t -> Bigstring.t -> _ t -> int

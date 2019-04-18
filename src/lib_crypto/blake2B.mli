@@ -25,12 +25,12 @@
 
 (** Tezos - Manipulation and creation of hashes *)
 
-(** {2 Predefined Hashes } ****************************************************)
+(** {2 Predefined Hashes } *)
 
 include S.MINIMAL_HASH
 include S.RAW_DATA with type t := t
 
-(** {2 Building Hashes} *******************************************************)
+(** {2 Building Hashes} *)
 
 (** The parameters for creating a new Hash type using
     {!Make_Blake2B}. Both {!name} and {!title} are only informative,

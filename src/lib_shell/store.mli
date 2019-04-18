@@ -34,7 +34,7 @@ val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close : t -> unit
 
 
-(** {2 Chain store} **********************************************************)
+(** {2 Chain store} *)
 
 module Chain : sig
 
@@ -71,7 +71,7 @@ module Chain : sig
 end
 
 
-(** {2 Mutable chain data} *******************************************************)
+(** {2 Mutable chain data} *)
 
 module Chain_data : sig
 
@@ -98,7 +98,7 @@ module Chain_data : sig
 end
 
 
-(** {2 Block header store} **************************************************)
+(** {2 Block header store} *)
 
 module Block : sig
 
@@ -164,7 +164,7 @@ module Block : sig
 end
 
 
-(** {2 Protocol store} ******************************************************)
+(** {2 Protocol store} *)
 
 module Protocol : sig
 
@@ -182,7 +182,7 @@ module Protocol : sig
 
 end
 
-(** {2 Temporary test chain forking block store} *****************************)
+(** {2 Temporary test chain forking block store} *)
 
 module Forking_block_hash : MAP_STORE
   with type t = global_store

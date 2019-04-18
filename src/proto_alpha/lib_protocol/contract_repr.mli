@@ -30,13 +30,13 @@ type contract = t
 
 include Compare.S with type t := contract
 
-(** {2 Implicit contracts} *****************************************************)
+(** {2 Implicit contracts} *)
 
 val implicit_contract : Signature.Public_key_hash.t -> contract
 
 val is_implicit : contract -> Signature.Public_key_hash.t option
 
-(** {2 Originated contracts} **************************************************)
+(** {2 Originated contracts} *)
 
 (** Originated contracts handles are crafted from the hash of the
     operation that triggered their origination (and nothing else).
@@ -56,7 +56,7 @@ val incr_origination_nonce : origination_nonce -> origination_nonce
 val is_originated : contract -> Contract_hash.t option
 
 
-(** {2 Human readable notation} ***********************************************)
+(** {2 Human readable notation} *)
 
 type error += Invalid_contract_notation of string (* `Permanent *)
 
@@ -68,7 +68,7 @@ val pp: Format.formatter -> contract -> unit
 
 val pp_short: Format.formatter -> contract -> unit
 
-(** {2 Serializers} ***********************************************************)
+(** {2 Serializers} *)
 
 val encoding : contract Data_encoding.t
 

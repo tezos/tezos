@@ -373,7 +373,7 @@ val restore_formatter : Format.formatter -> formatter_state -> unit
 type error += Help : _ command option -> error
 
 (** Find and call the applicable command on the series of arguments.
-    @raises [Failure] if the command list would be ambiguous. *)
+    @raise [Failure] if the command list would be ambiguous. *)
 val dispatch: 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
 
 (** Parse the global options, and return their value, with the rest of

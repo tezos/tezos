@@ -72,19 +72,19 @@ val var_to_field_annot : var_annot option -> field_annot option
 (** Replace an annotation by its default value if it is [None] *)
 val default_annot : default:'a option -> 'a option -> 'a option
 
-(** Generate annotation for field accesses, of the form @var.field1.field2 *)
+(** Generate annotation for field accesses, of the form [var.field1.field2] *)
 val gen_access_annot :
   var_annot option ->
   ?default:field_annot option -> field_annot option -> var_annot option
 
 (** Merge type annotations.
-    @returns an error {!Inconsistent_type_annotations} if they are both present
+    @return an error {!Inconsistent_type_annotations} if they are both present
     and different *)
 val merge_type_annot :
   type_annot option -> type_annot option -> type_annot option tzresult
 
 (** Merge field annotations.
-    @returns an error {!Inconsistent_type_annotations} if they are both present
+    @return an error {!Inconsistent_type_annotations} if they are both present
     and different *)
 val merge_field_annot :
   field_annot option -> field_annot option -> field_annot option tzresult
@@ -93,7 +93,7 @@ val merge_field_annot :
 val merge_var_annot :
   var_annot option -> var_annot option -> var_annot option
 
-(** @returns an error {!Unexpected_annotation} in the monad the list is not empty. *)
+(** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : int -> 'a list -> unit tzresult
 
 (** Same as {!error_unexpected_annot} in Lwt. *)

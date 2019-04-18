@@ -59,7 +59,7 @@ val commit_test_chain_genesis:
   Block_header.t Lwt.t
 
 
-(** {2 Generic interface} ****************************************************)
+(** {2 Generic interface} *)
 
 type key = string list
 type value = MBytes.t
@@ -79,7 +79,7 @@ val fold:
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
-(** {2 Accessing and Updating Versions} **************************************)
+(** {2 Accessing and Updating Versions} *)
 
 val exists: index -> Context_hash.t -> bool Lwt.t
 val checkout: index -> Context_hash.t -> context option Lwt.t
@@ -95,7 +95,7 @@ val set_head: index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 val set_master: index -> Context_hash.t -> unit Lwt.t
 
 
-(** {2 Predefined Fields} ****************************************************)
+(** {2 Predefined Fields} *)
 
 val get_protocol: context -> Protocol_hash.t Lwt.t
 val set_protocol: context -> Protocol_hash.t -> context Lwt.t
@@ -108,3 +108,4 @@ val del_test_chain: context -> context Lwt.t
 val fork_test_chain:
   context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
 val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
+

@@ -33,7 +33,7 @@
     seed such that the generated sequence is a given one. *)
 
 
-(** {2 Random Generation} ****************************************************)
+(** {2 Random Generation} *)
 
 (** The state of the random number generator *)
 type t
@@ -56,7 +56,7 @@ val take : sequence -> MBytes.t * sequence
 (** Generates the next random value as a bounded [int32] *)
 val take_int32 : sequence -> int32 -> int32 * sequence
 
-(** {2 Predefined seeds} *****************************************************)
+(** {2 Predefined seeds} *)
 
 val empty : seed
 
@@ -68,7 +68,7 @@ val deterministic_seed : seed -> seed
     concatenated with a constant. *)
 val initial_seeds : int -> seed list
 
-(** {2 Entropy} **************************************************************)
+(** {2 Entropy} *)
 
 (** A nonce for adding entropy to the generator *)
 type nonce
@@ -88,12 +88,12 @@ val check_hash : nonce -> Nonce_hash.t -> bool
 (** For using nonce hashes as keys in the hierarchical database *)
 val nonce_hash_key_part : Nonce_hash.t -> string list -> string list
 
-(** {2 Predefined nonce} *****************************************************)
+(** {2 Predefined nonce} *)
 
 val initial_nonce_0 : nonce
 val initial_nonce_hash_0 : Nonce_hash.t
 
-(** {2 Serializers} **********************************************************)
+(** {2 Serializers} *)
 
 val nonce_encoding  : nonce Data_encoding.t
 val seed_encoding : seed Data_encoding.t

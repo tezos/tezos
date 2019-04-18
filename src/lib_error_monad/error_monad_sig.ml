@@ -47,7 +47,7 @@ module type S = sig
   val json_of_error : error -> Data_encoding.json
   val error_of_json : Data_encoding.json -> error
 
-  (** {2 Error documentation} ************************************************)
+  (** {2 Error documentation} *)
 
   (** Error information *)
   type error_info =
@@ -62,7 +62,7 @@ module type S = sig
   (** Retrieves information of registered errors *)
   val get_registered_errors : unit -> error_info list
 
-  (** {2 Error classification} ***********************************************)
+  (** {2 Error classification} *)
 
   (** The error data type is extensible. Each module can register specialized
       error serializers
@@ -86,7 +86,7 @@ module type S = sig
   (** Classify an error using the registered kinds *)
   val classify_errors : error list -> error_category
 
-  (** {2 Monad definition} ***************************************************)
+  (** {2 Monad definition} *)
 
   (** The error monad wrapper type, the error case holds a stack of
       error, initialized by the first call to {!fail} and completed by
@@ -171,7 +171,7 @@ module type S = sig
     bool -> string ->
     ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 -> 'a
 
-  (** {2 In-monad list iterators} ********************************************)
+  (** {2 In-monad list iterators} *)
 
   (** A {!List.iter} in the monad *)
   val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t

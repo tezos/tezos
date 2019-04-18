@@ -25,11 +25,12 @@
 
 (** PVSS protocol, following
 
-    @see Schoenmakers, B., 1999:
+    see Schoenmakers, B., 1999:
     A simple publicly verifiable secret sharing scheme
     and its application to electronic voting. Lecture Notes in Computer Science,
     pp.148-164.
-    @see https://www.win.tue.nl/~berry/papers/crypto99.pdf
+
+    see https://www.win.tue.nl/~berry/papers/crypto99.pdf
 
     The protocol is expressed as a functor parametrized by a cyclic group
     of prime order. Algebraic properties are enforced at the type level,

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {1 Errors} ****************************************************************)
+(** {1 Errors} *)
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -40,7 +40,7 @@ type error += Failed_to_decode_parameter of Data_encoding.json * string
 
 val storage_error: storage_error -> 'a tzresult Lwt.t
 
-(** {1 Abstract Context} **************************************************)
+(** {1 Abstract Context} *)
 
 (** Abstract view of the context.
     Includes a handle to the functional key-value database
@@ -129,7 +129,7 @@ val origination_nonce: t -> Contract_repr.origination_nonce tzresult
 val increment_origination_nonce: t -> (t * Contract_repr.origination_nonce) tzresult
 val unset_origination_nonce: t -> t
 
-(** {1 Generic accessors} *************************************************)
+(** {1 Generic accessors} *)
 
 type key = string list
 
