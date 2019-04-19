@@ -30,9 +30,9 @@ Website http://www.ocaml.org below gives a few pointer for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
 
-Then, if you don’t know well about the Lwt library, that’s what you want
-to learn. This library is used extensively throughout the code base, as
-that’s the one we use to handle concurrency, and Tezos is a very
+Then, if you don’t know much about the Lwt library, that’s what you want
+to learn next. This library is used extensively throughout the code base, as
+that’s the one we use to handle concurrency; and Tezos is a very
 concurrent system. You can use the `online documentation <https://ocsigen.org/lwt/3.2.1/manual/manual>`__. The chapter on concurrency of `Real World
 OCaml <https://github.com/dkim/rwo-lwt>`__ has also been ported to Lwt.
 
@@ -59,10 +59,10 @@ contribute, simply create an account there.
 
 Then, there are many ways to use Git, here is ours.
 
-We use almost only merge requests to push into master. Meaning, nobody
-should push directly into master. Once a merge request is ready, it is
-reviewed and approved, we merge it using the ``--fast-forward`` option
-of Git, in order to maintain a linear history without merge patches.
+We mostly use merge requests for master, meaning that nobody should be pushing
+into master directly. Once a merge request is ready, it is reviewed and
+approved, then merged using the ``--fast-forward`` option of Git in order to
+maintain a linear history without merge patches.
 
 For that to work, it means that merge requests must be direct suffixes
 of the master branch. So whenever ``origin/master`` changes, you have to
@@ -121,10 +121,10 @@ painful for everybody. The reviewer is your ally, not your enemy.
 - Commented code: Did I remove any commented out lines?
   Did I leave a ``TODO`` or an old comment?
 
-- Docstrings: Did I exported a new function? Each exported
+- Docstrings: Did I export a new function? Each exported
   function should be documented in the corresponding ``mli`` .
 
-- Readability: Is the code easy to understand? Is it worth to add
+- Readability: Is the code easy to understand? Is it worth adding
   a comment to the code to explain a particular operation and its
   repercussion on the rest of the code?
 
@@ -167,9 +167,9 @@ pitfalls a code reviewer should avoid.
 - Suggest importance of fixes: While offering many suggestions at once, it is
   important to also clarify that not all of them need to be acted upon and some
   are more important than others. It gives an important guidance to the developer
-  to improve its work incrementally.
+  to improve their work incrementally.
 
-- Take the developer opinion into consideration: Imposing a particular design
+- Take the developer's opinion into consideration: Imposing a particular design
   choice out of personal preferences and without a real explanation will
   incentivize the developer to be a passive executor instead of a creative agent.
 
@@ -182,7 +182,7 @@ pitfalls a code reviewer should avoid.
 - Consider the person you are reviewing: Each developer is a person. If you
   know the person, consider their personality and experience while reviewing their
   code. Sometime it is possible with somebody to be more direct and terse, while
-  other people require to better explain a suggestion.
+  other people require a more thorough explaination.
 
 - Avoid confrontational and authoritative language: The way we communicate has
   an impact on the receiver. If communicating a problem in the code or a

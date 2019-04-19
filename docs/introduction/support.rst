@@ -17,7 +17,7 @@ to find answers.
   main meeting point for the Tezos community, for technical,
   economical and just random questions. They also have a nicely
   curated list of resources.
-- For anything baking related `Obsidian Systems
+- For anything baking related, `Obsidian Systems
   <https://obsidian.systems>`_ is running a dedicated Slack channel,
   contact them to get access.
 - There is a *#tezos* IRC channel on *freenode* that is reserved for
