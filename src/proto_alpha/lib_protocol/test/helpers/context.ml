@@ -227,6 +227,7 @@ let init
     ?endorsers_per_block
     ?commitments
     ?(initial_balances = [])
+    ?(minimum_endorsements_per_priority = [])
     n =
   let accounts = Account.generate_accounts ~initial_balances n in
   let contracts = List.map (fun (a, _) ->
@@ -237,6 +238,7 @@ let init
         ?preserved_cycles
         ?endorsers_per_block
         ?commitments
+        ~minimum_endorsements_per_priority
         accounts
     else
       Block.genesis
@@ -247,6 +249,7 @@ let init
         ~blocks_per_voting_period:(Int32.mul 32l 8l)
         ?endorsers_per_block
         ?commitments
+        ~minimum_endorsements_per_priority
         accounts
   end >>=? fun blk ->
   return (blk, contracts)

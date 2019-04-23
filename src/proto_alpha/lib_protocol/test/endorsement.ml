@@ -70,6 +70,23 @@ let assert_endorser_balance_consistency ~loc ?(priority=0) ?(nb_baking=0) ~nb_en
   Context.Contract.balance ~kind:Deposit ctxt contract >>=? fun deposit_balance ->
   Assert.equal_tez ~loc deposit_balance deposit
 
+(* calculate the smallest sublist of delegates -- with their first slot -- such that
+   their total number of slots >= needed_endorsements;
+   these delegates can provide the necessary endorsements for a block to be baked *)
+let rec get_min_delegates_to_endorse acc_s acc_delegates endorsers needed_endorsements =
+  match endorsers with
+  | [] -> acc_delegates
+  | endorser :: tail ->
+      begin
+        let delegate = endorser.Delegate_services.Endorsing_rights.delegate in
+        let slots = endorser.Delegate_services.Endorsing_rights.slots in
+        let new_s = acc_s + (List.length slots) in
+        let new_acc_delegates = (delegate, List.hd slots) :: acc_delegates in
+        if new_s < needed_endorsements then
+          get_min_delegates_to_endorse new_s new_acc_delegates tail needed_endorsements
+        else new_acc_delegates
+      end
+
 (****************************************************************)
 (*                      Tests                                   *)
 (****************************************************************)
@@ -331,14 +348,68 @@ let no_enough_for_deposit () =
     | _ -> false
   end
 
+let decrease_threshold priority () =
+  let minimum_endorsements_per_priority = [32; 24; 16; 8; 4; 2; 1] in
+  Context.init ~minimum_endorsements_per_priority 32 >>=? fun (b, _) ->
+  Context.get_endorsers (B b) >>=? fun endorsers ->
+  (* check that any bake at priorities < priority fail because no endorsements *)
+  fold_left_s
+    (fun b i -> Block.bake ~policy:(By_priority i) b >>= fun b2 ->
+      Assert.proto_error ~loc:__LOC__ b2 begin function
+        | Apply.Not_enough_endorsements_for_priority _ -> true
+        | _ -> false
+      end >>=? fun () -> return b)
+    b (1 -- priority) >>=? fun b ->
+  let needed_endorsements = List.nth minimum_endorsements_per_priority (priority - 1) in
+  let delegates_with_slots = get_min_delegates_to_endorse 0 [] endorsers needed_endorsements in
+  map_s (fun x ->  Op.endorsement ~delegate:x (B b) ()) delegates_with_slots >>=? fun ops ->
+  (* bake at priority succeed thanks to enough endorsements *)
+  Block.bake
+    ~policy:(By_priority priority)
+    ~operations:(List.map Operation.pack ops)
+    b >>= fun _ -> return_unit
+
+let test_fitness_gap () =
+  let minimum_endorsements_per_priority = [17; 9; 5; 2; 1] in
+  let n = List.length minimum_endorsements_per_priority in
+  Context.init ~minimum_endorsements_per_priority 32 >>=? fun (b, _) ->
+  begin
+    match Fitness_repr.to_int64 b.header.shell.fitness with
+    | Ok fitness ->
+        return (Int64.to_int fitness)
+    | Error _ -> assert false
+  end >>=? fun fitness ->
+  fold_left_s (fun b i ->
+      let needed_endorsements = List.nth minimum_endorsements_per_priority i in
+      Context.get_endorsers (B b) >>=? fun endorsers ->
+      let delegates_with_slots = get_min_delegates_to_endorse 0 [] endorsers needed_endorsements in
+      map_s (fun x ->  Op.endorsement ~delegate:x (B b) ()) delegates_with_slots >>=? fun ops ->
+      (* bake at priority i succeed thanks to enough endorsements *)
+      Block.bake
+        ~policy:(By_priority i)
+        ~operations:(List.map Operation.pack ops)
+        b >>=? fun b ->
+      begin
+        match Fitness_repr.to_int64 b.header.shell.fitness with
+        | Ok new_fitness ->
+            return ((Int64.to_int new_fitness) - fitness)
+        | Error _ -> assert false
+      end >>=? fun res ->
+      (* in EmmyB, fitness increases by 1, so the difference between
+         fitness at level i and at level 0 is i+1 *)
+      Assert.equal_int ~loc:__LOC__ res (i+1) >>=? fun () ->
+      return b
+    ) b (0 -- (n - 1)) >>=? fun _ -> return_unit
+
 let tests = [
   Test.tztest "Simple endorsement" `Quick simple_endorsement ;
   Test.tztest "Maximum endorsement" `Quick max_endorsement ;
-
   Test.tztest "Consistent priority" `Quick consistent_priority ;
   Test.tztest "Consistent priorities" `Quick consistent_priorities ;
   Test.tztest "Reward retrieval" `Quick reward_retrieval ;
   Test.tztest "Reward retrieval two endorsers" `Quick reward_retrieval_two_endorsers ;
+  Test.tztest "Decrease threshold" `Quick (decrease_threshold 5) ;
+  Test.tztest "fitness_gap" `Quick test_fitness_gap ;
 
   (* Fail scenarios *)
   Test.tztest "Wrong endorsement predecessor" `Quick wrong_endorsement_predecessor ;

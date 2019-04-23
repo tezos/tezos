@@ -314,8 +314,8 @@ let minimum_allowed_endorsements ctxt ~block_priority ~block_delay =
       (Period.to_seconds
          (Constants.delay_per_missing_endorsement ctxt))
   in
-  let reduced_time_constrait =
+  let reduced_time_constraint =
     Int64.to_int (Period.to_seconds block_delay) /
     delay_per_missing_endorsement
   in
-  Compare.Int.max 0 (minimum - reduced_time_constrait)
+  Compare.Int.max 0 (minimum - reduced_time_constraint)

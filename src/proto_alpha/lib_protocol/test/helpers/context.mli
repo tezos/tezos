@@ -108,4 +108,5 @@ val init:
   ?endorsers_per_block:int ->
   ?commitments:Commitment_repr.t list ->
   ?initial_balances: int64 list ->
+  ?minimum_endorsements_per_priority: int list ->
   int -> (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

@@ -107,18 +107,24 @@ val dawn_of_a_new_cycle: context -> Cycle.t option tzresult Lwt.t
 
 val earlier_predecessor_timestamp: context -> Level.t -> Timestamp.t tzresult Lwt.t
 
-(** Since Emmy B
+(** Since Emmy-B
 
-    Blocks are only valid if they contains a minimal amount of endorsments that
-    depends on their priority and the delay between the minimal time allowed for
-    baking that priority and the actual timestamp for the block.
+    A block is valid only if it contains a minimal amount of
+    endorsments that depends on the block's priority and the delay
+    between the minimal time allowed for baking at that priority and
+    the actual timestamp of the block.
 
-    This counterbalances the removal of fitness increase per endorsments. Combined,
-    those choices simplifies the optimal baking strategy. They used to have to choose
-    whether to wait for more endorsements to include in their block or publish it.
-    The incentive for including more endorsements was to increase the fitness and win
-    against unknown blocks, but when a block was produced too late in the priority
-    period, it took the risk of not reaching endorsers before the block of next
-    priority. Now the baker can't decide to publish it too early. *)
+    In Emmy-B, blocks' fitness increases by one unit with each level.
+
+    In this way, Emmy-B simplifies the optimal baking strategy: The
+    bakers used to have to choose whether to wait for more endorsements
+    to include in their block, or to publish the block immediately,
+    without waiting. The incentive for including more endorsements was
+    to increase the fitness and win against unknown blocks. However,
+    when a block was produced too late in the priority period, there
+    was the risk that the block did not reach endorsers before the
+    block of next priority. In Emmy-B, the baker does not need to take
+    such a decision, because the baker cannot publish a block too
+    early. *)
 
 val minimum_allowed_endorsements: context -> block_priority:int -> block_delay:Period.t -> int
