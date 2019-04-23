@@ -13,7 +13,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-protocol-environment"
-  "tezos-protocol-000-Ps9mPmXa"
+  "tezos-protocol-genesis"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
@@ -21,4 +21,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: 000-Ps9mPmXa (protocol-specific commands for `tezos-client`)"
+synopsis: "Tezos/Protocol: genesis (protocol-specific commands for `tezos-client`)"

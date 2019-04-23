@@ -17,7 +17,7 @@ depends: [
   "tezos-client-004-Pt24m4xi"
   "tezos-client-commands"
   "tezos-node" { with-test }
-  "tezos-client-000-Ps9mPmXa" { with-test }
+  "tezos-client-genesis" { with-test }
   "tezos-client-base-unix" { with-test }
   "alcotest-lwt" { with-test }
 ]

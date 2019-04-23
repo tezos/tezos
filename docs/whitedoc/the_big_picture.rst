@@ -220,8 +220,8 @@ The Embedded Economic Protocols
 
 Three economic protocols are included in the main Tezos repository.
 
-  - :package:`tezos-protocol-000-Ps9mPmXa`
-    (:package:`tezos-embedded-protocol-000-Ps9mPmXa`) is the protocol of
+  - :package:`tezos-protocol-genesis`
+    (:package:`tezos-embedded-protocol-genesis`) is the protocol of
     the genesis block. It accepts a single block, signed by a activator
     whose public key is hardcoded, that single action is to switch to
     a new protocol chosen by the activator.
@@ -257,7 +257,7 @@ compatible, and library vs command line interface.
   - :package:`tezos-client-003-PsddFKi3-commands` plugs the functions from
     :package:`tezos-client-003-PsddFKi3` as handlers for the alpha specific
     commands of the ``tezos-client`` command line wallet.
-  - :package:`tezos-client-000-Ps9mPmXa` contains the basic activator
+  - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
   - :package:`tezos-client-base-unix` implements configuration file
     and wallet storage in Unix files, user interaction via the Unix

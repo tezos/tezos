@@ -13,10 +13,10 @@ depends: [
 build: [
   [ "%{tezos-protocol-compiler:lib}%/replace"
       "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
-      "dune" "000_Ps9mPmXa" ]
+      "dune" "genesis" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: 000_Ps9mPmXa (economic-protocol definition, functor version)"
+synopsis: "Tezos/Protocol: genesis (economic-protocol definition, functor version)"

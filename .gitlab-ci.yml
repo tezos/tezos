@@ -459,15 +459,15 @@ opam:43:tezos-baking-004-Pt24m4xi:
   variables:
     package: tezos-baking-004-Pt24m4xi
 
-opam:44:tezos-protocol-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-000-Ps9mPmXa
-
-opam:45:tezos-protocol-demo:
+opam:44:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
+
+opam:45:tezos-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis
 
 opam:46:ocplib-resto-json:
   <<: *opam_definition
@@ -499,45 +499,45 @@ opam:51:tezos-baking-004-Pt24m4xi-commands:
   variables:
     package: tezos-baking-004-Pt24m4xi-commands
 
-opam:52:tezos-client-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-000-Ps9mPmXa
-
-opam:53:tezos-client-003-PsddFKi3-commands:
+opam:52:tezos-client-003-PsddFKi3-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-003-PsddFKi3-commands
 
-opam:54:tezos-client-004-Pt24m4xi-commands:
+opam:53:tezos-client-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-004-Pt24m4xi-commands
 
-opam:55:tezos-client-base-unix:
+opam:54:tezos-client-base-unix:
   <<: *opam_definition
   variables:
     package: tezos-client-base-unix
 
-opam:56:tezos-client-demo:
+opam:55:tezos-client-demo:
   <<: *opam_definition
   variables:
     package: tezos-client-demo
+
+opam:56:tezos-client-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis
 
 opam:57:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
 
-opam:58:tezos-embedded-protocol-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-000-Ps9mPmXa
-
-opam:59:tezos-embedded-protocol-demo:
+opam:58:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
+
+opam:59:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
 
 opam:60:tezos-mempool-003-PsddFKi3:
   <<: *opam_definition

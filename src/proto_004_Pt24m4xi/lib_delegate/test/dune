@@ -6,7 +6,7 @@
             tezos-rpc-http
             tezos-shell-services
             tezos-client-base
-            tezos-client-000-Ps9mPmXa
+            tezos-client-genesis
             tezos-client-004-Pt24m4xi
             tezos-baking-004-Pt24m4xi
             tezos-client-base-unix
@@ -17,7 +17,7 @@
                    -open Tezos_rpc_http
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_000_Ps9mPmXa
+                   -open Tezos_client_genesis
                    -open Tezos_client_004_Pt24m4xi
                    -open Tezos_baking_004_Pt24m4xi
                    -open Tezos_client_base_unix)))
