@@ -109,6 +109,7 @@ uninstall:
 
 clean:
 	@-dune clean
+	@-find . -name dune-project -delete
 	@-rm -f \
 		tezos-node \
 		tezos-client \
