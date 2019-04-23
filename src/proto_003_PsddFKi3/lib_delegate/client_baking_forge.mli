@@ -26,19 +26,6 @@
 open Proto_alpha
 open Alpha_context
 
-module State : sig
-  val get:
-    #Client_context.wallet ->
-    Signature.Public_key_hash.t ->
-    Raw_level.t option tzresult Lwt.t
-
-  val record:
-    #Client_context.wallet ->
-    Signature.Public_key_hash.t ->
-    Raw_level.t ->
-    unit tzresult Lwt.t
-end
-
 val generate_seed_nonce: unit -> Nonce.t
 (** [generate_seed_nonce ()] is a random nonce that is typically used
     in block headers. When baking, bakers generate random nonces whose
@@ -48,11 +35,13 @@ val generate_seed_nonce: unit -> Nonce.t
 val inject_block:
   #Proto_alpha.full ->
   ?force:bool ->
-  ?chain:Chain_services.chain ->
   ?seed_nonce_hash:Nonce_hash.t ->
+  chain:Chain_services.chain ->
   shell_header:Block_header.shell_header ->
   priority:int ->
-  src_sk:Client_keys.sk_uri ->
+  delegate_pkh:Signature.Public_key_hash.t ->
+  delegate_sk:Client_keys.sk_uri ->
+  level: Raw_level.t ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
@@ -66,7 +55,6 @@ type error +=
 
 val forge_block:
   #Proto_alpha.full ->
-  ?chain:Chain_services.chain ->
   ?force:bool ->
   ?operations: Operation.packed list ->
   ?best_effort:bool ->
@@ -79,8 +67,10 @@ val forge_block:
   ?mempool:string ->
   ?context_path:string ->
   ?seed_nonce_hash:Nonce_hash.t ->
+  chain:Chain_services.chain ->
   priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
-  src_sk:Client_keys.sk_uri ->
+  delegate_pkh: Signature.Public_key_hash.t ->
+  delegate_sk: Client_keys.sk_uri ->
   Block_services.block ->
   Block_hash.t tzresult Lwt.t
 (** [forge_block cctxt ?fee_threshold ?force ?operations ?best_effort
@@ -111,20 +101,8 @@ val create:
   ?minimal_nanotez_per_byte: Z.t ->
   ?await_endorsements: bool ->
   ?max_priority: int ->
+  chain: Chain_services.chain ->
   context_path: string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
-  unit tzresult Lwt.t
-
-val get_unrevealed_nonces:
-  #Proto_alpha.full ->
-  ?force:bool ->
-  ?chain:Chain_services.chain ->
-  Block_services.block ->
-  (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t
-
-val filter_outdated_nonces:
-  #Proto_alpha.full ->
-  ?chain:Block_services.chain ->
-  Shell_services.block ->
   unit tzresult Lwt.t

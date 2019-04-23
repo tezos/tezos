@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -114,31 +115,72 @@ module Connection_message = struct
 
   type t = {
     port : int option ;
-    versions : P2p_version.t list ;
     public_key : Crypto_box.public_key ;
     proof_of_work_stamp : Crypto_box.nonce ;
     message_nonce : Crypto_box.nonce ;
+    version : Network_version.t ;
   }
+
+  let mainnet_stage1_version_encoding =
+    (* minimal ugly hack for migrating from original mainnet.
+
+       Original node will send a singleton list containing:
+
+         [{ chain_name = "TEZOS_BETANET_2018-06-30T16:07:32Z" ;
+            distributed_db_version = 0 ;
+            p2p_version = 0 }]
+
+       Symetrically, original mainnet node will only accept us if we
+       send them a list containing this version. Their
+       version-selection algorithm will always select this one. *)
+    let open Data_encoding in
+    conv
+      (fun v ->
+         [ v ;
+           (* always send the original announce. New nodes will ignore it,
+              and old node will select it whatever is the first version
+              in this list. *)
+           { Network_version.
+             chain_name = Distributed_db_version.old_chain_name ;
+             distributed_db_version = Distributed_db_version.zero ;
+             p2p_version = P2p_version.zero } ;
+         ])
+      (function
+        | [] ->
+            (* Unexpected value, let the version-selection algorithm
+               reject the connection by returning a dummy value. *)
+            { chain_name = Distributed_db_version.incompatible_chain_name ;
+              distributed_db_version = Distributed_db_version.zero ;
+              p2p_version = P2p_version.zero }
+        | [ v ] when v.chain_name = Distributed_db_version.old_chain_name ->
+            (* Incoming connection from a original mainnet node,
+               we replace the `chain_name` by the new one. *)
+            { v with chain_name = Distributed_db_version.chain_name }
+        | v :: _ ->
+            (* This is a announce by a upgraded node, we can safely
+               ignore the rest of the list. *)
+            v)
+      (Variable.list Network_version.encoding)
 
   let encoding =
     let open Data_encoding in
     conv
       (fun { port ; public_key ; proof_of_work_stamp ;
-             message_nonce ; versions } ->
+             message_nonce ; version } ->
         let port = match port with None -> 0 | Some port -> port in
         (port, public_key, proof_of_work_stamp,
-         message_nonce, versions))
+         message_nonce, version))
       (fun (port, public_key, proof_of_work_stamp,
-            message_nonce, versions) ->
+            message_nonce, version) ->
         let port = if port = 0 then None else Some port in
         { port ; public_key ; proof_of_work_stamp ;
-          message_nonce ; versions })
+          message_nonce ; version })
       (obj5
          (req "port" uint16)
          (req "pubkey" Crypto_box.public_key_encoding)
          (req "proof_of_work_stamp" Crypto_box.nonce_encoding)
          (req "message_nonce" Crypto_box.nonce_encoding)
-         (req "versions" (Variable.list P2p_version.encoding)))
+         (req "version" mainnet_stage1_version_encoding))
 
   let write ~canceler fd message =
     let encoded_message_len =
@@ -292,7 +334,7 @@ let authenticate
     ~canceler
     ~proof_of_work_target
     ~incoming fd (remote_addr, remote_socket_port as point)
-    ?listening_port identity supported_versions metadata_config =
+    ?listening_port identity announced_version metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
   lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
   Connection_message.write ~canceler fd
@@ -300,7 +342,7 @@ let authenticate
       proof_of_work_stamp = identity.proof_of_work_stamp ;
       message_nonce = local_nonce_seed ;
       port = listening_port ;
-      versions = supported_versions } >>=? fun sent_msg ->
+      version = announced_version } >>=? fun sent_msg ->
   Connection_message.read ~canceler fd >>=? fun (msg, recv_msg) ->
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port in
@@ -323,7 +365,7 @@ let authenticate
   Metadata.read ~canceler metadata_config fd cryptobox_data >>=? fun remote_metadata ->
   let info =
     { P2p_connection.Info.peer_id = remote_peer_id ;
-      versions = msg.versions ; incoming ;
+      announced_version = msg.version ; incoming ;
       id_point ; remote_socket_port ;
       private_node = metadata_config.private_node remote_metadata ;
       local_metadata ;

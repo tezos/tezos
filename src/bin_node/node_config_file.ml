@@ -51,6 +51,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
+  enable_testchain : bool ;
 }
 
 and rpc = {
@@ -76,6 +77,7 @@ let default_p2p_limits : P2p.limits = {
   connection_timeout = 10. ;
   authentication_timeout = 5. ;
   greylist_timeout = 86400 ; (* one day *)
+  maintenance_idle_time = 120. ; (* two minutes *)
   min_connections = 10 ;
   expected_connections = 50 ;
   max_connections = 100 ;
@@ -105,6 +107,7 @@ let default_p2p = {
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
+  enable_testchain = false ;
 }
 
 let default_rpc = {
@@ -133,6 +136,7 @@ let limit : P2p.limits Data_encoding.t =
   let open Data_encoding in
   conv
     (fun { P2p.connection_timeout ; authentication_timeout ; greylist_timeout ;
+           maintenance_idle_time ;
            min_connections ; expected_connections ; max_connections ;
            backlog ; max_incoming_connections ;
            max_download_speed ; max_upload_speed ;
@@ -152,7 +156,7 @@ let limit : P2p.limits Data_encoding.t =
            incoming_message_queue_size, outgoing_message_queue_size,
            known_points_history_size, known_peer_ids_history_size,
            max_known_points)),
-        (  max_known_peer_ids, greylist_timeout))))
+        (  max_known_peer_ids, greylist_timeout, maintenance_idle_time))))
     (fun (((( connection_timeout, authentication_timeout,
               min_connections, expected_connections,
               max_connections, backlog, max_incoming_connections,
@@ -162,8 +166,9 @@ let limit : P2p.limits Data_encoding.t =
               incoming_message_queue_size, outgoing_message_queue_size,
               known_points_history_size, known_peer_ids_history_size,
               max_known_points)),
-           (  max_known_peer_ids, greylist_timeout))) ->
+           (  max_known_peer_ids, greylist_timeout, maintenance_idle_time))) ->
       { connection_timeout ; authentication_timeout ; greylist_timeout ;
+        maintenance_idle_time ;
         min_connections ; expected_connections ;
         max_connections ; backlog ; max_incoming_connections ;
         max_download_speed ; max_upload_speed ;
@@ -234,26 +239,34 @@ let limit : P2p.limits Data_encoding.t =
                 default_p2p_limits.known_points_history_size)
              (opt "max_known_points" (tup2 uint16 uint16))
           ))
-       (obj2
+       (obj3
           (opt "max_known_peer_ids" (tup2 uint16 uint16))
           (dft "greylist-timeout"
              ~description: "GC delay for the greylists tables, in seconds."
              int31 default_p2p_limits.greylist_timeout)
-
-       ))
+          (dft "maintenance-idle-time"
+             ~description: "How long to wait at most, in seconds, \
+                            before running a maintenance loop."
+             float default_p2p_limits.maintenance_idle_time)
+       )
+    )
 
 let p2p =
   let open Data_encoding in
   conv
-    (fun { expected_pow ; bootstrap_peers ; listen_addr ; discovery_addr ;
-           private_mode ; limits ; disable_mempool } ->
-      ( expected_pow, bootstrap_peers, listen_addr, discovery_addr ,
-        private_mode, limits, disable_mempool ))
-    (fun ( expected_pow, bootstrap_peers, listen_addr, discovery_addr,
-           private_mode, limits, disable_mempool ) ->
-      { expected_pow ; bootstrap_peers ; listen_addr ; discovery_addr ;
-        private_mode ; limits ; disable_mempool })
-    (obj7
+    (fun { expected_pow ; bootstrap_peers ;
+           listen_addr ; discovery_addr ; private_mode ;
+           limits ; disable_mempool ; enable_testchain } ->
+      (expected_pow, bootstrap_peers,
+       listen_addr, discovery_addr, private_mode, limits,
+       disable_mempool, enable_testchain))
+    (fun (expected_pow, bootstrap_peers,
+          listen_addr, discovery_addr, private_mode, limits,
+          disable_mempool, enable_testchain) ->
+      { expected_pow ; bootstrap_peers ;
+        listen_addr ; discovery_addr ; private_mode ; limits ;
+        disable_mempool ; enable_testchain })
+    (obj8
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
                          difficulty, 24 signifies for example that at least 24 leading \
@@ -292,6 +305,14 @@ let p2p =
                          Default value is [false]. \
                          It can be used to decrease the memory and \
                          computation footprints of the node."
+          bool false)
+       (dft "enable_testchain"
+          ~description: "If set to [true], the node will spawn a \
+                         testchain during the protocol's testing \
+                         voting period. Default value is [false]. It \
+                         is disabled to decrease the node storage \
+                         usage and computation by droping the \
+                         validation of the test network blocks."
           bool false)
     )
 
@@ -467,7 +488,7 @@ let encoding =
        (req "p2p"
           ~description: "Configuration of network parameters" p2p)
        (dft "log"
-          ~description: "Configuration of network parameters"
+          ~description: "Configuration of logging parameters"
           Logging_unix.cfg_encoding Logging_unix.default_cfg)
        (dft "shell"
           ~description: "Configuration of network parameters"
@@ -506,6 +527,7 @@ let update
     ?rpc_listen_addr
     ?(private_mode = false)
     ?(disable_mempool = false)
+    ?(enable_testchain = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
@@ -559,6 +581,7 @@ let update
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
+    enable_testchain = cfg.p2p.enable_testchain || enable_testchain ;
   }
   and rpc : rpc = {
     listen_addr =

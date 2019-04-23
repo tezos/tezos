@@ -3,7 +3,7 @@
  (action
   (run %{bin:ocp-ocamlres} -format ocaml -o %{targets}
        %{lib:stdlib:camlinternalFormatBasics.cmi}
-       %{dep:.tezos_protocol_registerer.objs/tezos_protocol_registerer__Registerer.cmi}
+       %{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi})))
 
@@ -99,10 +99,18 @@
                    -open Tezos_stdlib_unix))
  (modules Main_embedded_packer))
 
+(executable
+ (name replace)
+ (libraries tezos-base tezos-stdlib-unix str)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix))
+ (modules Replace))
+
 (install
- (section share)
- (files jbuild_protocol_template
-        jbuild_embedded_protocol_template))
+ (section libexec)
+ (files (replace.exe as replace)
+        dune_protocol
+        dune_protocol.template))
 
 (alias
  (name runtest_indent)

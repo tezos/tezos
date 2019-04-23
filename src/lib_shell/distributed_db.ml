@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -931,11 +932,13 @@ let clear_block chain_db hash n =
   Raw_block_header.Table.clear_or_cancel chain_db.block_header_db.table hash
 
 let commit_block chain_db hash
-    header header_data operations operations_data result =
+    header header_data operations operations_data result
+    ~forking_testchain =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
   State.Block.store chain_db.chain_state
-    header header_data operations operations_data result >>=? fun res ->
+    header header_data operations operations_data result
+    ~forking_testchain >>=? fun res ->
   Raw_block_header.Table.resolve_pending chain_db.block_header_db.table hash header;
   clear_block chain_db hash header.shell.validation_passes ;
   return res
@@ -962,7 +965,8 @@ let watch_operation { operation_input } =
 
 module Raw = struct
   let encoding = P2p.Raw.encoding Message.cfg.encoding
-  let supported_versions = Message.cfg.versions
+  let chain_name = Message.cfg.chain_name
+  let distributed_db_versions = Message.cfg.distributed_db_versions
 end
 
 module Make
@@ -1141,4 +1145,3 @@ module Advertise = struct
           ) (P2p_peer.Table.fold (fun k v acc -> (k,v)::acc) chain_db.active_connections [])
 
 end
-

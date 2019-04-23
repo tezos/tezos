@@ -103,4 +103,3 @@ let apply_block bvp ~predecessor block_header operations =
         ~max_operations_ttl
         chain_id ~predecessor_block_header
         ~block_header operations
-

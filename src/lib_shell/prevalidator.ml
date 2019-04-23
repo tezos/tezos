@@ -642,8 +642,10 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                 return_unit
               else
                 failwith "Operation %a rejected by the mempool post filter" Operation_hash.pp oph
-          | _ ->
-              failwith "Error while applying operation %a" Operation_hash.pp oph
+          | res ->
+              failwith "Error while applying operation %a:@ %a"
+                Operation_hash.pp oph
+                Prevalidation.pp_result res
         else
           failwith "Operation %a rejected by the mempool pre filter" Operation_hash.pp oph
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,24 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Network protocol version. *)
+(** P2p-layer protocol version. *)
 
-(** Type of a network protocol version. *)
-type t = {
-  name : string ;
-  major : int ;
-  minor : int ;
-}
+(** An abstract version number for the low-level p2p layer. *)
+type t = private int
 
-val pp : Format.formatter -> t -> unit
-val encoding : t Data_encoding.t
+val pp: Format.formatter -> t -> unit
+val encoding: t Data_encoding.t
 
-(** Selects the prefered common version for a pair of version
-    lists. Used during network protocol negociation. If any, it is the
-    maximum one, in lexicographic order (name, then major, minor). *)
-val common : t list -> t list -> t option
+val supported: t list
 
-(** Gives the prefered version in a list: the one selected by
-    {!common} among the list of compatible ones. *)
-val best : t list -> t
-
+val zero: t

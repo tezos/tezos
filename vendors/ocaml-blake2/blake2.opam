@@ -10,7 +10,7 @@ dev-repo: "git://github.com/vbmithr/ocaml-blake2"
 build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
 run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
 depends: [
-  "dune" {build & >= "1.0.1"}
+  "dune" {build & >= "1.7"}
   "bigstring" {>= "0.1.1"}
   "alcotest" { with-test }
   "hex" {with-test & >= "1.2.0"}

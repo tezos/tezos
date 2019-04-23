@@ -31,7 +31,46 @@ type result = {
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
+  forking_testchain : bool ;
 }
+
+let update_testchain_status ctxt predecessor_header timestamp =
+  Context.get_test_chain ctxt >>= function
+  | Not_running -> return ctxt
+  | Running { expiration } ->
+      if Time.(expiration <= timestamp) then
+        Context.set_test_chain ctxt Not_running >>= fun ctxt ->
+        return ctxt
+      else
+        return ctxt
+  | Forking { protocol ; expiration } ->
+      let predecessor_hash = Block_header.hash predecessor_header in
+      let genesis = Context.compute_testchain_genesis predecessor_hash in
+      let chain_id = Chain_id.of_block_hash genesis in (* legacy semantics *)
+      Context.set_test_chain ctxt
+        (Running { chain_id ; genesis ;
+                   protocol ; expiration }) >>= fun ctxt ->
+      return ctxt
+
+let is_testchain_forking ctxt =
+  Context.get_test_chain ctxt >>= function
+  | Not_running | Running _ -> Lwt.return_false
+  | Forking _ -> Lwt.return_true
+
+let init_test_chain
+    ctxt forked_header =
+  Context.get_test_chain ctxt >>= function
+  | Not_running | Running _ -> assert false
+  | Forking { protocol ; _ } ->
+      begin match Registered_protocol.get protocol with
+        | Some proto -> return proto
+        | None -> fail (Missing_test_protocol protocol)
+      end >>=? fun (module Proto_test) ->
+      Proto_test.init ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt } ->
+      Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
+      Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
+      Context.commit_test_chain_genesis test_ctxt forked_header >>= fun genesis_header ->
+      return genesis_header
 
 let may_patch_protocol
     ~level
@@ -137,14 +176,14 @@ module Make(Proto : Registered_protocol.T) = struct
       operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
-    let pred_hash = Block_header.hash predecessor_block_header in
     check_block_header
       ~predecessor_block_header
       block_hash block_header >>=? fun () ->
     parse_block_header block_hash block_header >>=? fun block_header ->
     check_operation_quota block_hash operations >>=? fun () ->
-    Context.reset_test_chain
-      predecessor_context pred_hash block_header.shell.timestamp >>= fun context ->
+    update_testchain_status
+      predecessor_context predecessor_block_header
+      block_header.shell.timestamp >>=? fun context ->
     parse_operations block_hash operations >>=? fun operations ->
     (* TODO wrap 'proto_error' into 'block_error' *)
     Proto.begin_application
@@ -164,6 +203,11 @@ module Make(Proto : Registered_protocol.T) = struct
       (state, []) operations >>=? fun (state, ops_metadata) ->
     let ops_metadata = List.rev ops_metadata in
     Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+    (* reset_test_chain
+     *   validation_result.context
+     *   current_block_header
+     *   ~start_testchain >>=? fun forked_genesis_header -> *)
+    is_testchain_forking validation_result.context >>= fun forking_testchain ->
     may_patch_protocol
       ~level:block_header.shell.level validation_result >>=? fun validation_result ->
     Context.get_protocol validation_result.context >>= fun new_protocol ->
@@ -217,7 +261,7 @@ module Make(Proto : Registered_protocol.T) = struct
       ?message:validation_result.message
       validation_result.context >>= fun context_hash ->
     return ({ validation_result ; block_metadata ;
-              ops_metadata ; context_hash })
+              ops_metadata ; context_hash ; forking_testchain })
 
 end
 

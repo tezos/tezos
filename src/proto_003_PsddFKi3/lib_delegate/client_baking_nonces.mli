@@ -23,29 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
-open Alpha_context
+open Proto_alpha.Alpha_context
 
-type t = Nonce.t Block_hash.Map.t
+type t
 
-val load:
-  #Client_context.wallet ->
+val empty: t
+
+val load: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t tzresult Lwt.t
+
+val save: #Client_context.wallet -> [ `Nonce ] Client_baking_files.location -> t -> unit tzresult Lwt.t
+
+val mem: t -> Block_hash.t -> bool
+
+val find_opt: t -> Block_hash.t -> Nonce.t option
+
+val add: t -> Block_hash.t -> Nonce.t -> t
+
+val remove: t -> Block_hash.t -> t
+
+(** [filter_outdated_nonces] filters nonces older than 5 cycles in the
+    nonce file or nonces associated to blocks that cannot be retrieved
+*)
+val filter_outdated_nonces:
+  #Proto_alpha.full ->
+  ?constants: Constants.t ->
+  chain: Chain_services.chain ->
+  [ `Nonce ] Client_baking_files.location ->
+  t ->
   t tzresult Lwt.t
-val save:
-  #Client_context.wallet ->
-  t -> unit tzresult Lwt.t
-val mem:
-  #Client_context.wallet ->
-  Block_hash.t -> bool tzresult Lwt.t
-val find:
-  #Client_context.wallet ->
-  Block_hash.t -> Nonce.t option tzresult Lwt.t
-val add:
-  #Client_context.wallet ->
-  Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
-val del:
-  #Client_context.wallet ->
-  Block_hash.t -> unit tzresult Lwt.t
-val dels:
-  #Client_context.wallet ->
-  Block_hash.t list -> unit tzresult Lwt.t
+
+(** [get_unrevealed_nonces] retrieve registered nonces *)
+val get_unrevealed_nonces:
+  #Proto_alpha.full ->
+  [ `Nonce ] Client_baking_files.location ->
+  t ->
+  (Raw_level.t * Nonce.t) list tzresult Lwt.t

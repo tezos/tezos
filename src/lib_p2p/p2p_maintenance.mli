@@ -50,15 +50,32 @@ type bounds = {
   max_threshold: int ;
 }
 
+type config = {
+
+  maintenance_idle_time: float ;
+  (** How long to wait at most, in seconds, before running a maintenance loop. *)
+
+  greylist_timeout: int ;
+  (** GC delay for the greylists tables, in seconds. *)
+
+  private_mode: bool ;
+  (** If [true], only open outgoing/accept incoming connections
+      to/from peers whose addresses are in [trusted_peers], and inform
+      these peers that the identity of this node should be revealed to
+      the rest of the network. *)
+
+}
+
+
 type 'meta t
 (** Type of a maintenance worker. *)
 
 val create:
   ?discovery:P2p_discovery.t ->
-  bounds ->
+  config -> bounds ->
   ('msg, 'meta, 'meta_conn) P2p_pool.t ->
   'meta t
-(** [run ?discovery bounds pool] returns a maintenance worker, with
+(** [run ?discovery config bounds pool] returns a maintenance worker, with
     the [discovery] worker if present, for [pool] with connection targets
     specified in [bounds]. *)
 

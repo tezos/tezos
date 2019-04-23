@@ -32,6 +32,7 @@ module Status = struct
     | Incorrect_class
     | Ins_not_supported
     | Memory_error
+    | Referenced_data_not_found
     | Technical_problem of int
     | Ok
     | Unknown of int
@@ -52,6 +53,7 @@ module Status = struct
     | 0x9000 -> Ok
     | 0x917e -> Incorrect_length_for_ins
     | 0x9200 -> Memory_error
+    | 0x6a88 -> Referenced_data_not_found
     | v when v >= 0x63c0 && v <= 0x63cf -> Invalid_pin (v land 0x0f)
     | v when v >= 0x6f00 && v <= 0x6fff -> Technical_problem (v land 0xff)
     | v -> Unknown v
@@ -71,6 +73,7 @@ module Status = struct
     | Incorrect_params -> "Incorrect params"
     | Ins_not_supported -> "Instruction not supported"
     | Technical_problem i -> "Technical problem " ^ string_of_int i
+    | Referenced_data_not_found -> "Referenced data not found"
     | Ok -> "Ok"
     | Unknown i -> Printf.sprintf "Unknown status code 0x%x" i
     | t ->

@@ -29,6 +29,18 @@ val may_patch_protocol:
   Tezos_protocol_environment_shell.validation_result ->
   Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
 
+val update_testchain_status:
+  Context.t ->
+  Block_header.t ->
+  Time.t ->
+  Context.t tzresult Lwt.t
+
+(** [init_test_chain] must only be called on a forking block. *)
+val init_test_chain:
+  Context.t ->
+  Block_header.t ->
+  Block_header.t tzresult Lwt.t
+
 val check_liveness:
   live_blocks:Block_hash.Set.t ->
   live_operations:Operation_hash.Set.t ->
@@ -41,6 +53,7 @@ type result = {
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
+  forking_testchain: bool ;
 }
 
 val apply:

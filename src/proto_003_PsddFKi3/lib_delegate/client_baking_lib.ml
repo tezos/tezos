@@ -28,7 +28,6 @@ open Alpha_context
 
 let bake_block
     (cctxt : #Proto_alpha.full)
-    ?(chain = `Main)
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
@@ -39,8 +38,8 @@ let bake_block
     ?mempool
     ?context_path
     ?src_sk
-    ?src_pk
-    block
+    ~chain
+    ~head
     delegate =
   begin
     match src_sk with
@@ -49,15 +48,8 @@ let bake_block
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  begin
-    match src_pk with
-    | None ->
-        Client_keys.get_key cctxt delegate >>=? fun (_, src_pk, _) ->
-        return src_pk
-    | Some pk -> return pk
-  end >>=? fun src_pk ->
   Alpha_services.Helpers.current_level
-    cctxt ~offset:1l (chain, block) >>=? fun level ->
+    cctxt ~offset:1l (chain, head) >>=? fun level ->
   let seed_nonce, seed_nonce_hash =
     if level.expected_commitment then
       let seed_nonce = Client_baking_forge.generate_seed_nonce () in
@@ -75,24 +67,30 @@ let bake_block
     ?seed_nonce_hash
     ?mempool
     ?context_path
+    ~chain
     ~priority:(`Auto (delegate, max_priority))
-    ~src_sk
-    block >>=? fun block_hash ->
-  let src_pkh = Signature.Public_key.hash src_pk in
-  Client_baking_forge.State.record cctxt src_pkh level.level >>=? fun () ->
+    ~delegate_pkh:delegate
+    ~delegate_sk:src_sk
+    head >>=? fun block_hash ->
   begin match seed_nonce with
     | None -> return_unit
     | Some seed_nonce ->
-        Client_baking_nonces.add cctxt block_hash seed_nonce
-        |> trace_exn (Failure "Error while recording block")
+        cctxt#with_lock begin fun () ->
+          let open Client_baking_nonces in
+          Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
+          load cctxt nonces_location >>=? fun nonces ->
+          let nonces = add nonces block_hash seed_nonce in
+          save cctxt nonces_location nonces
+        end |> trace_exn (Failure "Error while recording block")
   end >>=? fun () ->
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return_unit
 
-let endorse_block cctxt delegate =
+let endorse_block cctxt ~chain delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_baking_endorsement.forge_endorsement cctxt
-    cctxt#block ~src_sk src_pk >>=? fun oph ->
+    ~chain ~block:cctxt#block
+    ~src_sk src_pk >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node." >>= fun () ->
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return_unit
@@ -108,15 +106,15 @@ let get_predecessor_cycle (cctxt : #Client_context.printer) cycle =
           Cycle.pp cycle
   | Some cycle -> Lwt.return cycle
 
-let do_reveal cctxt block blocks =
-  let nonces = List.map snd blocks in
-  Client_baking_revelation.forge_seed_nonce_revelation
-    cctxt block nonces >>=? fun () ->
+let do_reveal cctxt ~chain ~block nonces =
+  Client_baking_revelation.inject_seed_nonce_revelation
+    cctxt ~chain ~block nonces >>=? fun () ->
   return_unit
 
-let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
+let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   cctxt#with_lock begin fun () ->
-    Client_baking_nonces.load cctxt
+    Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
+    Client_baking_nonces.load cctxt nonces_location
   end >>=? fun nonces ->
   Lwt_list.filter_map_p
     (fun hash ->
@@ -133,19 +131,25 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      match Block_hash.Map.find_opt bi.hash nonces with
+      match Client_baking_nonces.find_opt nonces bi.hash with
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->
           return_none
       | Some nonce ->
           return_some (bi.hash, (bi.level, nonce)))
-    block_infos >>=? fun blocks ->
-  do_reveal cctxt cctxt#block blocks
+    block_infos >>=? fun nonces ->
+  let nonces = List.map snd nonces in
+  do_reveal cctxt ~chain ~block nonces
 
-let reveal_nonces cctxt () =
-  Client_baking_forge.get_unrevealed_nonces
-    cctxt cctxt#block >>=? fun nonces ->
-  do_reveal cctxt cctxt#block nonces >>=? fun () ->
-  Client_baking_forge.filter_outdated_nonces cctxt cctxt#block >>=? fun () ->
-  return_unit
+let reveal_nonces (cctxt : #Proto_alpha.full) ~chain ~block () =
+  let open Client_baking_nonces in
+  cctxt#with_lock begin fun () ->
+    Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
+    load cctxt nonces_location >>=? fun nonces ->
+    get_unrevealed_nonces cctxt nonces_location nonces >>=? fun nonces_to_reveal ->
+    do_reveal cctxt ~chain ~block nonces_to_reveal >>=? fun () ->
+    filter_outdated_nonces cctxt ~chain nonces_location nonces >>=? fun nonces ->
+    save cctxt nonces_location nonces >>=? fun () ->
+    return_unit
+  end

@@ -62,5 +62,6 @@ type error +=
   | System_error of { errno: Unix.error ;
                       fn: string ;
                       msg: string }
+  | Missing_test_protocol of Protocol_hash.t
 
 val invalid_block : Block_hash.t -> block_error -> error

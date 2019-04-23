@@ -7,11 +7,14 @@
             tezos-rpc-http
             tezos-p2p
             tezos-shell
+	    tezos-storage
             tezos-protocol-updater
             tezos-embedded-protocol-demo
             tezos-embedded-protocol-000-Ps9mPmXa
             tezos-embedded-protocol-003-PsddFKi3
+            tezos-embedded-protocol-004-Pt24m4xi
             tezos-mempool-003-PsddFKi3
+            tezos-mempool-004-Pt24m4xi
             cmdliner
             tls)
  (flags (:standard -w -9+27-30-32-40@8
@@ -22,6 +25,7 @@
                    -open Tezos_rpc_http
                    -open Tezos_p2p
                    -open Tezos_shell
+		   -open Tezos_storage
                    -open Tezos_protocol_updater
                    -linkall)))
 

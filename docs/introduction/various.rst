@@ -378,6 +378,21 @@ for example, change the number of blocks per cycle, the time between
 blocks, etc.
 
 
+Preserve data
+~~~~~~~~~~~~~
+
+If you want to preserve data and configuration files at the end of your run, you
+can use the `DATA_DIR` environment variable.
+
+::
+
+    mkdir /tmp/tz-data
+    DATA_DIR='/tmp/tz-data' ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+
+You can even provide a custom `identity.json` and `config.json` to the
+sandboxed node by placing them in the data directory.
+
+
 .. _node-conf:
 
 Configuration options for the node

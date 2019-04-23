@@ -53,7 +53,7 @@ module Info : sig
     peer_id : P2p_peer_id.t;
     id_point : Id.t;
     remote_socket_port : P2p_addr.port;
-    versions : P2p_version.t list ;
+    announced_version : Network_version.t ;
     private_node : bool ;
     local_metadata : 'meta ;
     remote_metadata : 'meta ;

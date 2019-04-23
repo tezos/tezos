@@ -15,7 +15,7 @@ build: [
 run-test: ["dune" "runtest" "-p" name]
 
 depends: [
-  "dune" {build & >= "1.0.1"}
+  "dune" {build & >= "1.7"}
   "irmin"    {>= "1.4.0"}
   "lmdb"     {>= "0.1"}
 ]

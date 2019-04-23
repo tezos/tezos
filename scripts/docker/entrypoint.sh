@@ -36,8 +36,14 @@ case $command in
     tezos-baker)
         launch_baker "$@"
         ;;
+    tezos-baker-test)
+        launch_baker_test "$@"
+        ;;
     tezos-endorser)
         launch_endorser "$@"
+        ;;
+    tezos-endorser-test)
+        launch_endorser_test "$@"
         ;;
     tezos-accuser)
         launch_accuser "$@"
@@ -59,7 +65,9 @@ Available commands:
 - tezos-node [args]
 - tezos-client [args]
 - tezos-baker [keys]
+- tezos-baker-test [keys]
 - tezos-endorser [keys]
+- tezos-endorser-test [keys]
 - tezos-signer [args]
 EOF
         ;;

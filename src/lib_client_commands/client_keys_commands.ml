@@ -161,7 +161,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       | true -> return sk
       | false -> input_fundraiser_params cctxt
 
-let commands version : Client_context.io_wallet Clic.command list =
+let commands version : Client_context.full Clic.command list =
   let open Clic in
   let encrypted_switch () =
     if List.exists
@@ -192,7 +192,7 @@ let commands version : Client_context.io_wallet Clic.command list =
               version of the tezos client supports."
       no_options
       (fixed [ "list" ; "signing" ; "schemes" ])
-      (fun () (cctxt : Client_context.io_wallet) ->
+      (fun () (cctxt : Client_context.full) ->
          let signers =
            List.sort
              (fun (ka, _) (kb, _) -> String.compare ka kb)
@@ -210,7 +210,7 @@ let commands version : Client_context.io_wallet Clic.command list =
             (prefixes [ "gen" ; "keys" ]
              @@ Secret_key.fresh_alias_param
              @@ stop)
-            (fun (force, algo) name (cctxt : Client_context.io_wallet) ->
+            (fun (force, algo) name (cctxt : Client_context.full) ->
                Secret_key.of_fresh cctxt force name >>=? fun name ->
                let (pkh, pk, sk) = Signature.generate_key ~algo () in
                let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
@@ -222,7 +222,7 @@ let commands version : Client_context.io_wallet Clic.command list =
             (prefixes [ "gen" ; "keys" ]
              @@ Secret_key.fresh_alias_param
              @@ stop)
-            (fun (force, algo, encrypted) name (cctxt : Client_context.io_wallet) ->
+            (fun (force, algo, encrypted) name (cctxt : Client_context.full) ->
                Secret_key.of_fresh cctxt force name >>=? fun name ->
                let (pkh, pk, sk) = Signature.generate_key ~algo () in
                let pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
@@ -249,7 +249,7 @@ let commands version : Client_context.io_wallet Clic.command list =
              @@ Public_key_hash.fresh_alias_param
              @@ prefix "matching"
              @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
-            (fun (prefix, force) name containing (cctxt : Client_context.io_wallet) ->
+            (fun (prefix, force) name containing (cctxt : Client_context.full) ->
                Public_key_hash.of_fresh cctxt force name >>=? fun name ->
                gen_keys_containing ~encrypted:true ~force ~prefix ~containing ~name cctxt)
       | _ ->
@@ -266,7 +266,7 @@ let commands version : Client_context.io_wallet Clic.command list =
              @@ Public_key_hash.fresh_alias_param
              @@ prefix "matching"
              @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
-            (fun (prefix, force, encrypted) name containing (cctxt : Client_context.io_wallet) ->
+            (fun (prefix, force, encrypted) name containing (cctxt : Client_context.full) ->
                Public_key_hash.of_fresh cctxt force name >>=? fun name ->
                gen_keys_containing ~encrypted ~force ~prefix ~containing ~name cctxt)
     end ;
@@ -275,7 +275,7 @@ let commands version : Client_context.io_wallet Clic.command list =
       no_options
       (prefixes [ "encrypt" ; "secret" ; "key" ]
        @@ stop)
-      (fun () (cctxt : Client_context.io_wallet) ->
+      (fun () (cctxt : Client_context.full) ->
          cctxt#prompt_password "Enter unencrypted secret key: " >>=? fun sk_uri ->
          let sk_uri = Uri.of_string (MBytes.to_string sk_uri) in
          begin match Uri.scheme sk_uri with
@@ -295,7 +295,7 @@ let commands version : Client_context.io_wallet Clic.command list =
        @@ Secret_key.fresh_alias_param
        @@ Client_keys.sk_uri_param
        @@ stop)
-      (fun force name sk_uri (cctxt : Client_context.io_wallet) ->
+      (fun force name sk_uri (cctxt : Client_context.full) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          Client_keys.neuterize sk_uri >>=? fun pk_uri ->
          begin
@@ -307,7 +307,7 @@ let commands version : Client_context.io_wallet Clic.command list =
                     "public and secret keys '%s' don't correspond, \
                      please don't use --force" name)
          end >>=? fun () ->
-         Client_keys.public_key_hash ~interactive:cctxt pk_uri
+         Client_keys.public_key_hash ~interactive:(cctxt:>Client_context.io_wallet) pk_uri
          >>=? fun (pkh, public_key) ->
          cctxt#message
            "Tezos address added: %a"
@@ -321,7 +321,7 @@ let commands version : Client_context.io_wallet Clic.command list =
          @@ prefixes [ "fundraiser" ; "secret" ; "key" ]
          @@ Secret_key.fresh_alias_param
          @@ stop)
-        (fun force name (cctxt : Client_context.io_wallet) ->
+        (fun force name (cctxt : Client_context.full) ->
            Secret_key.of_fresh cctxt force name >>=? fun name ->
            input_fundraiser_params cctxt >>=? fun sk ->
            Tezos_signer_backends.Encrypted.encrypt cctxt sk >>=? fun sk_uri ->
@@ -346,7 +346,7 @@ let commands version : Client_context.io_wallet Clic.command list =
        @@ Public_key.fresh_alias_param
        @@ Client_keys.pk_uri_param
        @@ stop)
-      (fun force name pk_uri (cctxt : Client_context.io_wallet) ->
+      (fun force name pk_uri (cctxt : Client_context.full) ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
          Client_keys.public_key_hash pk_uri >>=? fun (pkh, public_key) ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
@@ -368,7 +368,7 @@ let commands version : Client_context.io_wallet Clic.command list =
     command ~group ~desc: "List all addresses and associated keys."
       no_options
       (fixed [ "list" ; "known" ; "addresses" ])
-      (fun () (cctxt : #Client_context.io_wallet) ->
+      (fun () (cctxt : #Client_context.full) ->
          list_keys cctxt >>=? fun l ->
          iter_s begin fun (name, pkh, pk, sk) ->
            Public_key_hash.to_source pkh >>=? fun v ->
@@ -390,7 +390,7 @@ let commands version : Client_context.io_wallet Clic.command list =
       (prefixes [ "show" ; "address"]
        @@ Public_key_hash.alias_param
        @@ stop)
-      (fun show_private (name, _) (cctxt : #Client_context.io_wallet) ->
+      (fun show_private (name, _) (cctxt : #Client_context.full) ->
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with
          | None ->
@@ -421,7 +421,7 @@ let commands version : Client_context.io_wallet Clic.command list =
       (prefixes [ "forget" ; "address"]
        @@ Public_key_hash.alias_param
        @@ stop)
-      (fun force (name, _pkh) (cctxt : Client_context.io_wallet) ->
+      (fun force (name, _pkh) (cctxt : Client_context.full) ->
          Secret_key.mem cctxt name >>=? fun has_secret_key ->
          Public_key.mem cctxt name >>=? fun has_public_key ->
          fail_when (not force && (has_secret_key || has_public_key))
@@ -436,7 +436,7 @@ let commands version : Client_context.io_wallet Clic.command list =
                 ~long:"force" ~short:'f'
                 ~doc:"you got to use the force for that" ()))
       (fixed [ "forget" ; "all" ; "keys" ])
-      (fun force (cctxt : Client_context.io_wallet) ->
+      (fun force (cctxt : Client_context.full) ->
          fail_unless force
            (failure "this can only be used with option --force") >>=? fun () ->
          Public_key.set cctxt [] >>=? fun () ->
@@ -452,7 +452,7 @@ let commands version : Client_context.io_wallet Clic.command list =
          ~name: "data"
          ~desc: "string from which to deterministically generate the nonce"
        @@ stop)
-      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+      (fun () (name, _pkh) data (cctxt : Client_context.full) ->
          let data = MBytes.of_string data in
          Secret_key.mem cctxt name >>=? fun sk_present ->
          fail_unless sk_present
@@ -470,7 +470,7 @@ let commands version : Client_context.io_wallet Clic.command list =
          ~name: "data"
          ~desc: "string from which to deterministically generate the nonce hash"
        @@ stop)
-      (fun () (name, _pkh) data (cctxt : Client_context.io_wallet) ->
+      (fun () (name, _pkh) data (cctxt : Client_context.full) ->
          let data = MBytes.of_string data in
          Secret_key.mem cctxt name >>=? fun sk_present ->
          fail_unless sk_present

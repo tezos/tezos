@@ -34,10 +34,13 @@ type limits = {
 val create:
   ?max_child_ttl:int ->
   start_prevalidator:bool ->
+  start_testchain:bool ->
+  active_chains: t Chain_id.Table.t ->
   Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->
   State.Block.t Lwt_watcher.input ->
+  (Chain_id.t * bool) Lwt_watcher.input ->
   Distributed_db.t ->
   State.Chain.t ->
   limits ->

@@ -43,7 +43,7 @@ let commands () = Clic.[
        stop)
       (fun unique prefix (cctxt : #Client_context.full) ->
          Shell_services.Blocks.Helpers.complete
-           cctxt ~block:cctxt#block prefix >>=? fun completions ->
+           cctxt ~chain:cctxt#chain ~block:cctxt#block prefix >>=? fun completions ->
          match completions with
          | [] -> Pervasives.exit 3
          | _ :: _ :: _ when unique -> Pervasives.exit 3

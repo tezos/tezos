@@ -50,7 +50,8 @@ type 'msg app_message_encoding = 'msg P2p_pool.encoding =
 
 type 'msg message_config = 'msg P2p_pool.message_config = {
   encoding : 'msg app_message_encoding list ;
-  versions : P2p_version.t list;
+  chain_name : Distributed_db_version.name ;
+  distributed_db_versions : Distributed_db_version.t list ;
 }
 
 type config = {
@@ -65,6 +66,7 @@ type config = {
   proof_of_work_target : Crypto_box.target ;
   disable_mempool : bool ;
   trust_discovered_peers : bool ;
+  disable_testchain : bool ;
 }
 
 type limits = {
@@ -72,6 +74,7 @@ type limits = {
   connection_timeout : float ;
   authentication_timeout : float ;
   greylist_timeout : int ;
+  maintenance_idle_time : float ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -126,7 +129,6 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     max_incoming_connections = limits.max_incoming_connections ;
     connection_timeout = limits.connection_timeout ;
     authentication_timeout = limits.authentication_timeout ;
-    greylist_timeout = limits.greylist_timeout ;
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;
@@ -171,11 +173,15 @@ let create_maintenance_worker limits pool config =
     bounds
       ~min:limits.min_connections
       ~expected:limits.expected_connections
-      ~max:limits.max_connections
-  in
-  let discovery =
-    may_create_discovery_worker limits config pool in
-  P2p_maintenance.create ?discovery bounds pool
+      ~max:limits.max_connections in
+  let maintenance_config = {
+    P2p_maintenance.
+    maintenance_idle_time = limits.maintenance_idle_time ;
+    greylist_timeout = limits.greylist_timeout ;
+    private_mode = config.private_mode ;
+  } in
+  let discovery = may_create_discovery_worker limits config pool in
+  P2p_maintenance.create ?discovery maintenance_config bounds pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
@@ -355,12 +361,12 @@ module Fake = struct
     current_inflow = 0 ;
     current_outflow = 0 ;
   }
-  let connection_info faked_metadata = {
+  let connection_info announced_version faked_metadata = {
     P2p_connection.Info.incoming = false ;
     peer_id = id.peer_id ;
     id_point = (Ipaddr.V6.unspecified, None) ;
     remote_socket_port = 0 ;
-    versions = [] ;
+    announced_version ;
     local_metadata = faked_metadata ;
     remote_metadata = faked_metadata ;
     private_node = false ;
@@ -369,7 +375,7 @@ module Fake = struct
 end
 
 type ('msg, 'peer_meta, 'conn_meta) t = {
-  versions : P2p_version.t list ;
+  announced_version : Network_version.t ;
   peer_id : P2p_peer.Id.t ;
   maintain : unit -> unit Lwt.t ;
   roll : unit -> unit Lwt.t ;
@@ -452,7 +458,11 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
   check_limits limits >>=? fun () ->
   Real.create ~config ~limits peer_cfg conn_cfg msg_cfg  >>=? fun net ->
   return {
-    versions = msg_cfg.versions ;
+    announced_version =
+      Network_version.announced
+        ~chain_name: msg_cfg.chain_name
+        ~distributed_db_versions: msg_cfg.distributed_db_versions
+        ~p2p_versions: P2p_version.supported ;
     peer_id = Real.peer_id net ;
     maintain = Real.maintain net ;
     roll = Real.roll net  ;
@@ -483,33 +493,40 @@ let activate t =
   log_info "activate P2P layer !";
   t.activate ()
 
-let faked_network peer_cfg faked_metadata = {
-  versions = [] ;
-  peer_id = Fake.id.peer_id ;
-  maintain = Lwt.return ;
-  roll = Lwt.return ;
-  shutdown = Lwt.return ;
-  connections = (fun () -> []) ;
-  find_connection = (fun _ -> None) ;
-  disconnect = (fun ?wait:_ _ -> Lwt.return_unit) ;
-  connection_info = (fun _ -> Fake.connection_info faked_metadata) ;
-  connection_local_metadata = (fun _ -> faked_metadata) ;
-  connection_remote_metadata = (fun _ -> faked_metadata) ;
-  connection_stat = (fun _ -> Fake.empty_stat) ;
-  global_stat = (fun () -> Fake.empty_stat) ;
-  get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial ()) ;
-  set_peer_metadata = (fun _ _ -> ()) ;
-  recv = (fun _ -> Lwt_utils.never_ending ()) ;
-  recv_any = (fun () -> Lwt_utils.never_ending ()) ;
-  send = (fun _ _ -> fail P2p_errors.Connection_closed) ;
-  try_send = (fun _ _ -> false) ;
-  fold_connections = (fun ~init ~f:_ -> init) ;
-  iter_connections = (fun _f -> ()) ;
-  on_new_connection = (fun _f -> ()) ;
-  broadcast = ignore ;
-  pool = None ;
-  activate = (fun _ -> ()) ;
-}
+let faked_network (msg_cfg : 'msg message_config) peer_cfg faked_metadata =
+  let announced_version =
+    Network_version.announced
+      ~chain_name: msg_cfg.chain_name
+      ~distributed_db_versions: msg_cfg.distributed_db_versions
+      ~p2p_versions: P2p_version.supported in
+  {
+    announced_version ;
+    peer_id = Fake.id.peer_id ;
+    maintain = Lwt.return ;
+    roll = Lwt.return ;
+    shutdown = Lwt.return ;
+    connections = (fun () -> []) ;
+    find_connection = (fun _ -> None) ;
+    disconnect = (fun ?wait:_ _ -> Lwt.return_unit) ;
+    connection_info =
+      (fun _ -> Fake.connection_info announced_version faked_metadata) ;
+    connection_local_metadata = (fun _ -> faked_metadata) ;
+    connection_remote_metadata = (fun _ -> faked_metadata) ;
+    connection_stat = (fun _ -> Fake.empty_stat) ;
+    global_stat = (fun () -> Fake.empty_stat) ;
+    get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial ()) ;
+    set_peer_metadata = (fun _ _ -> ()) ;
+    recv = (fun _ -> Lwt_utils.never_ending ()) ;
+    recv_any = (fun () -> Lwt_utils.never_ending ()) ;
+    send = (fun _ _ -> fail P2p_errors.Connection_closed) ;
+    try_send = (fun _ _ -> false) ;
+    fold_connections = (fun ~init ~f:_ -> init) ;
+    iter_connections = (fun _f -> ()) ;
+    on_new_connection = (fun _f -> ()) ;
+    broadcast = ignore ;
+    pool = None ;
+    activate = (fun _ -> ()) ;
+  }
 
 let peer_id net = net.peer_id
 let maintain net = net.maintain ()
@@ -612,7 +629,7 @@ let build_rpc_directory net =
 
   let dir =
     RPC_directory.register0 dir P2p_services.S.versions begin fun () () ->
-      return net.versions
+      return [net.announced_version]
     end in
 
   let dir =

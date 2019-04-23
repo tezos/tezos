@@ -52,6 +52,10 @@ class type wallet = object
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 end
 
+class type chain = object
+  method chain : Shell_services.chain
+end
+
 class type block = object
   method block : Shell_services.block
   method confirmations : int option
@@ -74,6 +78,7 @@ class type full = object
   inherit prompter
   inherit wallet
   inherit RPC_context.json
+  inherit chain
   inherit block
 end
 

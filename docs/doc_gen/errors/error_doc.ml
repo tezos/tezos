@@ -39,7 +39,7 @@ let default_section_title = "Miscellaneous"
    bottom of the document. Unprefixed ids or unreferenced prefixes
    will default to `Miscellaneous` *)
 let section_titles =
-  [ [ "proto.alpha" ], "Protocol Alpha";
+  [ [ "proto.003-PsddFKi3" ], "Protocol Alpha";
     [ "distributed_db" ; "node" ; "raw_store" ; "validator" ; "worker" ], "Shell" ;
     [ "micheline" ; "michelson" ], "Michelson parsing/macros" ;
     [ "rpc_client" ], "Client" ;

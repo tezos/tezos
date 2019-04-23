@@ -55,7 +55,8 @@ type 'msg app_message_encoding = Encoding : {
 
 type 'msg message_config = {
   encoding : 'msg app_message_encoding list ;
-  versions : P2p_version.t list;
+  chain_name : Distributed_db_version.name ;
+  distributed_db_versions : Distributed_db_version.t list ;
 }
 
 (** Network configuration *)
@@ -102,6 +103,8 @@ type config = {
   trust_discovered_peers : bool ;
   (** If [true], peers discovered on the local network will be trusted. *)
 
+  disable_testchain : bool ;
+  (** If [true], testchain related messages will be ignored. *)
 }
 
 (** Network capacities *)
@@ -115,6 +118,9 @@ type limits = {
 
   greylist_timeout : int ;
   (** GC delay for the grelists tables, in seconds. *)
+
+  maintenance_idle_time: float ;
+  (** How long to wait at most, in seconds, before running a maintenance loop. *)
 
   min_connections : int ;
   (** Strict minimum number of connections (triggers an urgent maintenance) *)
@@ -176,6 +182,7 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
 val faked_network :
+  'msg message_config ->
   'peer_meta peer_meta_config ->
   'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net

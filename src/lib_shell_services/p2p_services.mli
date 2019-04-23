@@ -29,7 +29,7 @@ val self: #simple -> P2p_peer.Id.t tzresult Lwt.t
 
 val stat: #simple -> P2p_stat.t tzresult Lwt.t
 
-val versions: #simple -> P2p_version.t list tzresult Lwt.t
+val versions: #simple -> Network_version.t list tzresult Lwt.t
 
 val events: #streamed ->
   (P2p_connection.Pool_event.t Lwt_stream.t * stopper) tzresult Lwt.t
@@ -51,7 +51,7 @@ module S : sig
   val versions :
     ([ `GET ], unit,
      unit, unit, unit,
-     P2p_version.t list) RPC_service.t
+     Network_version.t list) RPC_service.t
 
   val events :
     ([ `GET ], unit,

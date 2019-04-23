@@ -1,6 +1,10 @@
-version: "2"
-services:
+version: '3'
 
+volumes:
+  client_data:
+  node_data:
+
+services:
   node:
     image: tezos/tezos:latest
     hostname: node
@@ -18,19 +22,20 @@ services:
   ## in file `active_protocol_versions`
   baker:
     image: tezos/tezos:latest
-    hostname: baker
+    hostname: baker-003-PsddFKi3
     environment:
       - PROTOCOL=003-PsddFKi3
     command: tezos-baker
     links:
       - node
     volumes:
+      - node_data:/var/run/tezos/node:ro
       - client_data:/var/run/tezos/client
     restart: on-failure
 
   endorser:
     image: tezos/tezos:latest
-    hostname: endorser
+    hostname: endorser-003-PsddFKi3
     environment:
       - PROTOCOL=003-PsddFKi3
     command: tezos-endorser
@@ -42,7 +47,7 @@ services:
 
   accuser:
     image: tezos/tezos:latest
-    hostname: accuser
+    hostname: accuser-003-PsddFKi3
     environment:
       - PROTOCOL=003-PsddFKi3
     command: tezos-accuser
@@ -52,6 +57,77 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-volumes:
-  node_data:
-  client_data:
+    # protocol A
+  baker-004-Pt24m4xi:
+    image: tezos/tezos:latest
+    hostname: baker-004-Pt24m4xi
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-baker
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-004-Pt24m4xi:
+    image: tezos/tezos:latest
+    hostname: endorser-004-Pt24m4xi
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-endorser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-004-Pt24m4xi:
+    image: tezos/tezos:latest
+    hostname: accuser-004-Pt24m4xi
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-accuser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  baker-004-Pt24m4xi-test:
+    image: tezos/tezos:latest
+    hostname: baker-004-Pt24m4xi-test
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-baker-test
+    links:
+      - node
+    volumes:
+      - node_data:/var/run/tezos/node:ro
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser-004-Pt24m4xi-test:
+    image: tezos/tezos:latest
+    hostname: endorser-004-Pt24m4xi-test
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-endorser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  accuser-004-Pt24m4xi-test:
+    image: tezos/tezos:latest
+    hostname: accuser-004-Pt24m4xi-test
+    environment:
+      - PROTOCOL=004-PsGLNcdz
+    command: tezos-accuser-test
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure

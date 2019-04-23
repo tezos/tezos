@@ -43,6 +43,7 @@
   "blocks_per_roll_snapshot" : 4,
   "blocks_per_cycle" : 8,
   "blocks_per_voting_period" : 64,
+  "blocks_per_commitment" : 4,
   "preserved_cycles" : 2,
   "proof_of_work_threshold": "-1"
 }

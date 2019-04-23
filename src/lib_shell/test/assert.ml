@@ -110,3 +110,19 @@ let is_false ?(msg="") x =
 
 let is_true ?(msg="") x =
   if not x then fail "true" "false" msg
+
+let equal_checkpoint ?msg cp1 cp2 =
+  let eq cp1 cp2 =
+    match cp1, cp2 with
+    | None, None -> true
+    | Some (x, bh1), Some (y, bh2) ->
+        Int32.equal x y &&
+        (Block_hash.equal bh1 bh2)
+    | _ -> false in
+  let prn = function
+    | None -> "none"
+    | Some (_x, bh) ->
+        (*let s = Printf.sprintf "%s" x in*)
+        Block_hash.to_b58check bh
+  in
+  equal ?msg ~prn ~eq cp1 cp2

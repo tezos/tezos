@@ -37,7 +37,7 @@ let parse_chain s =
     | "main" -> Ok `Main
     | "test" -> Ok `Test
     | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
-  with _ -> Error "Cannot parse block identifier."
+  with _ -> Error "Cannot parse chain identifier."
 
 let chain_to_string = function
   | `Main -> "main"

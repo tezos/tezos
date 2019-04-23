@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { build & >= "1.7" }
   "tezos-base"
   "tezos-shell-services"
   "tezos-client-base"
@@ -21,3 +21,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos/Protocol: 000-Ps9mPmXa (protocol-specific commands for `tezos-client`)"

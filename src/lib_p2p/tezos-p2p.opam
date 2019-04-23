@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { build & >= "1.7" }
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-shell-services"
@@ -19,3 +19,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: library for a pool of P2P connections"

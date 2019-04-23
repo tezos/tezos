@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2019 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -65,7 +65,7 @@ let init_p2p ?(sandboxed = false) p2p_params =
       let c_meta = init_connection_metadata None in
       lwt_log_notice Tag.DSL.(fun f ->
           f "P2P layer is disabled" -% t event "p2p_disabled") >>= fun () ->
-      return (P2p.faked_network peer_metadata_cfg c_meta)
+      return (P2p.faked_network Distributed_db_message.cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
@@ -74,11 +74,7 @@ let init_p2p ?(sandboxed = false) p2p_params =
       let message_cfg =
         if sandboxed then
           { Distributed_db_message.cfg with
-            versions =
-              List.map
-                (fun v -> { v with P2p_version.name =
-                                     "SANDBOXED_" ^ v.P2p_version.name })
-                Distributed_db_message.cfg.versions }
+            chain_name = Distributed_db_version.sandboxed_chain_name }
         else
           Distributed_db_message.cfg in
       P2p.create
@@ -174,6 +170,46 @@ let may_update_checkpoint chain_state checkpoint =
       Chain.set_head chain_state new_head >>= fun _old_head ->
       State.Chain.set_checkpoint chain_state checkpoint
 
+let store_known_protocols state =
+  let embedded_protocols = Registered_protocol.list_embedded () in
+  Lwt_list.iter_s
+    (fun protocol_hash ->
+       State.Protocol.known state protocol_hash >>= function
+       | true ->
+           lwt_log_info Tag.DSL.(fun f ->
+               f "protocol %a is already in store: nothing to do"
+               -% a Protocol_hash.Logging.tag protocol_hash
+               -% t event "embedded_protocol_already_stored")
+       | false ->
+           match Registered_protocol.get_embedded_sources protocol_hash with
+           | None ->
+               lwt_log_info Tag.DSL.(fun f ->
+                   f "protocol %a won't be stored: missing source files"
+                   -% a Protocol_hash.Logging.tag protocol_hash
+                   -% t event "embedded_protocol_missing_sources"
+                 )
+           | Some protocol ->
+               let hash = Protocol.hash protocol in
+               if not (Protocol_hash.equal hash protocol_hash) then
+                 lwt_log_info Tag.DSL.(fun f ->
+                     f "protocol %a won't be stored: wrong hash"
+                     -% a Protocol_hash.Logging.tag protocol_hash
+                     -% t event "embedded_protocol_inconsistent_hash")
+               else
+                 State.Protocol.store state protocol >>= function
+                 | Some hash' ->
+                     assert (hash = hash') ;
+                     lwt_log_info Tag.DSL.(fun f ->
+                         f "protocol %a successfully stored"
+                         -% a Protocol_hash.Logging.tag protocol_hash
+                         -% t event "embedded_protocol_stored")
+                 | None ->
+                     lwt_log_info Tag.DSL.(fun f ->
+                         f "protocol %a is already in store: nothing to do"
+                         -% a Protocol_hash.Logging.tag protocol_hash
+                         -% t event "embedded_protocol_already_stored")
+    ) embedded_protocols
+
 let create
     ?(sandboxed = false)
     { genesis ; store_root ; context_root ;
@@ -184,25 +220,29 @@ let create
     block_validator_limits
     prevalidator_limits
     chain_validator_limits =
-  let start_prevalidator =
+  let (start_prevalidator, start_testchain) =
     match p2p_params with
-    | Some (config, _limits) -> not config.P2p.disable_mempool
-    | None -> true in
+    | Some (config, _limits) -> not config.P2p.disable_mempool, not config.P2p.disable_testchain
+    | None -> true, true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
     ~store_root ~context_root ?patch_context
     genesis >>=? fun (state, mainchain_state, context_index) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
+  store_known_protocols state >>= fun () ->
   Validator.create state distributed_db
     peer_validator_limits
     block_validator_limits
     (Block_validator.Internal context_index)
     prevalidator_limits
     chain_validator_limits
+    ~start_testchain
   >>=? fun validator ->
+  (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate validator
-    ?max_child_ttl ~start_prevalidator mainchain_state >>=? fun mainchain_validator ->
+    ?max_child_ttl ~start_prevalidator
+    mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Distributed_db.shutdown distributed_db >>= fun () ->
@@ -227,7 +267,8 @@ let build_rpc_directory node =
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q) in
 
-  merge (Protocol_directory.build_rpc_directory node.state) ;
+  merge (Protocol_directory.build_rpc_directory
+           (Block_validator.running_worker ()) node.state) ;
   merge (Monitor_directory.build_rpc_directory
            node.validator node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;

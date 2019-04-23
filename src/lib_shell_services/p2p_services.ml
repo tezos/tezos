@@ -60,7 +60,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Supported network layer versions."
       ~query: RPC_query.empty
-      ~output: (Data_encoding.list P2p_version.encoding)
+      ~output: (Data_encoding.list Network_version.encoding)
       RPC_path.(root / "network" / "versions")
 
   let stat =

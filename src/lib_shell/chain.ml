@@ -112,7 +112,7 @@ let locked_set_head chain_store data block =
                current_mempool = Mempool.empty ;
                live_blocks ;
                live_operations ;
-               test_chain = None ;
+               test_chain = data.test_chain ;
              }
 
 let set_head chain_state block =

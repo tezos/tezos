@@ -104,7 +104,6 @@ module Public_key = struct
 
   include Helpers.MakeB58(struct
       type nonrec t = t
-      let title = title
       let name = name
       let b58check_encoding = b58check_encoding
     end)
@@ -283,7 +282,6 @@ include Helpers.MakeRaw(struct
 
 include Helpers.MakeB58(struct
     type nonrec t = t
-    let title = title
     let name = name
     let b58check_encoding = b58check_encoding
   end)

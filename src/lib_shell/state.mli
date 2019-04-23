@@ -58,7 +58,9 @@ module Chain : sig
   val create:
     global_state ->
     ?allow_forked_chain:bool ->
-    genesis -> chain_state Lwt.t
+    genesis ->
+    Chain_id.t ->
+    chain_state Lwt.t
 
   (** Look up for a chain by the hash of its genesis block. *)
   val get: global_state -> Chain_id.t -> chain_state tzresult Lwt.t
@@ -109,6 +111,9 @@ module Chain : sig
 
 end
 
+(** {2 Block header manipulation} ******************************************)
+
+
 (** {2 Block database} *****************************************************)
 
 module Block : sig
@@ -140,6 +145,7 @@ module Block : sig
     Block_header.t -> MBytes.t ->
     Operation.t list list -> MBytes.t list list ->
     validation_store ->
+    forking_testchain: bool ->
     block option tzresult Lwt.t
 
   val store_invalid:
@@ -147,6 +153,37 @@ module Block : sig
     Block_header.t ->
     error list ->
     bool tzresult Lwt.t
+
+  module Header : sig
+    type t
+    type block_header = t
+
+    val known: Chain.t -> Block_hash.t -> bool Lwt.t
+
+    val read: Chain.t -> ?pred:int -> Block_hash.t -> block_header tzresult Lwt.t
+    val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block_header option Lwt.t
+    val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block_header Lwt.t
+    val of_block: block -> block_header
+    val to_block: Chain.t -> block_header -> block option Lwt.t
+
+    val compare: t -> t -> int
+    val equal: t -> t -> bool
+
+    val hash: t -> Block_hash.t
+    val header: t -> Block_header.t
+    val shell_header: t -> Block_header.shell_header
+    val timestamp: t -> Time.t
+    val fitness: t -> Fitness.t
+    val validation_passes: t -> int
+    val level: t -> Int32.t
+
+    val all_operation_hashes: Chain.t -> block_header -> Operation_hash.t list list Lwt.t
+
+    val predecessor : Chain.t -> block_header -> block_header option Lwt.t
+    val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+
+  end
+
 
   val compare: t -> t -> int
   val equal: t -> t -> bool
@@ -173,7 +210,7 @@ module Block : sig
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
-  val test_chain: t -> Test_chain_status.t Lwt.t
+  val test_chain: t -> (Test_chain_status.t * t option) Lwt.t
 
   val operation_hashes:
     t -> int ->
@@ -220,8 +257,15 @@ val best_known_head_for_checkpoint:
 
 val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.seed -> Block_locator.t Lwt.t
 
+val update_testchain:
+  Block.t ->
+  testchain_state: Chain.t ->
+  unit Lwt.t
+
 val fork_testchain:
-  Block.t -> Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
+  Block.t ->
+  Chain_id.t -> Block_hash.t -> Block_header.t ->
+  Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
 
 type chain_data = {
   current_head: Block.t ;

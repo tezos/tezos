@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -67,7 +68,7 @@ val authenticate:
   incoming:bool ->
   P2p_io_scheduler.connection -> P2p_point.Id.t ->
   ?listening_port: int ->
-  P2p_identity.t -> P2p_version.t list ->
+  P2p_identity.t -> Network_version.t ->
   'meta metadata_config ->
   ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 (** (Low-level) (Cancelable) Authentication function of a remote

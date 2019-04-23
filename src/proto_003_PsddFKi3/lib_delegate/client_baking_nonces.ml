@@ -26,10 +26,13 @@
 open Proto_alpha
 open Alpha_context
 
+include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.nonces" end)
 
 type t = Nonce.t Block_hash.Map.t
 
-let encoding : t Data_encoding.t =
+let empty = Block_hash.Map.empty
+
+let encoding =
   let open Data_encoding in
   def "seed_nonce" @@
   conv
@@ -44,47 +47,94 @@ let encoding : t Data_encoding.t =
        (req "block" Block_hash.encoding)
        (req "nonce" Nonce.encoding))
 
-let name = "nonce"
+let load (wallet : #Client_context.wallet) location =
+  wallet#load (Client_baking_files.filename location) ~default:empty encoding
 
-let load (wallet : #Client_context.wallet) =
-  wallet#load ~default:Block_hash.Map.empty name encoding
+let save (wallet : #Client_context.wallet) location nonces =
+  wallet#write (Client_baking_files.filename location) nonces encoding
 
-let save (wallet : #Client_context.wallet) list =
-  wallet#with_lock begin fun () ->
-    wallet#write name list encoding
-  end
+let mem nonces hash =
+  Block_hash.Map.mem hash nonces
 
-let mem (wallet : #Client_context.wallet) block_hash =
-  wallet#with_lock begin fun () ->
-    load wallet >>|? fun data ->
-    Block_hash.Map.mem block_hash data
-  end
+let find_opt nonces hash =
+  Block_hash.Map.find_opt hash nonces
 
-let find (wallet : #Client_context.wallet) block_hash =
-  wallet#with_lock begin fun () ->
-    load wallet >>|? fun data ->
-    try Some (Block_hash.Map.find block_hash data)
-    with Not_found -> None
-  end
+let add nonces hash nonce =
+  Block_hash.Map.add hash nonce nonces
 
+let remove nonces hash =
+  Block_hash.Map.remove hash nonces
 
-let add (wallet : #Client_context.wallet) block_hash nonce =
-  wallet#with_lock begin fun () ->
-    load wallet >>=? fun data ->
-    save wallet (Block_hash.Map.add block_hash nonce data)
-  end
+let get_block_level_opt cctxt ~chain ~block =
+  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>= function
+  | Ok { level } -> Lwt.return_some level
+  | Error errs ->
+      lwt_warn Tag.DSL.(fun f ->
+          f "@[<v 2>Cannot retrieve block %a header associated to \
+             nonce:@ @[%a@]@]@."
+          -% t event "cannot_retrieve_block_header"
+          -% a Logging.block_tag block
+          -% a errs_tag errs) >>= fun () ->
+      Lwt.return_none
 
-let del (wallet : #Client_context.wallet) block_hash =
-  wallet#with_lock begin fun () ->
-    load wallet >>=? fun data ->
-    save wallet (Block_hash.Map.remove block_hash data)
-  end
+let filter_outdated_nonces cctxt ?constants ~chain location nonces =
+  begin match constants with
+    | None -> Alpha_services.Constants.all cctxt (chain, `Head 0)
+    | Some constants -> return constants
+  end >>=? fun { Constants.parametric = { blocks_per_cycle }} ->
+  let chain = Client_baking_files.chain location in
+  get_block_level_opt cctxt ~chain ~block:(`Head 0) >>= function
+  | None ->
+      lwt_log_error Tag.DSL.(fun f ->
+          f "Cannot fetch chain's head level. Aborting nonces filtering."
+          -% t event "cannot_retrieve_head_level") >>= fun () ->
+      return empty
+  | Some current_level ->
+      let current_cycle = Int32.(div current_level blocks_per_cycle) in
+      let is_older_than_5_cycles block_level =
+        let block_cycle = Int32.(div block_level blocks_per_cycle) in
+        Int32.sub current_cycle block_cycle > 5l in
+      Block_hash.Map.fold (fun (hash : Block_hash.t) _ acc ->
+          acc >>=? fun acc ->
+          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
+          | Some level ->
+              if is_older_than_5_cycles level then
+                return (remove acc hash)
+              else
+                return acc
+          | None -> return (remove acc hash)
+        ) nonces (return nonces)
 
-let dels (wallet : #Client_context.wallet) hashes =
-  wallet#with_lock begin fun () ->
-    load wallet >>=? fun data ->
-    save wallet @@
-    List.fold_left
-      (fun data hash -> Block_hash.Map.remove hash data)
-      data hashes
-  end
+let get_unrevealed_nonces cctxt location nonces =
+  let chain = Client_baking_files.chain location in
+  Client_baking_blocks.blocks_from_current_cycle cctxt
+    ~chain (`Head 0)
+    ~offset:(-1l) () >>=? fun blocks ->
+  filter_map_s (fun hash ->
+      match find_opt nonces hash with
+      | None -> return_none
+      | Some nonce ->
+          begin get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
+            | Some level -> begin
+                Lwt.return
+                  (Alpha_environment.wrap_error (Raw_level.of_int32 level)) >>=? fun level ->
+                Alpha_services.Nonce.get cctxt (chain, `Head 0) level >>=? function
+                | Missing nonce_hash
+                  when Nonce.check_hash nonce nonce_hash ->
+                    lwt_log_notice Tag.DSL.(fun f ->
+                        f "Found nonce to reveal for %a (level: %a)"
+                        -% t event "found_nonce"
+                        -% a Block_hash.Logging.tag hash
+                        -% a Logging.level_tag level) >>= fun () ->
+                    return_some (level, nonce)
+                | Missing _nonce_hash ->
+                    lwt_log_error Tag.DSL.(fun f ->
+                        f "Incoherent nonce for level %a"
+                        -% t event "bad_nonce"
+                        -% a Logging.level_tag level)
+                    >>= fun () -> return_none
+                | Forgotten -> return_none
+                | Revealed _ -> return_none end
+            | None -> return_none
+          end)
+    blocks

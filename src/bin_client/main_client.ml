@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -74,27 +75,29 @@ let sandbox () =
 
 let check_network ctxt =
   Shell_services.P2p.versions ctxt >>= function
-  | Error _ ->
+  | Error _
+  | Ok [] ->
       Lwt.return_none
-  | Ok versions ->
-      match String.split_on_char '_' (P2p_version.best versions).name with
-      | "SANDBOXED" :: _ ->
-          sandbox () ;
-          Lwt.return_some `Sandbox
-      | "TEZOS" :: "ZERONET" :: _date :: [] ->
-          zeronet () ;
-          Lwt.return_some `Zeronet
-      | "TEZOS" :: "ALPHANET" :: _date :: [] ->
-          alphanet () ;
-          Lwt.return_some `Alphanet
-      | "TEZOS" :: "BETANET" :: _date :: [] ->
-          mainnet () ;
-          Lwt.return_some `Mainnet
-      | _ ->
-          Lwt.return_none
+  | Ok (version :: _) ->
+      let has_prefix prefix =
+        String.has_prefix ~prefix (version.chain_name :> string) in
+      if has_prefix "SANDBOXED" then begin
+        sandbox () ;
+        Lwt.return_some `Sandbox
+      end else if has_prefix "TEZOS_ZERONET" then begin
+        zeronet () ;
+        Lwt.return_some `Zeronet
+      end else if has_prefix "TEZOS_ALPHANET" then begin
+        alphanet () ;
+        Lwt.return_some `Alphanet
+      end else if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then begin
+        mainnet () ;
+        Lwt.return_some `Mainnet
+      end else
+        Lwt.return_none
 
-let get_commands_for_version ctxt network block protocol =
-  Shell_services.Blocks.protocols ctxt ~block () >>= function
+let get_commands_for_version ctxt network chain block protocol =
+  Shell_services.Blocks.protocols ctxt ~chain ~block () >>= function
   | Ok { next_protocol = version } -> begin
       match protocol with
       | None ->
@@ -123,16 +126,13 @@ let get_commands_for_version ctxt network block protocol =
           return (Some version, Client_commands.commands_for_version version network)
     end
 
-let select_commands ctxt { block ; protocol } =
+let select_commands ctxt { chain ; block ; protocol } =
   check_network ctxt >>= fun network ->
-  get_commands_for_version ctxt network block protocol >>|? fun (_, commands_for_version)  ->
+  get_commands_for_version ctxt network chain block protocol >>|? fun (_, commands_for_version)  ->
   Client_rpc_commands.commands @
   Tezos_signer_backends.Ledger.commands () @
-  List.map
-    (Clic.map_command
-       (fun (o : Client_context.full) -> (o :> Client_context.io_wallet)))
-    (Client_keys_commands.commands network) @
+  Client_keys_commands.commands network @
   Client_helpers_commands.commands () @
   commands_for_version
 
-let () = Client_main_run.run select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands

@@ -72,7 +72,7 @@ let commands () =
       (fun ppf cctxt ->
          Shell_services.Invalid_blocks.list cctxt () >>=? function
          | [] ->
-             Format.fprintf ppf "No invalid blocks." ;
+             Format.fprintf ppf "No invalid blocks.@." ;
              return_unit
          | _ :: _ as invalid ->
              Format.fprintf ppf "@[<v>%a@]@."

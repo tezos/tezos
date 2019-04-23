@@ -25,7 +25,9 @@
 
 let () =
   Prevalidator_filters.register
-    (module Tezos_mempool_003_PsddFKi3.Filter)
+    (module Tezos_mempool_003_PsddFKi3.Filter) ;
+  Prevalidator_filters.register
+    (module Tezos_mempool_004_Pt24m4xi.Filter)
 
 (** Commands *)
 
@@ -143,12 +145,15 @@ module Manpage = struct
         entries in the Tezos configuration file."
   ]
 
-  let schema = Data_encoding.Json.schema (Node_config_file.encoding)
-  let options = [
-    `S "OPTIONS" ;
-    `P "All options available in the config file";
-    `Pre (Format.asprintf "@[%a@]" Json_schema.pp schema)
-  ]
+  let options =
+    let schema = Data_encoding.Json.schema (Node_config_file.encoding) in
+    let schema = Format.asprintf "@[%a@]" Json_schema.pp schema in
+    let schema = String.concat "\\$" (String.split '$' schema) in
+    [
+      `S "OPTIONS" ;
+      `P "All options available in the config file";
+      `Pre schema
+    ]
 
   let man =
     description @

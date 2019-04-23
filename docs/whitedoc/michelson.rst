@@ -3,7 +3,7 @@
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
-The language is stack based, with high level data types and primitives
+The language is stack-based, with high level data types and primitives
 and strict static type checking. Its design cherry picks traits from
 several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
@@ -14,13 +14,13 @@ previous instruction, and rewrites it for the next one. The stack
 contains both immediate values and heap allocated structures. All values
 are immutable and garbage collected.
 
-A Michelson program receives as input a single element stack containing
-an input value and the contents of a storage space. It must return a
-single element stack containing an output value, a list of internal
-operations, and the new contents of the storage space. Alternatively,
-a Michelson program can fail, explicitly using a specific opcode,
-or because something went wrong that could not be caught by the type
-system (e.g. division by zero, gas exhaustion).
+A Michelson program receives as input a stack containing a single pair whose
+first element is an input value and second element the content of a storage
+space. It must return a stack containing a single pair whose first element is
+a list of internal operations, and second element the new contents of the
+storage space. Alternatively, a Michelson program can fail, explicitly using
+a specific opcode, or because something went wrong that could not be caught
+by the type system (e.g. division by zero, gas exhaustion).
 
 The types of the input, output and storage are fixed and monomorphic,
 and the program is typechecked before being introduced into the system.
@@ -33,25 +33,8 @@ not an easy introduction. Even though, some examples are provided at the
 end of the document and can be read first or at the same time as the
 specification.
 
-Table of contents
------------------
-
--  I - Semantics
--  II - Type system
--  III - Core data types
--  IV - Core instructions
--  V - Operations
--  VI - Domain specific data types
--  VII - Domain specific operations
--  VIII - Macros
--  IX - Concrete syntax
--  X - JSON syntax
--  XI - Examples
--  XII - Full grammar
--  XIII - Reference implementation
-
-I - Semantics
--------------
+Semantics
+---------
 
 This specification gives a detailed formal semantics of the Michelson
 language. It explains in a symbolic way the computation performed by the
@@ -93,7 +76,7 @@ case does not happen on well-typed programs, as explained in the next
 section.
 
 The right hand side describes the result of the interpreter if the rule
-applies. It consists in a stack pattern, whose part are either
+applies. It consists in a stack pattern, whose parts are either
 constants, or elements of the context (program and initial stack) that
 have been named on the left hand side of the ``=>`` sign.
 
@@ -127,38 +110,38 @@ Format of patterns
 Code patterns are of one of the following syntactical forms.
 
 -  ``INSTR`` (an uppercase identifier) is a simple instruction (e.g.
-   ``DROP``);
+   ``DROP``).
 -  ``INSTR (arg) ...`` is a compound instruction, whose arguments can be
-   code, data or type patterns (e.g. ``PUSH nat 3``) ;
+   code, data or type patterns (e.g. ``PUSH nat 3``).
 -  ``{ (instr) ; ... }`` is a possibly empty sequence of instructions,
    (e.g. ``IF { SWAP ; DROP } { DROP }``), nested sequences can drop the
-   braces ;
+   braces.
 -  ``name`` is a pattern that matches any program and names a part of
-   the matched program that can be used to build the result ;
+   the matched program that can be used to build the result.
 -  ``_`` is a pattern that matches any instruction.
 
 Stack patterns are of one of the following syntactical forms.
 
--  ``[FAILED]`` is the special failed state ;
--  ``[]`` is the empty stack ;
+-  ``[FAILED]`` is the special failed state.
+-  ``[]`` is the empty stack.
 -  ``(top) : (rest)`` is a stack whose top element is matched by the
    data pattern ``(top)`` on the left, and whose remaining elements are
    matched by the stack pattern ``(rest)`` on the right (e.g.
-   ``x : y : rest``) ;
+   ``x : y : rest``).
 -  ``name`` is a pattern that matches any stack and names it in order to
-   use it to build the result ;
+   use it to build the result.
 -  ``_`` is a pattern that matches any stack.
 
 Data patterns are of one of the following syntactical forms.
 
--  integer/natural number literals, (e.g. ``3``) ;
--  string literals, (e.g. ``"contents"``) ;
--  raw byte sequence literals (e.g. ``0xABCDEF42``)
+-  integer/natural number literals, (e.g. ``3``).
+-  string literals, (e.g. ``"contents"``).
+-  raw byte sequence literals (e.g. ``0xABCDEF42``).
 -  ``Tag`` (capitalized) is a symbolic constant, (e.g. ``Unit``,
-   ``True``, ``False``) ;
--  ``(Tag (arg) ...)`` tagged constructed data, (e.g. ``(Pair 3 4)``) ;
--  a code pattern for first class code values ;
--  ``name`` to name a value in order to use it to build the result ;
+   ``True``, ``False``).
+-  ``(Tag (arg) ...)`` tagged constructed data, (e.g. ``(Pair 3 4)``).
+-  a code pattern for first class code values.
+-  ``name`` to name a value in order to use it to build the result.
 -  ``_`` to match any value.
 
 The domain of instruction names, symbolic constants and data
@@ -166,7 +149,7 @@ constructors is fixed by this specification. Michelson does not let the
 programmer introduce its own types.
 
 Be aware that the syntax used in the specification may differ a bit from
-the concrete syntax, which is presented in Section IX. In particular,
+the :ref:`concrete syntax <ConcreteSyntax>`. In particular
 some instructions are annotated with types that are not present in the
 concrete language because they are synthesized by the typechecker.
 
@@ -192,8 +175,8 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
-II - Introduction to the type system and notations
---------------------------------------------------
+Introduction to the type system and notations
+---------------------------------------------
 
 This specification describes a type system for Michelson. To make things
 clear, in particular to readers that are not accustomed to reading
@@ -221,7 +204,7 @@ specification.
 
 A stack type can be written:
 
--  ``[]`` for the empty stack ;
+-  ``[]`` for the empty stack.
 -  ``(top) : (rest)`` for the stack whose first value has type ``(top)``
    and queue has stack type ``(rest)``.
 
@@ -234,13 +217,13 @@ their types are written:
 
 The types of values in the stack are written:
 
--  ``identifier`` for a primitive data-type (e.g. ``bool``),
+-  ``identifier`` for a primitive data-type (e.g. ``bool``).
 -  ``identifier (arg)`` for a parametric data-type with one parameter
-   type ``(arg)`` (e.g. ``list nat``),
+   type ``(arg)`` (e.g. ``list nat``).
 -  ``identifier (arg) ...`` for a parametric data-type with several
-   parameters (e.g. ``map string int``),
+   parameters (e.g. ``map string int``).
 -  ``[ (type of stack before) -> (type of stack after) ]`` for a code
-   quotation, (e.g. ``[ int : int : [] -> int : [] ]``),
+   quotation, (e.g. ``[ int : int : [] -> int : [] ]``).
 -  ``lambda (arg) (ret)`` is a shortcut for
    ``[ (arg) : [] -> (ret) : [] ]``.
 
@@ -256,8 +239,8 @@ express that both branches must have the same type.
 
 Here are the notations for meta type variables:
 
--  ``'a`` for a type variable,
--  ``'A`` for a stack type variable,
+-  ``'a`` for a type variable.
+-  ``'A`` for a stack type variable.
 -  ``_`` for an anonymous type or stack type variable.
 
 Typing rules
@@ -336,14 +319,14 @@ as well-typed. This is because the implementation uses a simple single
 pass typechecking algorithm, and does not handle any form of
 polymorphism.
 
-III - Core data types and notations
------------------------------------
+Core data types and notations
+-----------------------------
 
 -  ``string``, ``nat``, ``int`` and ``bytes``: The core primitive
    constant types.
 
 -  ``bool``: The type for booleans whose values are ``True`` and
-   ``False``
+   ``False``.
 
 -  ``unit``: The type whose only value is ``Unit``, to use as a
    placeholder when some result or parameter is non necessary. For
@@ -371,6 +354,7 @@ III - Core data types and notations
 -  ``map (k) (t)``: Immutable maps from keys of type ``(k)`` of values
    of type ``(t)`` that we note ``{ Elt key value ; ... }``, with keys
    sorted.
+
 -  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
    ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ; ... }``,
    with keys sorted.  These maps should be used if you intend to store
@@ -379,8 +363,8 @@ III - Core data types and notations
    single ``big_map`` per program, which must appear on the left hand
    side of a pair in the contract's storage.
 
-IV - Core instructions
-----------------------
+Core instructions
+-----------------
 
 Control structures
 ~~~~~~~~~~~~~~~~~~
@@ -441,7 +425,7 @@ Control structures
     > LOOP body / True : S  =>  body ; LOOP body / S
     > LOOP body / False : S  =>  S
 
--  ``LOOP_LEFT body``: A loop with an accumulator
+-  ``LOOP_LEFT body``: A loop with an accumulator.
 
 ::
 
@@ -600,8 +584,8 @@ second, and positive otherwise.
     > GE / v : S  =>  False : S
         iff v < 0
 
-V - Operations
---------------
+Operations
+----------
 
 Operations on booleans
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1198,8 +1182,8 @@ Operations on lists
     > ITER body / {} : S  =>  S
 
 
-VI - Domain specific data types
--------------------------------
+Domain specific data types
+--------------------------
 
 -  ``timestamp``: Dates in the real world.
 
@@ -1217,8 +1201,8 @@ VI - Domain specific data types
 
 -  ``signature``: A cryptographic signature.
 
-VII - Domain specific operations
---------------------------------
+Domain specific operations
+--------------------------
 
 Operations on timestamps
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1276,7 +1260,7 @@ of mutez. Operations are limited to prevent overflow and mixing them
 with other numerical types by mistake. They are also mandatory checked
 for under/overflows.
 
--  ``ADD``:
+-  ``ADD``
 
 ::
 
@@ -1285,7 +1269,7 @@ for under/overflows.
     > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
 
--  ``SUB``:
+-  ``SUB``
 
 ::
 
@@ -1593,8 +1577,8 @@ Cryptographic primitives
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
-VIII - Macros
--------------
+Macros
+------
 
 In addition to the operations above, several extensions have been added
 to the language's concrete syntax. If you are interacting with the node
@@ -1642,26 +1626,26 @@ in any context since it does not use its input stack.
 
     > FAIL / S  =>  UNIT; FAILWITH / S
 
-Assertion Macros
+Assertion macros
 ~~~~~~~~~~~~~~~~
 
 All assertion operations are syntactic sugar for conditionals with a
 ``FAIL`` instruction in the appropriate branch. When possible, use them
 to increase clarity about illegal states.
 
--  ``ASSERT``:
+-  ``ASSERT``
 
 ::
 
     > ASSERT  =>  IF {} {FAIL}
 
--  ``ASSERT_{EQ|NEQ|LT|LE|GT|GE}``:
+-  ``ASSERT_{EQ|NEQ|LT|LE|GT|GE}``
 
 ::
 
     > ASSERT_(\op)  =>  IF(\op) {} {FAIL}
 
--  ``ASSERT_CMP{EQ|NEQ|LT|LE|GT|GE}``:
+-  ``ASSERT_CMP{EQ|NEQ|LT|LE|GT|GE}``
 
 ::
 
@@ -1679,13 +1663,13 @@ to increase clarity about illegal states.
 
     > ASSERT_SOME  =>  IF_NONE {FAIL} {}
 
--  ``ASSERT_LEFT``:
+-  ``ASSERT_LEFT``
 
 ::
 
     > ASSERT_LEFT  =>  IF_LEFT {} {FAIL}
 
--  ``ASSERT_RIGHT``:
+-  ``ASSERT_RIGHT``
 
 ::
 
@@ -1811,8 +1795,9 @@ A typing rule can be inferred:
     > MAP_CD(\rest=[AD]+)R code / S   =>
         { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } / S
 
-IX - Concrete syntax
---------------------
+Concrete syntax
+---------------
+.. _ConcreteSyntax:
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
@@ -1962,8 +1947,8 @@ example.
 Comments that span on multiple lines or that stop before the end of the
 line can also be written, using C-like delimiters (``/* ... */``).
 
-X - Annotations
----------------
+Annotations
+-----------
 
 The annotation mechanism of Michelson provides ways to better track data
 on the stack and to give additional type constraints. Annotations are
@@ -1976,11 +1961,12 @@ the typechecker as well as variable annotations on the types of elements
 in the stack. This is useful as a debugging aid.
 
 We distinguish three kinds of annotations:
+
 - type annotations, written ``:type_annot``,
 - variable annotations, written ``@var_annot``,
 - and field or constructors annotations, written ``%field_annot``.
 
-Type Annotations
+Type annotations
 ~~~~~~~~~~~~~~~~
 
 Each type can be annotated with at most one type annotation. They are
@@ -2058,7 +2044,7 @@ this allows to change or remove type names explicitly.
    > CAST t / a : S  =>  a : S
 
 
-Variable Annotations
+Variable annotations
 ~~~~~~~~~~~~~~~~~~~~
 
 Variable annotations can only be used on instructions that produce
@@ -2068,7 +2054,8 @@ the stack can be given at most ``n`` variable annotations.
 The stack type contains both the types of each element in the stack, as
 well as an optional variable annotation for each element. In this
 sub-section we note:
-- ``[]`` for the empty stack ;
+
+- ``[]`` for the empty stack,
 - ``@annot (top) : (rest)`` for the stack whose first value has type ``(top)`` and is annotated with variable annotation ``@annot`` and whose queue has stack type ``(rest)``.
 
 The instructions which do not accept any variable annotations are:
@@ -2186,7 +2173,7 @@ or to erase variable annotations in the stack.
    :: @old 'a ; 'S -> 'a : 'S
 
 
-Field and Constructor Annotations
+Field and constructor annotations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Components of pair types, option types and or types can be annotated
@@ -2298,7 +2285,7 @@ only the right field of a pair instruction ``PAIR % %right`` or to
 ignore field access constraints, *e.g.* in the macro ``UNPPAIPAIR %x1 %
 %x3 %x4``.
 
-Annotations and Macros
+Annotations and macros
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Macros also support annotations, which are propagated on their expanded
@@ -2362,7 +2349,7 @@ purposes.
    :: (pair 'a (pair (pair 'b 'c) 'd )) : 'S
       -> @x1 'a : @x2 'b : @x3 'c : @x4 'd : 'S
 
-Automatic Variable and Field Annotations Inferring
+Automatic variable and field annotations inferring
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When no annotation is provided by the Michelson programmer, the
@@ -2428,7 +2415,7 @@ type (which can be changed). For instance the annotated typing rule for
    :: @l (list 'e) : 'A  ->  'A
       iff body :: [ @l.elt e' : 'A -> 'A ]
 
-Special Annotations
+Special annotations
 ~~~~~~~~~~~~~~~~~~~
 
 The special variable annotations ``@%%`` can be used on instructions
@@ -2459,8 +2446,8 @@ treatment of annotations with `.`.
    :: @p.x 'a : @p.y 'b : 'S   ->  @p (pair ('a %x) ('b %y)) : 'S
    :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
 
-XI - JSON syntax
-----------------
+JSON syntax
+-----------
 
 Micheline expressions are encoded in JSON like this:
 
@@ -2489,8 +2476,8 @@ Micheline expressions are encoded in JSON like this:
 As in the concrete syntax, all domain specific constants are encoded as
 strings.
 
-XII - Examples
---------------
+Examples
+---------
 
 Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each
@@ -2934,8 +2921,8 @@ The complete source ``forward.tz`` is:
                                       NIL operation ; SWAP ; CONS ;
                                       PAIR} } } } } } }
 
-XII - Full grammar
-------------------
+Full grammar
+------------
 
 ::
 
@@ -3066,8 +3053,8 @@ XII - Full grammar
       | key_hash
       | timestamp
 
-XIII - Reference implementation
--------------------------------
+Reference implementation
+------------------------
 
 The language is implemented in OCaml as follows:
 

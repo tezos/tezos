@@ -75,7 +75,7 @@ module Info = struct
     peer_id : P2p_peer_id.t ;
     id_point : Id.t ;
     remote_socket_port : P2p_addr.port ;
-    versions : P2p_version.t list ;
+    announced_version : Network_version.t ;
     private_node : bool ;
     local_metadata : 'meta ;
     remote_metadata : 'meta ;
@@ -85,36 +85,40 @@ module Info = struct
     let open Data_encoding in
     conv
       (fun { incoming ; peer_id ; id_point ; remote_socket_port ;
-             versions ; private_node ; local_metadata ; remote_metadata } ->
+             announced_version ; private_node ;
+             local_metadata ; remote_metadata } ->
         (incoming, peer_id, id_point, remote_socket_port,
-         versions, private_node, local_metadata, remote_metadata))
+         announced_version, private_node,
+         local_metadata, remote_metadata))
       (fun (incoming, peer_id, id_point, remote_socket_port,
-            versions, private_node, local_metadata, remote_metadata) ->
+            announced_version, private_node,
+            local_metadata, remote_metadata) ->
         { incoming ; peer_id ; id_point ; remote_socket_port ;
-          versions ; private_node ; local_metadata ; remote_metadata })
+          announced_version ; private_node ;
+          local_metadata ; remote_metadata })
       (obj8
          (req "incoming" bool)
          (req "peer_id" P2p_peer_id.encoding)
          (req "id_point" Id.encoding)
          (req "remote_socket_port" uint16)
-         (req "versions" (list P2p_version.encoding))
+         (req "announced_version" Network_version.encoding)
          (req "private" bool)
          (req "local_metadata" metadata_encoding)
          (req "remote_metadata" metadata_encoding))
 
   let pp pp_meta ppf
       { incoming ; id_point = (remote_addr, remote_port) ;
-        remote_socket_port ; peer_id ; versions ; private_node ;
+        remote_socket_port ; peer_id ; announced_version ;
+        private_node ;
         local_metadata = _ ; remote_metadata } =
-    let version = List.hd versions in
     let point = match remote_port with
       | None -> remote_addr, remote_socket_port
       | Some port -> remote_addr, port in
-    Format.fprintf ppf "%s %a %a (%a)%s%a"
+    Format.fprintf ppf "%s %a %a (%a) %s%a"
       (if incoming then "↘" else "↗")
       P2p_peer_id.pp peer_id
       P2p_point.Id.pp point
-      P2p_version.pp version
+      Network_version.pp announced_version
       (if private_node then " private" else "")
       pp_meta remote_metadata
 

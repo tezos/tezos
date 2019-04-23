@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { build & >= "1.7" }
   "tezos-base"
   "tezos-client-base-unix"
   "tezos-client-base"
@@ -15,8 +15,11 @@ depends: [
   "tezos-client-demo"
   "tezos-client-000-Ps9mPmXa"
   "tezos-client-003-PsddFKi3"
+  "tezos-client-004-Pt24m4xi"
   "tezos-client-003-PsddFKi3-commands"
   "tezos-baking-003-PsddFKi3-commands"
+  "tezos-client-004-Pt24m4xi-commands"
+  "tezos-baking-004-Pt24m4xi-commands"
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }
@@ -27,3 +30,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: `tezos-client` binary"

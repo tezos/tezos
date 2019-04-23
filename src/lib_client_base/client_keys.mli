@@ -28,9 +28,11 @@
 type pk_uri = private Uri.t
 type sk_uri = private Uri.t
 
+val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
 val pk_uri_param :
   ?name:string -> ?desc:string ->
   ('a, 'b) Clic.params -> (pk_uri -> 'a, 'b) Clic.params
+val sk_uri_parameter : unit -> (sk_uri, 'a) Clic.parameter
 val sk_uri_param :
   ?name:string -> ?desc:string ->
   ('a, 'b) Clic.params -> (sk_uri -> 'a, 'b) Clic.params

@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { build & >= "1.7" }
   "tezos-base"
   "tezos-client-base"
   "tezos-rpc"
@@ -18,3 +18,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
+synopsis: "Tezos: descriptions of RPCs exported by `tezos-signer`"

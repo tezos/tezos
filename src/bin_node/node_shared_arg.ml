@@ -47,6 +47,7 @@ type t = {
   rpc_listen_addr: string option ;
   private_mode: bool ;
   disable_mempool: bool ;
+  enable_testchain: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
@@ -58,8 +59,8 @@ let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr discovery_addr peers no_bootstrap_peers
-    bootstrap_threshold private_mode disable_mempool
+    listen_addr discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
+    disable_mempool enable_testchain
     expected_pow rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
 
@@ -107,6 +108,7 @@ let wrap
     rpc_listen_addr ;
     private_mode ;
     disable_mempool ;
+    enable_testchain ;
     cors_origins ;
     cors_headers ;
     rpc_tls ;
@@ -256,6 +258,14 @@ module Term = struct
        of the node." in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
 
+  let enable_testchain =
+    let doc =
+      "If set, the node will spawn a testchain during the protocol's \
+       testing voting period. It will increase the node storage usage \
+       and computation by additionally validating the test network \
+       blocks." in
+    Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
+
   (* rpc args *)
   let docs = Manpage.rpc_section
 
@@ -293,9 +303,8 @@ module Term = struct
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ discovery_addr $ peers $ no_bootstrap_peers
-    $ bootstrap_threshold
-    $ private_mode $ disable_mempool
+    $ listen_addr $ discovery_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
+    $ private_mode $ disable_mempool $ enable_testchain
     $ expected_pow $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
@@ -317,7 +326,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         peers ; no_bootstrap_peers ;
         listen_addr ; private_mode ;
         discovery_addr ;
-        disable_mempool ;
+        disable_mempool ; enable_testchain ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
         log_output ;
@@ -335,5 +344,5 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
     ~bootstrap_peers ?listen_addr ?discovery_addr ?rpc_listen_addr ~private_mode
-    ~disable_mempool ~cors_origins ~cors_headers ?rpc_tls ?log_output
-    ?bootstrap_threshold cfg
+    ~disable_mempool ~enable_testchain ~cors_origins ~cors_headers
+    ?rpc_tls ?log_output ?bootstrap_threshold cfg

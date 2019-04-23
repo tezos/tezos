@@ -146,7 +146,7 @@ let () =
        hash was not the one computed at commit time."
     ~pp: (fun ppf (got, exp) ->
         Format.fprintf ppf
-          "@[<v 2>Inconsistent hash:@ local: %a@ block_header: %a"
+          "@[<v 2>Inconsistent hash:@ got: %a@ expected: %a"
           Context_hash.pp got
           Context_hash.pp exp)
     Data_encoding.(obj2
@@ -282,7 +282,7 @@ let () =
   register_error_kind
     `Branch
     ~id:"node.validator.checkpoint_error"
-    ~title: "Block incompatble with the current checkpoint."
+    ~title: "Block incompatible with the current checkpoint."
     ~description: "The block belongs to a branch that is not compatible \
                    with the current checkpoint."
     ~pp: (fun ppf (block, peer) ->
@@ -302,4 +302,3 @@ let () =
                      (opt "peer" P2p_peer.Id.encoding))
     (function Checkpoint_error (block, peer) -> Some (block, peer) | _ -> None)
     (fun (block, peer) -> Checkpoint_error (block, peer))
-

@@ -68,6 +68,8 @@ module type T = sig
   val status: t -> status tzresult Lwt.t
 
   val validation_state: t -> Proto.validation_state
+
+  val pp_result: Format.formatter -> result -> unit
 end
 
 module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struct
@@ -123,18 +125,15 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
               level = predecessor_level } } =
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
+    let predecessor_header = State.Block.header predecessor in
     let predecessor_hash = State.Block.hash predecessor in
     Chain_traversal.live_blocks
       predecessor
       (State.Block.max_operations_ttl predecessor)
     >>= fun (live_blocks, live_operations) ->
-    Context.reset_test_chain
-      predecessor_context predecessor_hash
-      timestamp >>= fun predecessor_context ->
-
-    Context.reset_test_chain
-      predecessor_context predecessor_hash
-      timestamp >>= fun predecessor_context ->
+    Block_validation.update_testchain_status
+      predecessor_context predecessor_header
+      timestamp >>=? fun predecessor_context ->
     begin
       match protocol_data with
       | None -> return_none
@@ -201,6 +200,17 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
     }
 
   let validation_state { state } = state
+
+  let pp_result ppf =
+    let open Format in
+    function
+    | Applied _ -> pp_print_string ppf "applied"
+    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
+    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
+    | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
+    | Duplicate -> pp_print_string ppf "duplicate"
+    | Outdated -> pp_print_string ppf "outdated"
+
 end
 
 let preapply ~predecessor ~timestamp ~protocol_data operations =

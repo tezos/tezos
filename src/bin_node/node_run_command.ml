@@ -25,17 +25,7 @@
 (*****************************************************************************)
 
 open Node_logging
-
-let genesis : State.Chain.genesis = {
-  time =
-    Time.of_notation_exn "2018-11-30T15:30:56Z" ;
-  block =
-    Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesisb83baZgbyZe" ;
-  protocol =
-    Protocol_hash.of_b58check_exn
-      "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H" ;
-}
+open Genesis_chain
 
 type error += Non_private_sandbox of P2p_addr.t
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
@@ -59,11 +49,11 @@ let () =
   register_error_kind
     `Permanent
     ~id:"main.run.port_already_in_use"
-    ~title:"Cannot start sode: RPC port already in use"
-    ~description:"An other tezos node is probably running on the same RPC port."
+    ~title:"Cannot start node: RPC port already in use"
+    ~description:"Another tezos node is probably running on the same RPC port."
     ~pp:begin fun ppf addrlist ->
       Format.fprintf ppf
-        "An other tezos node is probably running on one of these addresses (%a). \
+        "Another tezos node is probably running on one of these addresses (%a). \
          Please choose another RPC port."
         (Format.pp_print_list P2p_point.Id.pp) addrlist
     end
@@ -112,7 +102,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
             Lwt_utils_unix.Json.read_file file >>= function
             | Error err ->
                 lwt_warn
-                  "Can't parse sandbox parameters: %s" file >>= fun () ->
+                  "Cannot parse sandbox parameters: %s" file >>= fun () ->
                 lwt_debug "%a" pp_print_error err >>= fun () ->
                 Lwt.return_none
             | Ok json ->
@@ -173,6 +163,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
               Crypto_box.make_target config.p2p.expected_pow ;
             disable_mempool = config.p2p.disable_mempool ;
             trust_discovered_peers = (sandbox_param <> None) ;
+            disable_testchain = not config.p2p.enable_testchain ;
           }
         in
         return_some (p2p_config, config.p2p.limits)

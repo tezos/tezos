@@ -94,6 +94,23 @@ Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
 
 
+Node synchronization
+~~~~~~~~~~~~~~~~~~~~
+
+Whenever a node starts, it tries to retrieve the most current head of the
+chain from its peers. This can be a long process when a node is launched for
+the first time, or if it has many blocks to retrieve. When the synchronization
+is complete, the node is said to be *bootstrapped*. Some operations require
+the node to be bootstrapped.
+
+Node protocol
+~~~~~~~~~~~~~
+
+A Tezos node can switch from one protocol to another during its execution.
+This typically happens during the synchronization phase when a node launches for
+the first time. The node starts with the genesis protocol and then switches to
+the alpha protocol.
+
 Storage
 ~~~~~~~
 
@@ -148,6 +165,10 @@ chain (time is in UTC so it may differ from your local):
 
    tezos-client get timestamp
 
+Beware that the commands available on the client depend on the specific
+protocol ran by the node. For instance, `get timestamp` isn't available when
+the node runs the genesis protocol, which may happen for a few minutes when
+launching a node for the first time.
 
 A simple wallet
 ~~~~~~~~~~~~~~~
@@ -169,6 +190,12 @@ with the alias *bob*:
 ::
 
       $ tezos-client gen keys bob
+
+To check the contract has been created:
+
+::
+
+      $ tezos-client list known contracts
 
 Tezos support three different ECC schemes: *Ed25519*, *secp256k1* (the
 one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
@@ -260,7 +287,14 @@ It is possible to review the receipt of a transaction with:
 
 ::
 
-   tezos-client rpc get /chains/main/blocks/head/operations
+    tezos-client get receipt for <operation hash>
+
+Alternatively, the operations stored in the head block can be inspected via
+an RPC call:
+
+::
+
+    tezos-client rpc get /chains/main/blocks/head/operations
 
 A manager operation, such as a transaction, has 3 important
 parameters: counter, gas and storage limit.
@@ -310,36 +344,57 @@ cycle as many delegates receive back part of their unfrozen accounts.
 
 .. _originated_accounts:
 
-Originated accounts and Contracts
+Originated accounts and contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Tezos there are two kinds of accounts: *implicit* and *originated*.
-The implicit accounts are the *tz1* we have used up to now and to
-create them if suffices to have a pair of keys and to transfer some
-funds to the public key hash.
-Originated accounts have addresses *KT1* and are created through an
-origination operation.
-One reason to originate an account is to delegate your tokens
-(see more :ref:`here. <howtorun>`).
-The other main reason is that an originated account can also have
-Michelson code, in which case it is called a *contract*.
+
+-  The implicit accounts are the *tz1* we have used up to now. They are created
+   with a transfer operation to the account public key hash.
+
+-  Originated accounts have addresses *KT1* and are created with an
+   origination operation.
+
+An originated account doesn't have a corresponding secret key, but is *managed*
+by an implicit account. An originated account serves two purposes.
+
+-  delegate tokens (see more :ref:`here <howtorun>`).
+
+-  run Michelson code, in which case it is called a *contract*.
 
 Let's originate our first contract and call it *id*:
 
 ::
 
-   tezos-client originate contract id for alice \
-                                   transferring 1 from alice \
-                                   running ./src/bin_client/test/contracts/id.tz \
-                                   --init '"hello"'
+    tezos-client originate contract id for alice transferring 1 from alice \
+                 running ./src/bin_client/test/contracts/attic/id.tz \
+                 --init '"hello"' --burn-cap 0.4
 
-We set *alice* as manager, a 1ꜩ starting balance generously provided
-by *alice* and the code from the ``id.tz`` Michelson program which
-is just the identity.
-Every program declares in its first 2 lines the type of its parameter
-and storage, for *id* they are both strings so we initialize the
-contract with the string ``"hello"`` (the extra quotes are to avoid
-the shell expansion).
+The contract manager is the implicit account ``alice``. The initial balance
+is 1ꜩ, generously provided by implicit account *alice* (but it could be from
+another contract managed by ``alice`` too). The contract stores a Michelson
+program ``id.tz``, with Michelson value ``"hello"`` as initial storage (the
+extra quotes are needed to avoid shell expansion). The parameter ``--burn-cap``
+specifies the maximal fee the user is willing to pay for this operation, the
+actual fee being determined by the system.
+
+A Michelson contract is semantically a pure function, mapping a pair
+``(parameter, storage)`` to a pair ``(list_of_operations, storage)``. It can
+be seen equivalently as an object with a single method, and a single attribute.
+The method updates the state (the storage), and submits operations as a side
+effect.
+
+For the sake of this example, here is the `id.tz` contract:
+
+::
+
+    parameter string;
+    storage string;
+    code {CAR; NIL operation; PAIR};
+
+It specifies the types for the parameter and storage, and implements a
+function which ignores the parameter and returns the storage unchanged together
+with an empty list of operations.
 
 Gas and storage cost model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

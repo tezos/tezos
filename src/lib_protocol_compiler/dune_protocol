@@ -1,0 +1,19 @@
+
+(include dune.inc)
+
+(rule
+ (targets "dune.inc.gen")
+ (deps TEZOS_PROTOCOL (glob_files *.ml) (glob_files *.mli))
+ (action
+  (run
+    %{libexec:tezos-protocol-compiler:replace}
+    %{libexec:tezos-protocol-compiler:dune_protocol.template}
+    "dune.inc.gen")))
+
+(alias
+ (name   runtest_dune_template)
+ (action (diff dune.inc dune.inc.gen)))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_dune_template)))
