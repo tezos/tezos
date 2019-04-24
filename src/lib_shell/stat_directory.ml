@@ -22,24 +22,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type Error_monad.error += Proc_stat_failure
+type Error_monad.error += Proc_stat_failure of string
 
 let proc_statm () =
   let pid = string_of_int @@ Unix.getpid () in
   let fname = ("/proc/"^pid^"/statm") in
-  Lwt_unix.file_exists fname >>= function
-  | true ->
-      Lwt.catch
-        begin fun () -> Lwt_io.open_file ~mode:Input fname   >>= fun ic ->
-          Lwt_io.read_line ic >>= fun line ->
-          match List.map Int64.of_string @@ String.split ' ' line  with
-          | size::resident::shared::text::lib::data::dt::_ ->
-              return
-                Stat_services.{ size ; resident ; shared ; text ;
-                                lib ; data ; dt ; }
-          | _ ->  return Stat_services.empty_proc_statm end
-        (function _ -> Lwt.return @@ error Proc_stat_failure )
-  | false -> return Stat_services.empty_proc_statm
+  if Sys.os_type = "Unix" then
+    Lwt.catch
+      (fun () ->
+         begin Lwt_process.with_process_in  ("uname", [| "uname" |])
+             (fun pc -> Lwt_io.read_line pc#stdout) >>= function
+           | "Linux" ->
+               Lwt_process.with_process_in
+                 ("getconf", [| "getconf";  "PAGE_SIZE" |])
+                 (fun pc -> Lwt_io.read_line pc#stdout >>= fun ps ->
+                   Lwt.return (int_of_string ps)) >>= return
+           | "Darwin" ->
+               Lwt_process.with_process_in ("pagesize", [| "pagesize" |])
+                 (fun pc -> Lwt_io.read_line pc#stdout >>= fun ps ->
+                   Lwt.return (int_of_string ps)) >>= return
+           | _ ->
+               Lwt.return
+                 (error (Proc_stat_failure "uname")) end >>=? fun page_size ->
+         begin Lwt_unix.file_exists fname >>= function
+           | true ->
+               begin Lwt_io.open_file ~mode:Input fname >>= fun ic ->
+                 Lwt_io.read_line ic >>= fun line ->
+                 match List.map Int64.of_string @@ String.split ' ' line with
+                 | size::resident::shared::text::lib::data::dt::_ ->
+                     return
+                       Stat_services.{ page_size ; size ; resident ;
+                                       shared ; text ;
+                                       lib ; data ; dt ; }
+                 | _ ->  return Stat_services.empty_proc_statm end
+           | false ->
+               Lwt.return
+                 (error (Proc_stat_failure (fname^" not found"))) end)
+      (function _ ->
+         Lwt.return (error (Proc_stat_failure "proc/statm")) )
+  else Lwt.return (error (Proc_stat_failure "os_type"))
+
 
 let rpc_directory () =
   let dir = RPC_directory.empty in

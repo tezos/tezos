@@ -72,6 +72,7 @@ let gc_stat_encoding =
     )
 
 type proc_statm = {
+  page_size : int ;
   size : int64;
   resident : int64 ;
   shared : int64 ;
@@ -82,17 +83,20 @@ type proc_statm = {
 }
 
 let empty_proc_statm =
-  { size = 0L ; resident  = 0L ;
+  { page_size = 0 ; size = 0L ; resident  = 0L ;
     shared = 0L ; text  = 0L ;
     lib = 0L ; data = 0L ;dt = 0L }
 
 let proc_stat_encoding =
   conv
-    (fun { size ; resident ; shared ; text ;  lib ; data ; dt ; } ->
-       (size, resident, shared, text,  lib, data, dt))
-    ( fun (size, resident, shared, text,  lib, data, dt) ->
-        { size ; resident ; shared ; text ;  lib ; data ; dt ; })
-    (obj7
+    (fun { page_size ; size ; resident ; shared ; text ;
+           lib ; data ; dt ; } ->
+      (page_size , size, resident, shared, text,  lib, data, dt))
+    ( fun (page_size , size, resident, shared, text,  lib, data, dt) ->
+        { page_size ; size ; resident ; shared ; text ;
+          lib ; data ; dt ; })
+    (obj8
+       (req "page_size" int31)
        (req "size" int64)
        (req "resident" int64)
        (req "shared" int64)

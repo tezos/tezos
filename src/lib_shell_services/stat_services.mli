@@ -23,6 +23,7 @@
 (*****************************************************************************)
 
 type proc_statm = {
+  page_size : int ;
   size : int64;
   resident : int64 ;
   shared : int64 ;
