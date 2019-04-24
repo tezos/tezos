@@ -30,7 +30,7 @@ module Map : Map.S with type key = string
     ignoring slashes at the beginning and end of string. *)
 val split_path: string -> string list
 
-(** Splits a string on a delimier character, grouping multiple
+(** Splits a string on a delimiter character, grouping multiple
     delimiters, and ignoring delimiters at the beginning and end of
     string, if [limit] is passed, stops after [limit] split(s). *)
 val split: char -> ?dup:bool -> ?limit: int -> string -> string list
