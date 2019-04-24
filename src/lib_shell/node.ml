@@ -315,6 +315,8 @@ let build_rpc_directory node =
   merge (P2p.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.state) ;
 
+  merge (Stat_directory.rpc_directory ()) ;
+
   register0 RPC_service.error_service begin fun () () ->
     return (Data_encoding.Json.schema Error_monad.error_encoding)
   end ;
