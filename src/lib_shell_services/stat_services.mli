@@ -22,32 +22,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type Error_monad.error += Proc_stat_failure
+type proc_statm = {
+  size : int64;
+  resident : int64 ;
+  shared : int64 ;
+  text : int64 ;
+  lib : int64 ;
+  data : int64 ;
+  dt : int64
+}
 
-let proc_statm () =
-  let pid = string_of_int @@ Unix.getpid () in
-  let fname = ("/proc/"^pid^"/statm") in
-  Lwt_unix.file_exists fname >>= function
-  | true ->
-      Lwt.catch
-        begin fun () -> Lwt_io.open_file ~mode:Input fname   >>= fun ic ->
-          Lwt_io.read_line ic >>= fun line ->
-          match List.map Int64.of_string @@ String.split ' ' line  with
-          | size::resident::shared::text::lib::data::dt::_ ->
-              return
-                Stat_services.{ size ; resident ; shared ; text ;
-                                lib ; data ; dt ; }
-          | _ ->  return Stat_services.empty_proc_statm end
-        (function _ -> Lwt.return @@ error Proc_stat_failure )
-  | false -> return Stat_services.empty_proc_statm
+val empty_proc_statm : proc_statm
 
-let rpc_directory () =
-  let dir = RPC_directory.empty in
-  RPC_directory.gen_register dir Stat_services.S.gc_stat begin fun () () () ->
-    RPC_answer.return @@ Gc.stat () end |> fun dir ->
+module S : sig
+  val gc_stat:
+    ([ `GET ], unit, unit, unit, unit, Gc.stat) RPC_service.service
 
-  RPC_directory.gen_register dir Stat_services.S.proc_statm begin fun () () () ->
-    proc_statm () >>= function
-    | Ok statm ->
-        RPC_answer.return statm
-    | Error errs -> RPC_answer.fail errs end
+  val proc_statm:
+    ([ `GET ], unit, unit, unit, unit, proc_statm) RPC_service.service
+
+end
+
+val gc_stat :
+  #RPC_context.simple -> Gc.stat Error_monad.tzresult Lwt.t
+
+val proc_statm :
+  #RPC_context.simple -> proc_statm Error_monad.tzresult Lwt.t

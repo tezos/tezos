@@ -71,6 +71,36 @@ let gc_stat_encoding =
              (req "stack_size" int31)))
     )
 
+type proc_statm = {
+  size : int64;
+  resident : int64 ;
+  shared : int64 ;
+  text : int64 ;
+  lib : int64 ;
+  data : int64 ;
+  dt : int64
+}
+
+let empty_proc_statm =
+  { size = 0L ; resident  = 0L ;
+    shared = 0L ; text  = 0L ;
+    lib = 0L ; data = 0L ;dt = 0L }
+
+let proc_stat_encoding =
+  conv
+    (fun { size ; resident ; shared ; text ;  lib ; data ; dt ; } ->
+       (size, resident, shared, text,  lib, data, dt))
+    ( fun (size, resident, shared, text,  lib, data, dt) ->
+        { size ; resident ; shared ; text ;  lib ; data ; dt ; })
+    (obj7
+       (req "size" int64)
+       (req "resident" int64)
+       (req "shared" int64)
+       (req "text" int64)
+       (req "lib" int64)
+       (req "data" int64)
+       (req "dt" int64))
+
 module S = struct
 
   let gc_stat =
@@ -80,7 +110,18 @@ module S = struct
       ~output:gc_stat_encoding
       RPC_path.(root / "stats" / "gc")
 
+  let proc_statm =
+    RPC_service.get_service
+      ~description:"Gets stats from procstat"
+      ~query: RPC_query.empty
+      ~output:proc_stat_encoding
+      RPC_path.(root / "stats" / "proc_statm")
+
+
 end
 
 let gc_stat ctxt =
   RPC_context.make_call S.gc_stat ctxt () () ()
+
+let proc_statm ctxt =
+  RPC_context.make_call S.proc_statm ctxt () () ()
