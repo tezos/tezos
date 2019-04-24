@@ -532,6 +532,8 @@ module Block_data = struct
     operations : Operation.t list list ;
   }
 
+  let header { block_header } = block_header
+
   let encoding =
     let open Data_encoding in
     conv

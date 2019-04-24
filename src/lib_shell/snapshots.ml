@@ -273,8 +273,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
           block_store chain_data_store block_header export_rolling >>=? fun export_limit ->
         let iterator = pruned_block_iterator context_index block_store export_limit in
         let block_data = { Context.Block_data.block_header ; operations } in
-        let starting_block_header = block_header in
-        return (pred_block_header, block_data, iterator, starting_block_header)
+        return (pred_block_header, block_data, iterator)
   end >>=? fun data_to_dump ->
   lwt_log_notice (fun f -> f "Now loading data") >>= fun () ->
   Context.dump_contexts context_index [ data_to_dump ] ~filename >>=? fun () ->

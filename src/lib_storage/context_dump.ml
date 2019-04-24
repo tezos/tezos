@@ -62,6 +62,7 @@ module type Dump_interface = sig
     type t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
+    val header : t -> Block_header.t
     val encoding : t Data_encoding.t
   end
 
@@ -126,7 +127,7 @@ module type S = sig
   val dump_contexts_fd :
     index ->
     (block_header * block_data *
-     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t) * block_header) list ->
+     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) list ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
     (block_header * block_data * pruned_block list * protocol_data list) list tzresult Lwt.t
@@ -486,7 +487,7 @@ module Make (I:Dump_interface) = struct
     in
     Lwt.catch begin fun () ->
       set_version buf ;
-      Error_monad.iter_s begin fun (bh, block_data, pruned_iterator, starting_block_header) ->
+      Error_monad.iter_s begin fun (bh, block_data, pruned_iterator) ->
         I.get_context idx bh >>= function
         | None ->
             fail @@ Context_not_found (I.Block_header.to_bytes bh)
@@ -516,7 +517,9 @@ module Make (I:Dump_interface) = struct
                   dump_pruned cpt pred_pruned >>= fun () ->
                   aux (succ cpt) acc
                     (I.Pruned_block.header pred_pruned)
-            in aux 0 [] starting_block_header >>=? fun protocol_datas ->
+            in
+            let starting_block_header = I.Block_data.header block_data in
+            aux 0 [] starting_block_header >>=? fun protocol_datas ->
             (* Dump protocol data *)
             Lwt_list.iter_s (fun proto ->
                 set_loot buf proto;

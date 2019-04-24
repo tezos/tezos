@@ -173,16 +173,14 @@ val get_protocol_data_from_header :
 val dump_contexts :
   index ->
   (Block_header.t * Block_data.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
-   Block_header.t) list ->
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) list ->
   filename:string ->
   unit tzresult Lwt.t
 
 val dump_contexts_fd :
   index ->
   (Block_header.t * Block_data.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
-   Block_header.t) list ->
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) list ->
   fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
 
