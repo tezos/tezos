@@ -55,10 +55,6 @@ module Make_single_store (S : STORE) (N : NAME) (V : VALUE) = struct
     read t >|= function
     | Error _ -> None
     | Ok v -> Some v
-  let read_exn t =
-    read t >>= function
-    | Error _ -> Lwt.fail Not_found
-    | Ok v -> Lwt.return v
   let store t v = S.store t N.name (V.to_bytes v)
   let remove t = S.remove t N.name
 end
@@ -216,10 +212,6 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
       read s i >>= function
       | Error _ -> Lwt.return_none
       | Ok v -> Lwt.return_some v
-    let read_exn s i =
-      read s i >>= function
-      | Error _ -> Lwt.fail Not_found
-      | Ok v -> Lwt.return v
     let store s i v = Store.store (s,i) N.name (V.to_bytes v)
     let remove s i = Store.remove (s,i) N.name
     let remove_all s = fold_indexes s ~init:() ~f:(fun i () -> remove s i)
@@ -320,10 +312,6 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
     read s i >>= function
     | Error _ -> Lwt.return_none
     | Ok v -> Lwt.return_some v
-  let read_exn s i =
-    read s i >>= function
-    | Error _ -> Lwt.fail Not_found
-    | Ok v -> Lwt.return v
   let store s i v = S.store s (I.to_path i []) (V.to_bytes v)
   let remove s i = S.remove s (I.to_path i [])
   let remove_all s = S.remove_dir s []

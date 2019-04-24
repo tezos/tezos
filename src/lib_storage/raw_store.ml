@@ -116,15 +116,6 @@ let read { dir ; parent } key =
   | Ok v -> return v
   | Error _err -> fail (Unknown key)
 
-let read_exn { dir ; parent } key =
-  begin match Lwt.get parent with
-    | Some (txn, db, _cursor) -> Lmdb.get txn db (concat key) >>| MBytes.copy
-    | None ->
-        Lmdb.with_ro_db dir ~f:begin fun txn db ->
-          Lmdb.get txn db (concat key) >>| MBytes.copy
-        end
-  end |> of_result
-
 let store { dir ; parent } k v =
   begin match Lwt.get parent with
     | Some (txn, db, _cursor) -> Lmdb.put txn db (concat k) v
