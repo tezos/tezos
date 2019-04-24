@@ -116,8 +116,12 @@ val genesis:
   ?endorsement_security_deposit:Tez_repr.tez ->
   ?block_reward:Tez_repr.tez ->
   ?endorsement_reward:Tez_repr.tez ->
-  ?cost_per_byte: Tez_repr.t ->
-  ?hard_storage_limit_per_operation: Z.t ->
+  ?endorsement_reward_priority_bonus:Tez_repr.tez ->
+  ?endorsement_bonus_intercept:int ->
+  ?endorsement_bonus_slope:int ->
+  ?cost_per_byte:Tez_repr.t ->
+  ?hard_storage_limit_per_operation:Z.t ->
+  ?delay_per_missing_endorsement:Period_repr.t ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and

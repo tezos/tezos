@@ -308,8 +308,12 @@ let genesis
     ?(endorsement_security_deposit = Constants_repr.default.endorsement_security_deposit)
     ?(block_reward = Constants_repr.default.block_reward)
     ?(endorsement_reward = Constants_repr.default.endorsement_reward)
+    ?(endorsement_reward_priority_bonus = Constants_repr.default.endorsement_reward_priority_bonus)
+    ?(endorsement_bonus_intercept = Constants_repr.default.endorsement_bonus_intercept)
+    ?(endorsement_bonus_slope = Constants_repr.default.endorsement_bonus_slope)
     ?(cost_per_byte = Constants_repr.default.cost_per_byte)
     ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(delay_per_missing_endorsement = Constants_repr.default.delay_per_missing_endorsement)
     (initial_accounts : (Account.t * Tez_repr.t) list) =
   let constants : Constants_repr.parametric = {
     preserved_cycles ;
@@ -331,8 +335,12 @@ let genesis
     endorsement_security_deposit ;
     block_reward ;
     endorsement_reward ;
+    endorsement_reward_priority_bonus ;
+    endorsement_bonus_intercept ;
+    endorsement_bonus_slope ;
     cost_per_byte ;
     hard_storage_limit_per_operation ;
+    delay_per_missing_endorsement ;
   } in
   genesis_with_parameters constants initial_accounts
 
