@@ -124,10 +124,11 @@ module type S = sig
   val dump_contexts_fd :
     index ->
     (block_header * block_data *
-     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) list ->
+     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-    (block_header * block_data * pruned_block list * protocol_data list) list tzresult Lwt.t
+    (block_header * block_data * pruned_block list * protocol_data list) tzresult Lwt.t
 end
 
 module Make (I:Dump_interface) : S

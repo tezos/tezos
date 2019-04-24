@@ -127,10 +127,11 @@ module type S = sig
   val dump_contexts_fd :
     index ->
     (block_header * block_data *
-     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) list ->
+     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-    (block_header * block_data * pruned_block list * protocol_data list) list tzresult Lwt.t
+    (block_header * block_data * pruned_block list * protocol_data list) tzresult Lwt.t
 end
 
 type error += Writing_error of string
@@ -421,7 +422,7 @@ module Make (I:Dump_interface) = struct
     let bytes = Data_encoding.Binary.to_bytes_exn command_encoding End in
     set_mbytes buf bytes
 
-  let dump_contexts_fd idx datas ~fd =
+  let dump_contexts_fd idx data ~fd =
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
     let written = ref 0 in
@@ -487,51 +488,50 @@ module Make (I:Dump_interface) = struct
     in
     Lwt.catch begin fun () ->
       set_version buf ;
-      Error_monad.iter_s begin fun (bh, block_data, pruned_iterator) ->
-        I.get_context idx bh >>= function
-        | None ->
-            fail @@ Context_not_found (I.Block_header.to_bytes bh)
-        | Some ctxt ->
-            let tree = I.context_tree ctxt in
-            fold_tree_path ctxt [] tree >>= fun () ->
-            Tezos_stdlib.Utils.display_progress_end ();
-            I.context_parents ctxt >>= fun parents ->
-            (* Dump pruned blocks *)
-            let dump_pruned cpt pruned =
-              Tezos_stdlib.Utils.display_progress
-                ~refresh_rate:(cpt, 1_000)
-                "History: %dK block, %dMiB written"
-                (cpt / 1_000) (!written / 1_048_576) ;
-              set_proot buf pruned;
-              maybe_flush () in
-            let rec aux cpt acc header =
-              pruned_iterator header >>=? function
-              | (None, None) -> return acc (* assert false *)
-              | (None, Some protocol_data) ->
-                  return (protocol_data :: acc)
-              | (Some pred_pruned, Some protocol_data) ->
-                  dump_pruned cpt pred_pruned >>= fun () ->
-                  aux (succ cpt) (protocol_data :: acc)
-                    (I.Pruned_block.header pred_pruned)
-              | (Some pred_pruned, None) ->
-                  dump_pruned cpt pred_pruned >>= fun () ->
-                  aux (succ cpt) acc
-                    (I.Pruned_block.header pred_pruned)
-            in
-            let starting_block_header = I.Block_data.header block_data in
-            aux 0 [] starting_block_header >>=? fun protocol_datas ->
-            (* Dump protocol data *)
-            Lwt_list.iter_s (fun proto ->
-                set_loot buf proto;
-                maybe_flush () ;
-              ) protocol_datas >>= fun () ->
-            set_root buf bh (I.context_info ctxt) parents block_data;
-            Tezos_stdlib.Utils.display_progress_end ();
-            return_unit
-      end datas >>=? fun () ->
-      set_end buf;
-      flush () >>= fun () ->
-      return_unit
+      let bh, block_data, pruned_iterator = data in
+      I.get_context idx bh >>= function
+      | None ->
+          fail @@ Context_not_found (I.Block_header.to_bytes bh)
+      | Some ctxt ->
+          let tree = I.context_tree ctxt in
+          fold_tree_path ctxt [] tree >>= fun () ->
+          Tezos_stdlib.Utils.display_progress_end ();
+          I.context_parents ctxt >>= fun parents ->
+          (* Dump pruned blocks *)
+          let dump_pruned cpt pruned =
+            Tezos_stdlib.Utils.display_progress
+              ~refresh_rate:(cpt, 1_000)
+              "History: %dK block, %dMiB written"
+              (cpt / 1_000) (!written / 1_048_576) ;
+            set_proot buf pruned;
+            maybe_flush () in
+          let rec aux cpt acc header =
+            pruned_iterator header >>=? function
+            | (None, None) -> return acc (* assert false *)
+            | (None, Some protocol_data) ->
+                return (protocol_data :: acc)
+            | (Some pred_pruned, Some protocol_data) ->
+                dump_pruned cpt pred_pruned >>= fun () ->
+                aux (succ cpt) (protocol_data :: acc)
+                  (I.Pruned_block.header pred_pruned)
+            | (Some pred_pruned, None) ->
+                dump_pruned cpt pred_pruned >>= fun () ->
+                aux (succ cpt) acc
+                  (I.Pruned_block.header pred_pruned)
+          in
+          let starting_block_header = I.Block_data.header block_data in
+          aux 0 [] starting_block_header >>=? fun protocol_datas ->
+          (* Dump protocol data *)
+          Lwt_list.iter_s (fun proto ->
+              set_loot buf proto;
+              maybe_flush () ;
+            ) protocol_datas >>= fun () ->
+          set_root buf bh (I.context_info ctxt) parents block_data;
+          Tezos_stdlib.Utils.display_progress_end ();
+          return_unit >>=? fun () ->
+          set_end buf;
+          flush () >>= fun () ->
+          return_unit
     end
       begin function
         | Unix.Unix_error (e,_,_) ->
@@ -599,10 +599,10 @@ module Make (I:Dump_interface) = struct
             | None -> fail @@ Bad_read "context_hash does not correspond for block"
             | Some block_header ->
                 let new_acc =
-                  (block_header,
-                   block_data,
-                   List.rev pruned_blocks,
-                   List.rev protocol_datas) :: acc
+                  Some (block_header,
+                        block_data,
+                        List.rev pruned_blocks,
+                        List.rev protocol_datas)
                 in
                 loop (I.make_context index) [] [] new_acc cpt
           end
@@ -637,11 +637,14 @@ module Make (I:Dump_interface) = struct
             if pruned_blocks <> [] || protocol_datas <> [] then
               fail (Bad_read "ill-formed snapshot: end mark not expected")
             else
-              return (List.rev acc)
+              begin match acc with
+                | Some res -> return res
+                | None -> fail (Bad_read "ill-formed snapshot: no root")
+              end
           end
     in
     Lwt.catch begin fun () ->
-      loop (I.make_context index) [] [] [] 0
+      loop (I.make_context index) [] [] None 0
     end
       begin function
         | Unix.Unix_error (e,_,_) ->
