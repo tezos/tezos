@@ -74,7 +74,7 @@ let init ?mapsize path =
         | "nosync" -> [ Lmdb.NoSync ]
         | "nometasync" -> [ Lmdb.NoMetaSync ]
         | _ ->
-            Printf.eprintf "Unrecognized TEZOS_SYNC option : %s\n\
+            Printf.eprintf "Unrecognized TEZOS_STORE_SYNC option : %s\n\
                             allowed: nosync nometasync" s;
             []
   in
