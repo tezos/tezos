@@ -428,9 +428,11 @@ let may_update_checkpoint chain_state new_head =
       (Int32.to_int (Int32.sub head_level new_level)) >>= function
     | None -> return @@ Assert.fail_msg "Unexpected None in predecessor query"
     | Some hash ->
-        State.Block.read_exn chain_state hash >>= fun b ->
-        State.Chain.set_checkpoint chain_state (State.Block.header b) >>= fun () ->
-        return_unit
+        State.Block.read_opt chain_state hash >>= function
+        | None -> assert false
+        | Some b ->
+            State.Chain.set_checkpoint chain_state (State.Block.header b) >>= fun () ->
+            return_unit
 
 let test_may_update_checkpoint s =
   let block = vblock s "A3" in
