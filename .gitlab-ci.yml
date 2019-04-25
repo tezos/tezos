@@ -7,7 +7,9 @@ variables:
 stages:
   - doc
   - build
-  - test
+  - unittest
+  - integration
+  - documentation
   - packaging
   - publish
 
@@ -66,14 +68,13 @@ build:
     expire_in: 1 day
 
 
-
 ############################################################
 ## Stage: test (only MR)                                  ##
 ############################################################
 
 .test_template: &test_definition
   <<: *build_definition
-  stage: test
+  stage: unittest
   dependencies:
     - build
 
@@ -152,70 +153,6 @@ test:client_alpha:vote:
   script:
     - dune build @src/proto_alpha/lib_delegate/runtest_vote
 
-test:basic.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_basic.sh
-
-test:contracts.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts.sh
-
-test:contracts_opcode.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_opcode.sh
-
-test:contracts_macros.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_macros.sh
-
-test:contracts_mini_scenarios.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
-
-test:multinode.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_multinode.sh
-
-test:inject.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_injection.sh
-
-test:voting.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_voting.sh
-
-test:proto:sandbox:
-  <<: *test_definition
-  script:
-    - dune build @runtest_sandbox
-
-test:documentation:
-  <<: *test_definition
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-html
-
-test:linkcheck:
-  <<: *test_definition
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-html-and-linkcheck
-  allow_failure: true
-
 test:validation:
   <<: *test_definition
   script:
@@ -225,6 +162,157 @@ test:micheline:
   <<: *test_definition
   script:
     - dune build @src/lib_micheline/runtest
+
+############################################################
+## Stage: run shell integration tests                     ##
+############################################################
+
+# definition for the environment to run all integration tests
+.integration_template: &integration_definition
+  <<: *build_definition
+  stage: integration
+  dependencies:
+    - build
+  before_script:
+    - sudo apk add py-pip python3 python3-dev
+    - sudo pip install --upgrade pip
+    - sudo pip3 install -r tests_python/requirements.txt
+    - make all
+  tags:
+    - gitlab-org
+
+test:basic.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_basic.sh
+
+test:contracts.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts.sh
+
+test:contracts_opcode.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_opcode.sh
+
+test:contracts_macros.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_macros.sh
+
+test:contracts_mini_scenarios.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
+
+test:multinode.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_multinode.sh
+
+test:inject.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_injection.sh
+
+test:voting.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_voting.sh
+
+test:proto:sandbox:
+  <<: *integration_definition
+  script:
+    - dune build @runtest_sandbox
+
+############################################################
+## Stage: run python integration tests                    ##
+############################################################
+
+integration:linter_python:
+  <<: *integration_definition
+  script:
+    - make -C tests_python lint_all
+
+##BEGIN_INTEGRATION_PYTHON##
+integration:00:baker_endorser:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_baker_endorser.py
+
+integration:01:basic:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_basic.py
+
+integration:02:contract:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_contract.py
+
+integration:03:contract_baker:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_contract_baker.py
+
+integration:04:injection:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_injection.py
+
+integration:05:many_bakers:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_many_bakers.py
+
+integration:06:many_nodes:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_many_nodes.py
+
+integration:07:mempool:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_mempool.py
+
+integration:08:multinode:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode.py
+
+integration:09:voting:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_voting.py
+
+
+##END_INTEGRATION_PYTHON##
+
+############################################################
+## Stage: run doc integration tests                       ##
+############################################################
+
+test:documentation:
+  <<: *test_definition
+  stage: documentation
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-html
+
+test:linkcheck:
+  <<: *test_definition
+  stage: documentation
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-html-and-linkcheck
+  allow_failure: true
 
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
