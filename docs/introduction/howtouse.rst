@@ -347,7 +347,7 @@ An interesting block receipt is the one produced at the end of a
 cycle as many delegates receive back part of their unfrozen accounts.
 
 
-.. _originated_accounts:
+.. _originated-accounts:
 
 Originated accounts and contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

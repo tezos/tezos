@@ -21,7 +21,7 @@ Implicit accounts cannot have a delegate, so the first step is to
 originate an account, transfer your tez there and set a delegate.
 Notice that an originated account is a special case of a contract
 without code, so it is still necessary to pay for its small storage
-(see :ref:`originated_account`).
+(see :ref:`Originated Account <originated-accounts>`).
 
 ::
 
