@@ -171,7 +171,7 @@ let compute_export_limit
     (block_store, block_hash) >>= begin function
     | Some contents -> return contents
     | None -> fail (Wrong_block_export (block_hash, `Pruned))
-  end >>=? fun { max_operations_ttl } ->
+  end >>=? fun { max_operations_ttl ; _ } ->
   if not export_rolling then
     Store.Chain_data.Caboose.read chain_data_store >>=? fun (caboose_level, _) ->
     return (max 1l caboose_level)
@@ -239,7 +239,8 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
   begin match block with
     | Some block_hash -> return (Block_hash.of_b58check_exn block_hash)
     | None ->
-        Store.Chain_data.Checkpoint.read_exn (chain_data_store) >>= fun last_checkpoint ->
+        Store.Chain_data.Checkpoint.read_opt (chain_data_store) >|=
+        Option.unopt_assert ~loc:__POS__  >>= fun last_checkpoint ->
         if last_checkpoint.shell.level = 0l then
           fail (Wrong_block_export (genesis, `Too_few_predecessors))
         else

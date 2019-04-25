@@ -163,7 +163,7 @@ let headers_fetch_worker_loop pipeline =
             Block_locator.to_steps_truncate ~limit:(Int32.to_int truncate_limit)
               ~save_point seed pipeline.locator
       in
-      let { Block_locator.predecessor } = List.hd steps in
+      let { Block_locator.predecessor ; _ } = List.hd steps in
       State.Block.known chain_state predecessor >>= fun predecessor_known ->
       (* Check that the locator is anchored in a block locally known *)
       fail_unless
