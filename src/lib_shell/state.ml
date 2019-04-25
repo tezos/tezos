@@ -433,7 +433,7 @@ module Chain = struct
       let global_store = global_data.global_store in
       let chain_store = Store.Chain.get global_store chain_id in
       Store.Chain.Protocol_hash.read_opt chain_store protocol_level >>= function
-      | None -> assert false
+      | None -> assert false    (* paul:fixme use error *)
       | Some p -> Lwt.return p
     end
 
@@ -444,7 +444,7 @@ module Chain = struct
       let chain_store = Store.Chain.get global_store chain_id in
       Store.Chain.Protocol_hash.read_opt chain_store level >>= begin function
         | Some h ->
-            assert Protocol_hash.(h = protocol_hash);
+            assert Protocol_hash.(h = protocol_hash); (* paul:fixme use error *)
             Lwt.return_unit
         | None ->
             Store.Chain.Protocol_hash.store chain_store level protocol_hash
@@ -1273,7 +1273,7 @@ module Block = struct
     | None -> Lwt.return_none
     | Some pred when equal pred block -> Lwt.return_none (* genesis *)
     | Some pred ->
-        protocol_hash pred >>= fun protocol ->
+        Chain.get_level_indexed_protocol chain_state pred.header >>= fun protocol ->
         match
           Protocol_hash.Table.find_opt
             chain_state.block_rpc_directories protocol
