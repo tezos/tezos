@@ -258,7 +258,7 @@ let export ?(export_rolling=false) ~data_dir ~genesis filename block  =
         fail (Wrong_block_export (checkpoint_block_hash, `Cannot_be_found))
     | Some block_header ->
         lwt_log_notice Tag.DSL.(fun f ->
-            f "Dumping a %a snapshot with block hash \"%a\" and level %a"
+            f "Dumping a snapshot in mode %a, targeting block hash \"%a\" at level %a"
             -%a History_mode.tag (if export_rolling then Rolling else Full)
             -%a block_hash_tag checkpoint_block_hash
             -%a block_level_tag (Int32.to_int block_header.shell.level)
