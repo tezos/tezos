@@ -158,8 +158,7 @@ let rec interactive_decrypt_loop
 
 (* add all passwords obtained by [ctxt#load_passwords] to the list of known passwords *)
 let password_file_load ctxt = match ctxt#load_passwords with
-  | Some f ->
-      let stream = f () in
+  | Some stream ->
       Lwt_stream.iter
         (fun p ->
            passwords := MBytes.of_string p :: !passwords)

@@ -46,7 +46,7 @@ class type io = object
 end
 
 class type wallet = object
-  method load_passwords : (unit -> string Lwt_stream.t) option
+  method load_passwords : string Lwt_stream.t option
   method read_file : string -> string tzresult Lwt.t
   method with_lock : (unit -> 'a Lwt.t) -> 'a  Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t

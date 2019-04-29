@@ -32,12 +32,11 @@ class unix_wallet ~base_dir ~password_filename : wallet = object (self)
 
   method load_passwords = match password_filename with
     | None -> None
-    | Some filename -> 
-        Some (fun () ->
-            if Sys.file_exists filename then begin
-              Lwt_io.lines_of_file filename
-            end else 
-              Lwt_stream.of_list [])
+    | Some filename ->
+        if Sys.file_exists filename then
+          Some (Lwt_io.lines_of_file filename)
+        else
+          None
 
   method read_file path =
     Lwt.catch
