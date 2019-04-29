@@ -10,6 +10,9 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.0.1" }
   "tezos-network-sandbox"
+  "tezos-node" { with-test }
+  "tezos-client" { with-test }
+  "tezos-embedded-protocol-demo" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

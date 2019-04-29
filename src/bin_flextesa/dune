@@ -28,10 +28,11 @@
 
 (alias
   (name runtest_sandbox_voting_demo)
+  (deps (package tezos-embedded-protocol-demo))
   (locks /tcp-port/30000_range)
   (action
     (run %{exe:main.exe} voting
-         ../../../../src/bin_client/test/proto_test_injection
+         %{lib:tezos-embedded-protocol-demo:raw/TEZOS_PROTOCOL}
          --root-path %{env:ROOT_PATH=/tmp/flextesa-voting-demo/}
          --base-port 30_000
          --size 3
