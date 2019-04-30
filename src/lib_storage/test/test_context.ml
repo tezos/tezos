@@ -253,8 +253,7 @@ let test_dump { idx; genesis; block2; block3b; _ } =
         (fun context ->
            empty_block_header context,
            Context.Block_data.empty,
-           (fun _ -> return (None, None)),
-           empty_block_header context
+           (fun _ -> return (None, None))
         ) ctxt_hashes
     in
     Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
