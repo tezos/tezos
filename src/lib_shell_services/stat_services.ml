@@ -135,25 +135,25 @@ let proc_stat_encoding =
 
 module S = struct
 
-  let gc_stat =
+  let gc =
     RPC_service.get_service
       ~description:"Gets stats from the OCaml Garbage Collector"
       ~query: RPC_query.empty
       ~output:gc_stat_encoding
       RPC_path.(root / "stats" / "gc")
 
-  let proc_statm =
+  let memory =
     RPC_service.get_service
-      ~description:"Gets stats from procstat"
+      ~description:"Gets memory usage stats"
       ~query: RPC_query.empty
       ~output:proc_stat_encoding
-      RPC_path.(root / "stats" / "proc_statm")
+      RPC_path.(root / "stats" / "memory")
 
 
 end
 
-let gc_stat ctxt =
-  RPC_context.make_call S.gc_stat ctxt () () ()
+let gc ctxt =
+  RPC_context.make_call S.gc ctxt () () ()
 
-let proc_statm ctxt =
-  RPC_context.make_call S.proc_statm ctxt () () ()
+let memory ctxt =
+  RPC_context.make_call S.memory ctxt () () ()

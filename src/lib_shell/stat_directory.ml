@@ -40,7 +40,7 @@ let () =
     (fun s -> Mem_stat_failure s)
 
 
-let proc_statm () =
+let memory_stats () =
   let pid = string_of_int @@ Unix.getpid () in
   if Sys.os_type = "Unix" then
     Lwt.catch
@@ -102,11 +102,11 @@ let proc_statm () =
 
 let rpc_directory () =
   let dir = RPC_directory.empty in
-  RPC_directory.gen_register dir Stat_services.S.gc_stat begin fun () () () ->
+  RPC_directory.gen_register dir Stat_services.S.gc begin fun () () () ->
     RPC_answer.return @@ Gc.stat () end |> fun dir ->
 
-  RPC_directory.gen_register dir Stat_services.S.proc_statm begin fun () () () ->
-    proc_statm () >>= function
-    | Ok statm ->
-        RPC_answer.return statm
+  RPC_directory.gen_register dir Stat_services.S.memory begin fun () () () ->
+    memory_stats () >>= function
+    | Ok stats ->
+        RPC_answer.return stats
     | Error errs -> RPC_answer.fail errs end

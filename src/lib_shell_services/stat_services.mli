@@ -44,16 +44,16 @@ type unix = Linux | Darwin
 type mem_stat = Statm of linux_proc_statm | Ps of darwin_ps_stats
 
 module S : sig
-  val gc_stat:
+  val gc:
     ([ `GET ], unit, unit, unit, unit, Gc.stat) RPC_service.service
 
-  val proc_statm:
+  val memory:
     ([ `GET ], unit, unit, unit, unit, mem_stat) RPC_service.service
 
 end
 
-val gc_stat :
+val gc:
   #RPC_context.simple -> Gc.stat Error_monad.tzresult Lwt.t
 
-val proc_statm :
+val memory:
   #RPC_context.simple -> mem_stat Error_monad.tzresult Lwt.t
