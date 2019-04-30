@@ -226,10 +226,10 @@ let test_fold { idx ; genesis ; _ } =
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return_unit
 
-let test_dump { idx; genesis; block2; block3b; _ } =
+let test_dump { idx ; block3b; _ } =
   Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir2 ->
     let dumpfile = base_dir2 // "dump" in
-    let ctxt_hashes = [genesis;block2;block3b;] in
+    let ctxt_hash = block3b in
     let empty_block_header context =
       Block_header.{
         protocol_data = MBytes.empty;
@@ -249,19 +249,18 @@ let test_dump { idx; genesis; block2; block3b; _ } =
         operation_hashes = [] ;
       } : Context.Pruned_block.t) in
     let bhs =
-      List.map
-        (fun context ->
-           empty_block_header context,
-           Context.Block_data.empty,
-           (fun _ -> return (None, None))
-        ) ctxt_hashes
+      (fun context ->
+         empty_block_header context,
+         Context.Block_data.empty,
+         (fun _ -> return (None, None))
+      ) ctxt_hash
     in
     Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
-    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun l ->
-    let l = List.map (fun (bh,_, _,_) -> bh.Block_header.shell.context) l in
-    Assert.equal_context_hash_list ~msg:__LOC__ ctxt_hashes l ;
+    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun imported ->
+    let expected_ctxt_hash = (fun (bh,_, _,_) -> bh.Block_header.shell.context) imported in
+    assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
     return ()
   end
   >>= function
