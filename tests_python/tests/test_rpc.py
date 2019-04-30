@@ -497,3 +497,9 @@ class TestRPCs:
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'votes/proposals')
+
+    def test_stat_gc(self, sandbox):
+        assert sandbox.client(1).rpc('get', "/stats/gc")
+
+    def test_stat_memory(self, sandbox):
+        assert sandbox.client(1).rpc('get', "/stats/memory")
