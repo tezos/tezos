@@ -22,7 +22,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type proc_statm = {
+type linux_proc_statm = {
   page_size : int ;
   size : int64;
   resident : int64 ;
@@ -33,14 +33,22 @@ type proc_statm = {
   dt : int64
 }
 
-val empty_proc_statm : proc_statm
+type darwin_ps_stats = {
+  page_size : int ;
+  mem : float ;
+  resident : int64 }
+
+
+type unix = Linux | Darwin
+
+type mem_stat = Statm of linux_proc_statm | Ps of darwin_ps_stats
 
 module S : sig
   val gc_stat:
     ([ `GET ], unit, unit, unit, unit, Gc.stat) RPC_service.service
 
   val proc_statm:
-    ([ `GET ], unit, unit, unit, unit, proc_statm) RPC_service.service
+    ([ `GET ], unit, unit, unit, unit, mem_stat) RPC_service.service
 
 end
 
@@ -48,4 +56,4 @@ val gc_stat :
   #RPC_context.simple -> Gc.stat Error_monad.tzresult Lwt.t
 
 val proc_statm :
-  #RPC_context.simple -> proc_statm Error_monad.tzresult Lwt.t
+  #RPC_context.simple -> mem_stat Error_monad.tzresult Lwt.t

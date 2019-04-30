@@ -22,9 +22,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Data_encoding
 open Gc
+
 let gc_stat_encoding =
+  let open  Data_encoding in
   conv
     (fun
       { minor_words ; promoted_words ; major_words ;
@@ -71,7 +72,7 @@ let gc_stat_encoding =
              (req "stack_size" int31)))
     )
 
-type proc_statm = {
+type linux_proc_statm = {
   page_size : int ;
   size : int64;
   resident : int64 ;
@@ -82,28 +83,55 @@ type proc_statm = {
   dt : int64
 }
 
-let empty_proc_statm =
-  { page_size = 0 ; size = 0L ; resident  = 0L ;
-    shared = 0L ; text  = 0L ;
-    lib = 0L ; data = 0L ;dt = 0L }
+type darwin_ps_stats = {
+  page_size : int ;
+  mem : float ;
+  resident : int64 }
+
+type unix = Linux | Darwin
+
+type mem_stat =
+  | Statm of linux_proc_statm
+  | Ps of darwin_ps_stats
 
 let proc_stat_encoding =
-  conv
-    (fun { page_size ; size ; resident ; shared ; text ;
-           lib ; data ; dt ; } ->
-      (page_size , size, resident, shared, text,  lib, data, dt))
-    ( fun (page_size , size, resident, shared, text,  lib, data, dt) ->
-        { page_size ; size ; resident ; shared ; text ;
-          lib ; data ; dt ; })
-    (obj8
-       (req "page_size" int31)
-       (req "size" int64)
-       (req "resident" int64)
-       (req "shared" int64)
-       (req "text" int64)
-       (req "lib" int64)
-       (req "data" int64)
-       (req "dt" int64))
+  let open  Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [ case (Tag 0)
+        (conv
+           (fun { page_size ; size ; resident ; shared ; text ;
+                  lib ; data ; dt ; } ->
+             (page_size , size, resident, shared, text,  lib, data, dt))
+           ( fun (page_size , size, resident, shared, text,  lib, data, dt) ->
+               { page_size ; size ; resident ; shared ; text ;
+                 lib ; data ; dt ; })
+           (obj8
+              (req "page_size" int31)
+              (req "size" int64)
+              (req "resident" int64)
+              (req "shared" int64)
+              (req "text" int64)
+              (req "lib" int64)
+              (req "data" int64)
+              (req "dt" int64)))
+        ~title:"Linux_proc_statm"
+        (function Statm x -> Some x | _ -> None)
+        (function res -> Statm res) ;
+      case (Tag 1)
+        (conv
+           (fun { page_size ; mem ; resident } ->
+              (page_size , mem, resident))
+           ( fun (page_size , mem, resident) ->
+               { page_size ; mem ; resident })
+           (obj3
+              (req "page_size" int31)
+              (req "mem" float)
+              (req "resident" int64)))
+        ~title:"Darwin_ps"
+        (function Ps x -> Some x | _ -> None)
+        (function res -> Ps res)
+    ]
 
 module S = struct
 
