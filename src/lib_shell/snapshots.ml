@@ -243,7 +243,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
         else
           let last_checkpoint_hash = Block_header.hash last_checkpoint in
           lwt_log_notice Tag.DSL.(fun f ->
-              f "No block hash specified with the `--block` option. Using %a by default (last checkpoint)"
+              f "There is no block hash specified with the `--block` option. Using %a by default (last checkpoint)"
               -%a block_hash_tag last_checkpoint_hash
             ) >>= fun () ->
           return last_checkpoint_hash
