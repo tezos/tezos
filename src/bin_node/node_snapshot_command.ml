@@ -41,13 +41,10 @@ module Term = struct
     Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
     Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
-  let process subcommand config_file file block export_rolling reconstruct =
-    let data_dir =
-      match config_file with
-      | None -> Node_config_file.default_data_dir
-      | Some dir -> dir in
-    let genesis = Genesis_chain.genesis in
-    let res =
+  let process subcommand args file block export_rolling reconstruct =
+    let run =
+      Node_shared_arg.read_data_dir args >>=? fun data_dir ->
+      let genesis = Genesis_chain.genesis in
       match subcommand with
       | Export ->
           Internal_event_unix.init () >>= fun () ->
@@ -68,11 +65,11 @@ module Term = struct
           Lwt_lock_file.create ~unlink_on_exit:true
             (Node_data_version.lock_file data_dir) >>=? fun () ->
           Snapshots.import
-            ~reconstruct ~data_dir ~dir_cleaner
+            ~reconstruct ~data_dir:data_dir ~dir_cleaner
             ~genesis ~patch_context:Patch_context.patch_context
             file block
     in
-    match Lwt_main.run res with
+    match Lwt_main.run run with
     | Ok () -> `Ok ()
     | Error err ->
         `Error (false, Format.asprintf "%a" pp_print_error err)
@@ -119,7 +116,7 @@ module Term = struct
   let term =
     let open Cmdliner.Term in
     ret (const process $ subcommand_arg
-         $ Node_shared_arg.Term.data_dir
+         $ Node_shared_arg.Term.args
          $ file_arg
          $ blocks
          $ export_rolling

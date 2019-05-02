@@ -335,13 +335,20 @@ module Term = struct
 
 end
 
+let read_config_file args =
+  if Sys.file_exists args.config_file then
+    Node_config_file.read args.config_file
+  else
+    return Node_config_file.default_config
+
+let read_data_dir args =
+  read_config_file args >>=? fun cfg ->
+  let { data_dir ; _ } = args in
+  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+  return data_dir
+
 let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
-  begin
-    if Sys.file_exists args.config_file then
-      Node_config_file.read args.config_file
-    else
-      return Node_config_file.default_config
-  end >>=? fun cfg ->
+  read_config_file args >>=? fun cfg ->
   let { data_dir ;
         min_connections ; expected_connections ; max_connections ;
         max_download_speed ; max_upload_speed ; binary_chunks_size ;
