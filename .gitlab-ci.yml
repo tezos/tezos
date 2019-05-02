@@ -316,7 +316,12 @@ integration:08:multinode:
   script:
     - pytest tests_python/tests/test_multinode.py
 
-integration:09:voting:
+integration:09:rpc:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_rpc.py
+
+integration:10:voting:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_voting.py
