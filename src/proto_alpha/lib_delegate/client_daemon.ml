@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let wrap_thread thread =
+  Lwt.pick
+    [ (thread >|= fun v -> `End v) ;
+      (Lwt_exit.termination_thread >|= fun _ -> `Killed) ] >>= function
+  | `End v -> Lwt.return v
+  | `Killed -> Lwt_exit.exit 1
+
 let rec retry (cctxt: #Proto_alpha.full) ~delay ~tries f x =
   f x >>= function
   | Ok _ as r -> Lwt.return r
@@ -111,10 +118,11 @@ module Endorser = struct
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt chain >>=? fun block_stream ->
     cctxt#message "Endorser started." >>= fun () ->
-    Client_baking_endorsement.create cctxt
-      ~delay
-      delegates
-      block_stream >>=? fun () ->
+    let endorser_thread = Client_baking_endorsement.create cctxt
+        ~delay
+        delegates
+        block_stream in
+    wrap_thread endorser_thread >>=? fun () ->
     return_unit
 
 end
@@ -139,15 +147,17 @@ module Baker = struct
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt chain >>=? fun block_stream ->
     cctxt#message "Baker started." >>= fun () ->
-    Client_baking_forge.create cctxt
-      ?minimal_fees
-      ?minimal_nanotez_per_gas_unit
-      ?minimal_nanotez_per_byte
-      ?max_priority
-      ~chain
-      ~context_path
-      delegates
-      block_stream >>=? fun () ->
+
+    let baker_thread = Client_baking_forge.create cctxt
+        ?minimal_fees
+        ?minimal_nanotez_per_gas_unit
+        ?minimal_nanotez_per_byte
+        ?max_priority
+        ~chain
+        ~context_path
+        delegates
+        block_stream in
+    wrap_thread baker_thread >>=? fun () ->
     return_unit
 
 end
@@ -164,7 +174,8 @@ module Accuser = struct
       ~next_protocols:(Some [Proto_alpha.hash])
       cctxt ~chains:[ chain ] () >>=? fun valid_blocks_stream ->
     cctxt#message "Accuser started." >>= fun () ->
-    Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
+    let accuser_thread = Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream in
+    wrap_thread accuser_thread >>=? fun () ->
     return_unit
 
 end
