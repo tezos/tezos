@@ -470,7 +470,6 @@ let filter_and_apply_operations
     ~chain
     ~block
     block_info
-    ~slot_timestamp
     ~priority
     ?protocol_data
     ((operations : packed_operation list list), overflowing_operations) =
@@ -493,7 +492,7 @@ let filter_and_apply_operations
         begin_construction ~timestamp:min_valid_timestamp ?protocol_data index block_info >>=? fun inc ->
         state.index <- index ;
         return inc
-  end  >>=? fun initial_inc ->
+  end >>=? fun initial_inc ->
   let endorsements = List.nth operations endorsements_index in
   let votes = List.nth operations votes_index in
   let anonymous = List.nth operations anonymous_index in
@@ -509,73 +508,43 @@ let filter_and_apply_operations
         >>= fun () ->
         Lwt.return_none
     | Ok (resulting_state, _receipt) ->
-        Lwt.return_some resulting_state
-  in
+        Lwt.return_some resulting_state in
   let filter_valid_operations inc ops =
     Lwt_list.fold_left_s (fun (inc, acc) op ->
         validate_operation inc op >>= function
         | None -> Lwt.return (inc, acc)
         | Some inc' -> Lwt.return (inc', op :: acc)
-      ) (inc, []) ops
-  in
-  let is_valid_endorsement inc endorsement =
-    validate_operation inc endorsement >>= function
-    | None -> Lwt.return_none
-    | Some inc' -> finalize_construction inc' >>= begin function
-        | Ok _ -> Lwt.return_some endorsement
-        | Error _ -> Lwt.return_none
-      end
-  in
-  filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
+      ) (inc, []) ops in
+
+  (* First pass : we filter out invalid operations by applying them in the correct order *)
+  filter_valid_operations initial_inc endorsements >>= fun (inc, endorsements) ->
+  filter_valid_operations inc votes >>= fun (inc, votes) ->
+  filter_valid_operations inc anonymous >>= fun (manager_inc, anonymous) ->
   (* Retrieve the correct index order *)
   let managers = List.sort Proto_alpha.compare_operations managers in
   let overflowing_operations = List.sort Proto_alpha.compare_operations overflowing_operations in
-  filter_valid_operations inc (managers @  overflowing_operations) >>= fun (inc, managers) ->
-  (* Gives a chance to the endorser to fund their deposit in the current block *)
-  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
+  filter_valid_operations manager_inc (managers @  overflowing_operations) >>= fun (inc, managers) ->
   finalize_construction inc >>=? fun _ ->
   let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
-  let  { Constants.endorsers_per_block ; hard_gas_limit_per_block ; _ } =
-    state.constants.parametric in
-  let endorsements =
-    List.sub (List.rev endorsements) endorsers_per_block
-  in
-  let votes =
-    retain_operations_up_to_quota
-      (List.rev votes)
-      (List.nth quota votes_index) in
-  let anonymous =
-    retain_operations_up_to_quota
-      (List.rev anonymous)
-      (List.nth quota anonymous_index) in
-  let is_evidence  = function
-    | { protocol_data = Operation_data { contents = Single (Double_baking_evidence _ ) ; _ } ; _ } -> true
-    | { protocol_data = Operation_data { contents = Single (Double_endorsement_evidence _ ) ; _ } ; _ } -> true
-    | _ -> false in
-  let evidences, anonymous = List.partition is_evidence anonymous in
+  let  { Constants.hard_gas_limit_per_block ; _ } = state.constants.parametric in
+  let votes = retain_operations_up_to_quota (List.rev votes) (List.nth quota votes_index) in
+  let anonymous = retain_operations_up_to_quota (List.rev anonymous) (List.nth quota anonymous_index) in
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
   (* Retrieve the correct index order *)
   let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
-  (* Make sure we only keep valid operations *)
-  filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
-  filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
-  filter_valid_operations inc accepted_managers >>= fun (inc, accepted_managers) ->
-  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
-  (* Endorsements won't fail now *)
-  fold_left_s (fun inc op ->
-      add_operation inc op >>=? fun (inc, _receipt) ->
-      return inc) inc endorsements >>=? fun inc ->
-  (* Endorsement and double baking/endorsement evidence do not commute:
-     we apply denunciation operations after endorsements. *)
-  filter_valid_operations inc evidences >>= fun (_final_inc, evidences) ->
-  let operations = List.map List.rev [ endorsements ; votes ; anonymous @ evidences ; accepted_managers ] in
-  (* Construct a context with the valid operations and a correct
-     timestamp *)
+
+  (* Second pass : make sure we only keep valid operations *)
+  filter_valid_operations manager_inc accepted_managers >>= fun (_, accepted_managers) ->
+  (* Put the operations back in order *)
+  let operations = List.map List.rev [ endorsements ; votes ; anonymous ; accepted_managers ] in
+  (* Construct a context with the valid operations and a correct timestamp *)
   compute_endorsing_power cctxt ~chain ~block endorsements >>=? fun current_endorsing_power ->
   Delegate_services.Minimal_valid_time.get cctxt (chain, block)
     priority current_endorsing_power >>=? fun expected_validity ->
+
+  (* Finally, we construct a block with the minimal possible timestamp
+     given the endorsing power *)
   begin_construction
     ~timestamp:expected_validity
     ?protocol_data
@@ -711,7 +680,7 @@ let forge_block
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte ;
         } in
         filter_and_apply_operations cctxt state
-          ~chain ~block ~slot_timestamp:timestamp ~priority ~protocol_data bi (operations, overflowing_ops)
+          ~chain ~block ~priority ~protocol_data bi (operations, overflowing_ops)
         >>=? fun (final_context, (validation_result, _), operations, min_valid_timestamp) ->
         let current_protocol = bi.next_protocol in
         Context.get_protocol validation_result.context >>= fun next_protocol ->
@@ -924,7 +893,7 @@ let build_block
       else
         let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
         filter_and_apply_operations cctxt state
-          ~chain ~block ~slot_timestamp ~priority ~protocol_data bi (operations, overflowing_ops)
+          ~chain ~block ~priority ~protocol_data bi (operations, overflowing_ops)
         >>= function
         | Error errs ->
             lwt_log_error Tag.DSL.(fun f ->
