@@ -761,7 +761,7 @@ let apply_manager_contents_list ctxt mode baker contents_list =
   | `Success ctxt -> Lwt.return (ctxt, results)
 
 let apply_contents_list
-    (type kind) ctxt ~partial chain_id mode pred_block baker
+    (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation)
     (contents_list : kind contents_list)
   : (context * kind contents_result_list) tzresult Lwt.t =
@@ -783,12 +783,7 @@ let apply_contents_list
         Lwt.return
           Tez.(Constants.endorsement_security_deposit ctxt *?
                Int64.of_int gap) >>=? fun deposit ->
-        begin
-          if partial then
-            Delegate.freeze_deposit ctxt delegate deposit
-          else
-            add_deposit ctxt delegate deposit
-        end >>=? fun ctxt ->
+        Delegate.freeze_deposit ctxt delegate deposit >>=? fun ctxt ->
         Global.get_last_block_priority ctxt >>=? fun block_priority ->
         Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
         Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
@@ -939,10 +934,10 @@ let apply_contents_list
       apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
       return (ctxt, result)
 
-let apply_operation ctxt ~partial chain_id mode pred_block baker hash operation =
+let apply_operation ctxt chain_id mode pred_block baker hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
   apply_contents_list
-    ctxt ~partial chain_id mode pred_block baker operation
+    ctxt chain_id mode pred_block baker operation
     operation.protocol_data.contents >>=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
