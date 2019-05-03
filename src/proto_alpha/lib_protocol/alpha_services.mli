@@ -44,23 +44,6 @@ module Nonce : sig
 
 end
 
-module Endorsing_power : sig
-
-  val get:
-    'a #RPC_context.simple -> 'a ->
-    Alpha_context.packed_operation ->
-    int shell_tzresult Lwt.t
-
-end
-
-module Required_endorsements : sig
-
-  val get:
-    'a #RPC_context.simple -> 'a ->
-    int -> Period.t -> int shell_tzresult Lwt.t
-
-end
-
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services

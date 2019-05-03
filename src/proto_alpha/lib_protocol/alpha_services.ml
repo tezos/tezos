@@ -110,76 +110,6 @@ module Nonce = struct
 
 end
 
-module Endorsing_power = struct
-
-  let endorsing_power ctxt (operation:packed_operation) =
-    let Operation_data data = operation.protocol_data in
-    match data.contents with
-    | Single Endorsement _ ->
-        Baking.check_endorsement_rights ctxt {
-          shell = operation.shell ;
-          protocol_data = data ;
-        } >>=? fun (_, slots, _) ->
-        return (List.length slots)
-    | _ ->
-        failwith "Operation is not an endorsement"
-
-  module S = struct
-    let endorsing_power =
-      let open Data_encoding in
-      RPC_service.post_service
-        ~description:"Count the endorsing power of an operation."
-        ~query: RPC_query.empty
-        ~input: Operation.encoding
-        ~output: int31
-        RPC_path.(open_root / "endorsing_power")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 S.endorsing_power begin fun ctxt () op ->
-      endorsing_power ctxt op
-    end
-
-  let get ctxt block op =
-    RPC_context.make_call0 S.endorsing_power ctxt block () op
-
-end
-
-module Required_endorsements = struct
-
-  let required_endorsements ctxt block_priority block_delay =
-    let minimum =
-      Baking.minimum_allowed_endorsements
-        ctxt ~block_priority ~block_delay
-    in
-    return minimum
-
-  module S = struct
-    let required_endorsements =
-      let open Data_encoding in
-      RPC_service.post_service
-        ~description:"Minimum number of endorsements for a block to be valid."
-        ~query: RPC_query.empty
-        ~input:
-          (obj2
-             (req "priority" int31)
-             (req "block_delay" Period.encoding))
-        ~output: int31
-        RPC_path.(open_root / "required_endorsements")
-  end
-
-  let register () =
-    let open Services_registration in
-    register0 S.required_endorsements begin fun ctxt () (priority, delay) ->
-      required_endorsements ctxt priority delay
-    end
-
-  let get ctxt block priority delay =
-    RPC_context.make_call0 S.required_endorsements ctxt block () (priority, delay)
-
-end
-
 module Contract = Contract_services
 module Constants = Constants_services
 module Delegate = Delegate_services
@@ -194,6 +124,4 @@ let register () =
   Delegate.register () ;
   Helpers.register () ;
   Nonce.register () ;
-  Voting.register () ;
-  Endorsing_power.register () ;
-  Required_endorsements.register ()
+  Voting.register ()

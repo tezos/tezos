@@ -162,6 +162,25 @@ module Endorsing_rights : sig
 
 end
 
+module Endorsing_power : sig
+
+  val get:
+    'a #RPC_context.simple -> 'a ->
+    Alpha_context.packed_operation ->
+    int shell_tzresult Lwt.t
+
+end
+
+module Required_endorsements : sig
+
+  val get:
+    'a #RPC_context.simple -> 'a ->
+    int -> Period.t -> int shell_tzresult Lwt.t
+
+end
+
+end
+
 (* temporary export for deprecated unit test *)
 val endorsement_rights:
   Alpha_context.t ->
@@ -173,4 +192,14 @@ val baking_rights:
   int option ->
   (Raw_level.t * (public_key_hash * Time.t option) list) tzresult Lwt.t
 
+val endorsing_power:
+  Alpha_context.t ->
+  Alpha_context.packed_operation ->
+  int tzresult Lwt.t
+
+val required_endorsements:
+  Alpha_context.t ->
+  int ->
+  Alpha_context.Period.t ->
+  int tzresult Lwt.t
 val register: unit -> unit
