@@ -40,7 +40,6 @@ module Baker : sig
     ?minimal_fees: Tez.t ->
     ?minimal_nanotez_per_gas_unit: Z.t ->
     ?minimal_nanotez_per_byte: Z.t ->
-    ?await_endorsements: bool ->
     ?max_priority: int ->
     chain: Chain_services.chain ->
     context_path: string ->

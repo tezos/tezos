@@ -62,7 +62,6 @@ val forge_block:
   ?minimal_fees: Tez.t ->
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->
-  ?await_endorsements: bool ->
   ?timestamp:Time.t ->
   ?mempool:string ->
   ?context_path:string ->
@@ -99,7 +98,6 @@ val create:
   ?minimal_fees: Tez.t ->
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->
-  ?await_endorsements: bool ->
   ?max_priority: int ->
   chain: Chain_services.chain ->
   context_path: string ->

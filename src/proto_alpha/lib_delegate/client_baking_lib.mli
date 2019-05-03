@@ -32,7 +32,6 @@ val bake_block:
   ?minimal_fees: Tez.t ->
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->
-  ?await_endorsements: bool ->
   ?force: bool ->
   ?max_priority: int ->
   ?minimal_timestamp: bool ->

@@ -45,7 +45,6 @@ let default_max_priority = 64
 let default_minimal_fees = Tez.zero
 let default_minimal_nanotez_per_gas_unit = Z.of_int 10000
 let default_minimal_nanotez_per_byte = Z.zero
-let default_await_endorsements = true
 
 type slot = (Time.t * (Client_baking_blocks.block_info * int * public_key_hash))
 
@@ -64,8 +63,6 @@ type state = {
   minimal_nanotez_per_gas_unit : Z.t ;
   (* Minimal operation fee per byte required to include an operation in a block *)
   minimal_nanotez_per_byte : Z.t ;
-  (* Await endorsements *)
-  await_endorsements: bool ;
   (* truly mutable *)
   mutable best_slot: slot option ;
 }
@@ -74,7 +71,6 @@ let create_state
     ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(await_endorsements = default_await_endorsements)
     context_path index nonces_location delegates constants =
   { context_path ;
     index ;
@@ -84,7 +80,6 @@ let create_state
     minimal_fees ;
     minimal_nanotez_per_gas_unit ;
     minimal_nanotez_per_byte ;
-    await_endorsements ;
     best_slot = None ;
   }
 
@@ -611,7 +606,6 @@ let forge_block
     ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(await_endorsements = default_await_endorsements)
     ?timestamp
     ?mempool
     ?context_path
@@ -685,21 +679,23 @@ let forge_block
           constants ;
           delegates = [] ;
           best_slot = None ;
-          await_endorsements ;
           minimal_fees = default_minimal_fees ;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit ;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte ;
         } in
-        filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
-        >>=? fun (final_context, (validation_result, _), operations) ->
+        filter_and_apply_operations cctxt state
+          ~chain ~block ~slot_timestamp:timestamp ~priority ~protocol_data bi (operations, overflowing_ops)
+        >>=? fun (final_context, (validation_result, _), operations, min_valid_timestamp) ->
         let current_protocol = bi.next_protocol in
         Context.get_protocol validation_result.context >>= fun next_protocol ->
         if Protocol_hash.equal current_protocol next_protocol then begin
-          finalize_block_header final_context.header ~timestamp
+          finalize_block_header final_context.header ~timestamp:min_valid_timestamp
             validation_result operations >>= function
           | Error [ Forking_test_chain ] ->
               Alpha_block_services.Helpers.Preapply.block
-                cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
+                cctxt ~chain ~block
+                ~timestamp:min_valid_timestamp
+                ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
               return (shell_header, List.map (List.map forge) operations)
           | Error _ as errs -> Lwt.return errs
           | Ok shell_header -> return (shell_header, List.map (List.map forge) operations)
@@ -856,9 +852,6 @@ let fetch_operations
       count_slots_endorsements inc slot !operations >>= fun nb_arrived_endorsements ->
       (* If 100% of the endorsements arrived, we don't need to wait *)
       let endorsers_per_block = state.constants.parametric.endorsers_per_block in
-      if (not state.await_endorsements) || nb_arrived_endorsements = endorsers_per_block then
-        return_some !operations
-      else
         next_baking_delay state priority >>=? fun next_slot_delay ->
         let hard_delay = Int64.div next_slot_delay 2L in
         (* The time limit is defined as 1/2 of the next baking slot's time *)
@@ -1223,7 +1216,6 @@ let create
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
-    ?await_endorsements
     ?max_priority
     ~chain
     ~context_path
@@ -1237,7 +1229,6 @@ let create
     Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     let state = create_state
         ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-        ?await_endorsements
         context_path index nonces_location delegates constants in
     return state
   in

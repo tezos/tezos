@@ -126,7 +126,6 @@ module Baker = struct
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
-      ?await_endorsements
       ?max_priority
       ~chain
       ~context_path
@@ -144,7 +143,6 @@ module Baker = struct
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
-      ?await_endorsements
       ?max_priority
       ~chain
       ~context_path
