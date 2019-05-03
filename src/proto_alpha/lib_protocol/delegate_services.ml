@@ -608,12 +608,44 @@ module Required_endorsements = struct
 
 end
 
+module Minimal_valid_time = struct
+
+  let minimal_valid_time ctxt ~priority ~endorsing_power =
+    Baking.minimal_valid_time ctxt
+      ~priority ~endorsing_power
+
+  module S = struct
+    let minimal_valid_time =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description: "Minimal valid time for a block given an \
+                       endorsing power."
+        ~query: RPC_query.empty
+        ~input:
+          (obj2
+             (req "priority" int31)
+             (req "endorsing_power" int31))
+        ~output: Time.encoding
+        RPC_path.(open_root / "minimal_valid_time")
+  end
+
+  let register () =
+    let open Services_registration in
+    register0 S.minimal_valid_time begin fun ctxt () (priority, endorsing_power) ->
+      minimal_valid_time ctxt ~priority ~endorsing_power
+    end
+
+  let get ctxt block priority endorsing_power =
+    RPC_context.make_call0 S.minimal_valid_time ctxt block () (priority, endorsing_power)
+end
+
 let register () =
   register () ;
   Baking_rights.register () ;
   Endorsing_rights.register () ;
   Endorsing_power.register () ;
   Required_endorsements.register () ;
+  Minimal_valid_time.register ()
 
 let endorsement_rights ctxt level =
   Endorsing_rights.endorsement_slots ctxt (level, None) >>=? fun l ->
@@ -633,3 +665,6 @@ let endorsing_power ctxt operation =
 
 let required_endorsements ctxt priority delay =
   Required_endorsements.required_endorsements ctxt priority delay
+
+let minimal_valid_time ctxt priority endorsing_power =
+  Minimal_valid_time.minimal_valid_time ctxt priority endorsing_power

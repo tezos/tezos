@@ -179,6 +179,12 @@ module Required_endorsements : sig
 
 end
 
+module Minimal_valid_time : sig
+
+  val get:
+    'a #RPC_context.simple -> 'a ->
+    int -> int -> Time.t shell_tzresult Lwt.t
+
 end
 
 (* temporary export for deprecated unit test *)
@@ -202,4 +208,10 @@ val required_endorsements:
   int ->
   Alpha_context.Period.t ->
   int tzresult Lwt.t
+
+val minimal_valid_time:
+  Alpha_context.t ->
+  int ->
+  int ->
+  Time.t tzresult Lwt.t
 val register: unit -> unit

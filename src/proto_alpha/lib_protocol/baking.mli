@@ -128,3 +128,9 @@ val earlier_predecessor_timestamp: context -> Level.t -> Timestamp.t tzresult Lw
     early. *)
 
 val minimum_allowed_endorsements: context -> block_priority:int -> block_delay:Period.t -> int
+
+val minimal_valid_time:
+  context ->
+  priority:int ->
+  endorsing_power: int ->
+  Time.t tzresult Lwt.t

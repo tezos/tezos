@@ -295,18 +295,18 @@ let dawn_of_a_new_cycle ctxt =
   else
     return_none
 
+let rec find_minimal_required_endorsements priority minimum =
+  match minimum with
+  | [] -> 0
+  | h :: minimum ->
+      if Compare.Int.(priority = 0) then
+        h
+      else
+        find_minimal_required_endorsements (pred priority) minimum
+
 let minimum_allowed_endorsements ctxt ~block_priority ~block_delay =
-  let rec find_constraint priority minimum =
-    match minimum with
-    | [] -> 0
-    | h :: minimum ->
-        if Compare.Int.(priority = 0) then
-          h
-        else
-          find_constraint (pred priority) minimum
-  in
   let minimum =
-    find_constraint block_priority
+    find_minimal_required_endorsements block_priority
       (Constants.minimum_endorsements_per_priority ctxt)
   in
   let delay_per_missing_endorsement =
@@ -319,3 +319,23 @@ let minimum_allowed_endorsements ctxt ~block_priority ~block_delay =
     delay_per_missing_endorsement
   in
   Compare.Int.max 0 (minimum - reduced_time_constraint)
+
+let minimal_valid_time ctxt ~priority ~endorsing_power =
+  let predecessor_timestamp = Timestamp.current ctxt in
+  minimal_time ctxt
+    priority predecessor_timestamp >>=? fun minimal_time ->
+  let minimal_required_endorsements =
+    find_minimal_required_endorsements priority
+      (Constants.minimum_endorsements_per_priority ctxt)
+  in
+  let delay_per_missing_endorsement =
+    Constants.delay_per_missing_endorsement ctxt
+  in
+  let missing_endorsements =
+    Compare.Int.max 0 (minimal_required_endorsements - endorsing_power) in
+  match Period.mult
+          (Int32.of_int missing_endorsements)
+          delay_per_missing_endorsement with
+  | Ok delay ->
+      return (Time.add minimal_time (Period.to_seconds delay))
+  | Error _ as err -> Lwt.return err
