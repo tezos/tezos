@@ -143,6 +143,17 @@ module Block : sig
     last_allowed_fork_level: Int32.t ;
   }
 
+  (** Abstract view over block header storage.
+      This module aims to abstract over block header's [read], [read_opt] and [known]
+      functions by calling the adequate function depending on the block being pruned or not. *)
+  module Header : sig
+    val read :
+      Store.Block.store * Block_hash.t -> Block_header.t tzresult Lwt.t
+    val read_opt :
+      Store.Block.store * Block_hash.t -> Block_header.t option Lwt.t
+    val known : Store.Block.store * Block_hash.t -> bool Lwt.t
+  end
+
   val known: Chain.t -> Block_hash.t -> bool Lwt.t
   val known_valid: Chain.t -> Block_hash.t -> bool Lwt.t
   val known_invalid: Chain.t -> Block_hash.t -> bool Lwt.t

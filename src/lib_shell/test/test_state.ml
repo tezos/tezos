@@ -262,6 +262,11 @@ let test_set_checkpoint_then_purge_full (s : state) =
     | Some _header -> assert true
     | None -> assert false
   end
+  >>= fun () -> (* and is accesible in Store.Block.Header *)
+  State.Chain.store s.chain >>= fun chain_store ->
+  let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
+  let block_store = Store.Block.get chain_store in
+  begin Store.Block.Header.known (block_store, ha1) >|= fun b -> assert b end
   >>= fun () -> return_unit
 
 (** Chain.set_checkpoint_then_purge_rolling *)
@@ -296,7 +301,19 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   (* Assert a1 is in the to-delete range. *)
   let ila1 = Int32.to_int la1 in
   assert (ilb2 - ila1 > min max_op_ttl ilb2);
+  (* Assert b1 is not yet in Store.Block.Header since not pruned *)
+  State.Chain.store s.chain >>= fun chain_store ->
+  let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
+  let block_store = Store.Block.get chain_store in
+  begin Store.Block.Header.known (block_store, hb1) >|= fun b -> assert (not b) end
+  (* But accessible with State.Block.Header *)
+  >>= fun () ->
+  begin State.Block.known s.chain hb1 >|= fun b -> assert b end
+  (* And Store.Block.Contents *)
+  >>= fun () ->
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert b end
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
+  >>= fun () ->
   State.Chain.set_checkpoint_then_purge_rolling s.chain (State.Block.header b2)
   >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
@@ -311,9 +328,18 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   >>= fun () -> (* pruned, so we can still access its header. *)
   begin
     State.Block.read_opt s.chain hb1 >|= function
-    | Some _header -> assert true
+    | Some _block -> assert true
     | None -> assert false
   end
+  >>= fun () ->
+  (* Assert b1 is now in Store.Block.Header since it has been pruned *)
+  begin Store.Block.Header.known (block_store, hb1) >|= fun b -> assert b end
+  >>= fun () ->
+  (* And also accessible with State.Block.Header *)
+  begin State.Block.Header.known (block_store, hb1) >|= fun b -> assert b end
+  (* But not in Store.Block.Contents *)
+  >>= fun () ->
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
   >>= fun () -> (* Assert a1 has been deleted.. *)
   begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
   >>= fun () -> (* deleted, so we can not access its header anymore. *)
@@ -322,6 +348,16 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
     | Some _header -> assert false
     | None -> assert true
   end
+  >>= fun () ->
+  (* Assert a1 is not in Store.Block.Header since it has been deleted *)
+  begin Store.Block.Header.known (block_store, ha1) >|= fun b -> assert (not b) end
+  >>= fun () ->
+  (* And not in State.Block.Header *)
+  begin State.Block.Header.known (block_store, ha1) >|= fun b -> assert (not b) end
+  (* Neither in Store.Block.Contents *)
+  >>= fun () ->
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
+  (*  *)
   >>= fun () -> return_unit
 
 (****************************************************************************)

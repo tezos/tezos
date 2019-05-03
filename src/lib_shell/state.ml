@@ -100,6 +100,36 @@ and block = {
   header: Block_header.t ;
 }
 
+(* Abstract view over block header storage.
+   This module aims to abstract over block header's [read], [read_opt] and [known]
+   functions by calling the adequate function depending on the block being pruned or not.
+*)
+
+module Header = struct
+
+  let read (store, hash) =
+    Store.Block.Header.read (store, hash) >>= function
+    | Ok h -> return h
+    | Error _ -> (* The block was not pruned yet *)
+        Store.Block.Contents.read (store, hash) >>= begin function
+          | Ok c -> return c.header
+          | Error errs -> Lwt.return (Error errs)
+        end
+
+  let read_opt (store, hash) = Store.Block.Header.read_opt (store, hash) >>= function
+    | Some h -> Lwt.return_some h
+    | None -> begin Store.Block.Contents.read_opt (store, hash) >>= function
+      | None -> Lwt.return_none
+      | Some c -> Lwt.return_some c.header
+      end
+
+  let known (store, hash) =
+    Store.Block.Header.known (store, hash) >>= function
+    | true -> Lwt.return true
+    | false -> (* The block was not pruned yet *)
+        Store.Block.Contents.known (store, hash)
+end
+
 let read_chain_data { chain_data ; _ } f =
   Shared.use chain_data begin fun state ->
     f state.chain_data_store state.data
@@ -154,7 +184,7 @@ let store_predecessors (store: Store.Block.store) (b: Block_hash.t) : unit Lwt.t
           loop p (dist+1)
   in
   (* the first predecessor is fetched from the header *)
-  Store.Block.Header.read_opt (store, b) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
+  Header.read_opt (store, b) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
   let pred = header.shell.predecessor in
   if Block_hash.equal b pred then
     Lwt.return_unit  (* genesis *)
@@ -229,7 +259,7 @@ let predecessor_n ?(below_save_point = false) block_store block_hash distance =
       (* check if this block was pruned by the gc *)
       begin
         if below_save_point then
-          Store.Block.Header.known (block_store, predecessor)
+          Header.known (block_store, predecessor)
         else (* Force read of pruned block *)
           Store.Block.Contents.known (block_store, predecessor)
       end
@@ -244,7 +274,7 @@ let compute_locator_from_hash chain_state ?(size = 200) head_hash seed =
     Lwt.return state.data.caboose
   end >>= fun (_lvl, caboose) ->
   Shared.use chain_state.block_store begin fun block_store ->
-    Store.Block.Header.read_opt (block_store, head_hash) >|=
+    Header.read_opt (block_store, head_hash) >|=
     Option.unopt_assert ~loc:__POS__ >>= fun header ->
     Block_locator.compute
       ~get_predecessor:(predecessor_n ~below_save_point:true block_store)
@@ -272,9 +302,9 @@ module Locked_block = struct
       context ;
     } in
     let header : Block_header.t = { shell ; protocol_data = MBytes.create 0 } in
-    Store.Block.Header.store  (store, genesis.block) header >>= fun () ->
     Store.Block.Contents.store (store, genesis.block)
-      { Store.Block.message = Some "Genesis" ;
+      { header ;
+        Store.Block.message = Some "Genesis" ;
         max_operations_ttl = 0 ; context ;
         metadata = MBytes.create 0 ;
         last_allowed_fork_level = 0l ;
@@ -320,7 +350,7 @@ let locked_valid_heads_for_checkpoint block_store data checkpoint =
   Block_hash.Set.fold
     (fun head acc ->
        let valid_header =
-         Store.Block.Header.read_opt
+         Header.read_opt
            (block_store, head) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
          Locked_block.is_valid_for_checkpoint
            block_store head header checkpoint >>= fun valid ->
@@ -351,7 +381,7 @@ let tag_invalid_heads block_store chain_store heads level =
       Store.Block.Operations_metadata.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Operations.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Predecessors.remove_all (block_store, hash) >>= fun () ->
-      Store.Block.Header.read_opt
+      Header.read_opt
         (block_store, header.shell.predecessor) >>= function
       | None ->
           Lwt.return_none
@@ -369,6 +399,15 @@ let prune_block store block_hash =
   Store.Block.Invalid_block.remove store block_hash >>= fun () ->
   Store.Block.Operations_metadata.remove_all st
 
+let store_header_and_prune_block store block_hash =
+  let st = (store, block_hash) in
+  Store.Block.Contents.read_opt st >>= begin function
+    | Some contents ->
+        Store.Block.Header.store st contents.header
+    | None -> assert false
+  end >>= fun () ->
+  prune_block store block_hash
+
 let delete_block store block_hash =
   prune_block store block_hash >>= fun () ->
   let st = (store, block_hash) in
@@ -385,7 +424,7 @@ let cut_alternate_heads block_store chain_store heads =
     if in_chain then
       Lwt.return_unit
     else
-      Store.Block.Header.read_opt
+      Header.read_opt
         (block_store, header.Block_header.shell.predecessor) >>= function
       | None ->
           delete_block block_store hash >>= fun () ->
@@ -462,7 +501,7 @@ module Chain = struct
       ~checkpoint
       ~chain_id
       global_state context_index chain_data_store block_store =
-    Store.Block.Header.read_opt (block_store, current_head) >|=
+    Header.read_opt (block_store, current_head) >|=
     Option.unopt_assert ~loc:__POS__ >>= fun current_block_head ->
 
     let rec chain_data = {
@@ -576,7 +615,7 @@ module Chain = struct
     Store.Chain.Expiration.read_opt chain_store >>= fun expiration ->
     Store.Chain.Allow_forked_chain.known
       data.global_store chain_id >>= fun allow_forked_chain ->
-    Store.Block.Header.read (block_store, genesis_hash) >>=? fun genesis_header ->
+    Header.read (block_store, genesis_hash) >>=? fun genesis_header ->
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
     Store.Chain_data.Checkpoint.read chain_data_store >>=? fun checkpoint ->
@@ -660,14 +699,14 @@ module Chain = struct
   let purge_loop_full global_store store ~genesis_hash block_hash bottom =
     let do_prune blocks =
       Store.with_atomic_rw global_store @@ fun () ->
-      Lwt_list.iter_s (prune_block store) blocks in
+      Lwt_list.iter_s (store_header_and_prune_block store) blocks in
     let rec loop block_hash (n_blocks, blocks) =
       begin if n_blocks >= 4000 then
           do_prune blocks >>= fun () ->
           Lwt.return (0, [])
         else Lwt.return (n_blocks, blocks)
       end >>= fun (n_blocks, blocks) ->
-      Store.Block.Header.read_opt (store, block_hash) >>= function
+      Header.read_opt (store, block_hash) >>= function
       | None -> assert false (* Should not happen *)
       | Some header ->
           if Block_hash.equal block_hash genesis_hash then
@@ -676,7 +715,7 @@ module Chain = struct
             do_prune (block_hash :: blocks)
           else
             loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks) in
-    Store.Block.Header.read_opt (store, block_hash) >|=
+    Header.read_opt (store, block_hash) >|=
     Option.unopt_assert ~loc:__POS__ >>= fun header ->
     loop header.shell.predecessor (0, [])
 
@@ -704,20 +743,20 @@ module Chain = struct
       Lwt_list.iter_s (delete_block store) blocks in
     let rec prune_loop block_hash limit =
       if limit = 1 then
-        Store.Block.Header.read_opt (store, block_hash) >>= function
+        Header.read_opt (store, block_hash) >>= function
         | None -> assert false (* Should not happen. *)
         | Some header ->
             if Block_hash.equal genesis_hash block_hash then
               Lwt.return block_hash
             else begin
-              prune_block store block_hash >>= fun () ->
+              store_header_and_prune_block store block_hash >>= fun () ->
               delete_loop header.shell.predecessor (0, []) >>= fun () ->
               Lwt.return block_hash end
       else
-        Store.Block.Header.read_opt (store, block_hash) >>= function
+        Header.read_opt (store, block_hash) >>= function
         | None -> assert false (* Should not happen. *)
         | Some header ->
-            prune_block store block_hash >>= fun () ->
+            store_header_and_prune_block store block_hash >>= fun () ->
             prune_loop header.shell.predecessor (pred limit)
     and delete_loop block_hash (n_blocks, blocks) =
       begin if n_blocks >= 4000 then
@@ -725,7 +764,7 @@ module Chain = struct
           Lwt.return (0, [])
         else Lwt.return (n_blocks, blocks)
       end >>= fun (n_blocks, blocks) ->
-      Store.Block.Header.read_opt (store, block_hash) >>= function
+      Header.read_opt (store, block_hash) >>= function
       | None -> do_delete blocks
       | Some header ->
           if Block_hash.equal genesis_hash block_hash
@@ -734,7 +773,7 @@ module Chain = struct
             delete_loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks)
           end
     in
-    Store.Block.Header.read_opt (store, block_hash) >|=
+    Header.read_opt (store, block_hash) >|=
     Option.unopt_assert ~loc:__POS__ >>= fun header ->
     prune_loop header.shell.predecessor limit
 
@@ -743,7 +782,7 @@ module Chain = struct
       Shared.use chain_state.block_store begin fun store ->
         Store.Block.Contents.read_opt (store, hash) >|=
         Option.unopt_assert ~loc:__POS__ >>= fun contents ->
-        Store.Block.Header.read_opt (store, hash) >|=
+        Header.read_opt (store, hash) >|=
         Option.unopt_assert ~loc:__POS__ >>= fun header ->
         let max_op_ttl = contents.max_operations_ttl in
         assert (max_op_ttl > 0);
@@ -882,6 +921,8 @@ module Block = struct
   }
 
 
+  module Header = Header
+
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
   let equal b1 b2 = Block_hash.equal b1.hash b2.hash
 
@@ -890,7 +931,7 @@ module Block = struct
 
   let header_of_hash chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Header.read_opt (store, hash)
+      Header.read_opt (store, hash)
     end
 
   let metadata b =
@@ -985,7 +1026,7 @@ module Block = struct
       match new_hash_opt with
       | None -> Lwt.fail Not_found
       | Some hash ->
-          Store.Block.Header.read_opt (store, hash) >>= fun header ->
+          Header.read_opt (store, hash) >>= fun header ->
           begin match header with
             | Some header ->
                 Lwt.return_some { chain_state ; hash ; header }
@@ -996,7 +1037,7 @@ module Block = struct
 
   let read chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Header.read (store, hash) >>=? fun header ->
+      Header.read (store, hash) >>=? fun header ->
       return  { chain_state ; hash ; header }
     end
 
@@ -1050,7 +1091,7 @@ module Block = struct
            with the current checkpoint.  *)
         begin
           let predecessor = block_header.shell.predecessor in
-          Store.Block.Header.known
+          Header.known
             (store, predecessor) >>= fun valid_predecessor ->
           if not valid_predecessor then
             Lwt.return_false
@@ -1080,13 +1121,13 @@ module Block = struct
             block_header
         in
         let contents = {
+          header ;
           Store.Block.message ;
           max_operations_ttl ;
           last_allowed_fork_level ;
           context = commit ;
           metadata = block_header_metadata ;
         } in
-        Store.Block.Header.store (store, hash) header >>= fun () ->
         Store.Block.Contents.store (store, hash) contents >>= fun () ->
         Lwt_list.iteri_p (fun i ops ->
             Store.Block.Operation_hashes.store
@@ -1308,7 +1349,7 @@ module Block = struct
 
   let get_header_rpc_directory chain_state header =
     Shared.use chain_state.block_store begin fun block_store ->
-      Store.Block.Header.read_opt
+      Header.read_opt
         (block_store, header.Block_header.shell.predecessor) >>= function
       | None -> Lwt.return_none (* genesis or caboose *)
       | Some pred when Block_header.equal pred header -> Lwt.return_none (* genesis *)
@@ -1326,7 +1367,7 @@ module Block = struct
 
   let set_header_rpc_directory chain_state header dir =
     Shared.use chain_state.block_store begin fun block_store ->
-      Store.Block.Header.read_opt
+      Header.read_opt
         (block_store, header.Block_header.shell.predecessor) >>= function
       | None -> assert false
       | Some pred ->
@@ -1376,9 +1417,9 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
   Shared.use block.chain_state.global_state.global_data begin fun data ->
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store in
-    Store.Block.Header.store (block_store, genesis_hash) genesis_header >>= fun () ->
     Store.Block.Contents.store (block_store, genesis_hash)
-      { Store.Block.message = Some "Genesis" ;
+      { header = genesis_header ;
+        Store.Block.message = Some "Genesis" ;
         max_operations_ttl = 0 ; context = genesis_header.shell.context ;
         metadata = MBytes.create 0 ;
         last_allowed_fork_level = 0l ;
@@ -1406,7 +1447,7 @@ let best_known_head_for_checkpoint chain_state checkpoint =
         Lwt.return data.data.current_head
       else
         let find_valid_predecessor hash =
-          Store.Block.Header.read_opt
+          Header.read_opt
             (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
           if Compare.Int32.(header.shell.level < checkpoint.shell.level) then
             Lwt.return { hash ; chain_state ; header }
@@ -1417,12 +1458,12 @@ let best_known_head_for_checkpoint chain_state checkpoint =
             Option.unopt_assert ~loc:__POS__ >>= fun pred ->
             (* Store.Block.Contents.read_opt
              *   (store, pred) >|= Option.unopt_assert ~loc:__POS__ >>= fun pred_contents -> *)
-            Store.Block.Header.read_opt
+            Header.read_opt
               (store, pred) >|= Option.unopt_assert ~loc:__POS__ >>= fun pred_header ->
             Lwt.return { hash = pred ; chain_state ; header = pred_header } in
         Store.Chain_data.Known_heads.read_all
           data.chain_data_store >>= fun heads ->
-        Store.Block.Header.read_opt
+        Header.read_opt
           (store, chain_state.genesis.block) >|= Option.unopt_assert ~loc:__POS__ >>= fun genesis_header ->
         let genesis =
           { hash = chain_state.genesis.block ;
@@ -1678,70 +1719,13 @@ let upgrade_0_0_1
       let chain_store = Store.Chain.get global_store chain_id in
       let block_store = Store.Block.get chain_store in
       let chain_data_store = Store.Chain_data.get chain_store in
-      Format.eprintf "Listing blocks..." ;
-      if Unix.isatty Unix.stderr then
-        Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
-      else Format.eprintf "\n%!" ;
-      Store.Block.fold ~init:(0, []) ~f:begin fun h (listed, acc) ->
-        if listed mod 1000 = 0 then begin
-          Format.eprintf "%dK blocks listed..." (listed / 1000);
-          if Unix.isatty Unix.stderr then
-            Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
-          else Format.eprintf "\n%!"
-        end ;
-        Lwt.return (listed + 1, h :: acc)
-      end block_store >>= fun (_, blocks) ->
-      Format.eprintf "Processing blocks..." ;
-      if Unix.isatty Unix.stderr then
-        Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
-      else Format.eprintf "\n%!" ;
-      let rec loop_on_chunks blocks (erroneous, skipped, processed) =
-        let blocks, rest = List.split_n 1000 blocks in
-        Store.with_atomic_rw global_store begin fun () ->
-          fold_left_s begin fun (erroneous, skipped, processed) h ->
-            begin
-              Store.Block.Contents_0_0_1.read
-                (block_store, h) >>=? fun (header, contents) ->
-              Store.Block.Header.store (block_store, h) header >>= fun () ->
-              Store.Block.Contents.store (block_store, h) contents >>= fun () ->
-              if (processed + skipped) mod 1000 = 0 then begin
-                Format.eprintf "%dK blocks processed..." ((processed + skipped) / 1000);
-                if Unix.isatty Unix.stderr then
-                  Format.eprintf "%!\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b%!"
-                else Format.eprintf "\n%!"
-              end ;
-              return ()
-            end >>= function
-            | Ok () -> return (erroneous, skipped, processed + 1)
-            | Error _ ->
-                Store.Block.Header.read_opt (block_store, h) >>= fun header ->
-                Store.Block.Contents.read_opt (block_store, h) >>= fun contents ->
-                match header, contents with
-                | Some _, Some _ -> (* already converted *) return (erroneous, skipped + 1, processed)
-                | _ -> return (h :: erroneous, skipped, processed)
-          end (erroneous, skipped, processed) blocks
-        end >>=? fun (erroneous, skipped, processed) ->
-        if rest = [] then return (erroneous, skipped, processed)
-        else loop_on_chunks rest (erroneous, skipped, processed) in
-      loop_on_chunks blocks ([], 0, 0) >>=? fun (erroneous, skipped, processed) ->
-      Format.eprintf
-        "Done Processing %d blocks (%d already converted were skipped).\n%!"
-        processed skipped ;
-      begin match erroneous with
-        | [] -> ()
-        | blocks ->
-            Format.eprintf
-              "Some blocks were corrupted. Consider resynchronizing.@.\
-               @[<v 0>%a@]@."
-              (Format.pp_print_list Block_hash.pp) blocks
-      end ;
       Format.eprintf "Upgrading checkpoint for chain %a...@." Chain_id.pp chain_id ;
       Store.Chain_data.Checkpoint_0_0_1.read_opt chain_data_store >>= begin function
         | None ->
             Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
             return_unit
         | Some (_level, hash) ->
-            Store.Block.Header.read (block_store, hash) >>=? fun header ->
+            Header.read (block_store, hash) >>=? fun header ->
             Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
             return_unit
       end >>=? fun () ->

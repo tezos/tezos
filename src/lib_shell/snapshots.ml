@@ -197,7 +197,7 @@ let pruned_block_iterator index block_store limit
       return (None, Some protocol_data)
     else
       let pred_hash = header.Block_header.shell.predecessor in
-      Store.Block.Header.read (block_store, pred_hash) >>=? fun pred_header ->
+      State.Block.Header.read (block_store, pred_hash) >>=? fun pred_header ->
       Store.Block.Operations.bindings (block_store, pred_hash) >>= fun pred_operations ->
       Store.Block.Operation_hashes.bindings (block_store, pred_hash) >>= fun pred_operation_hashes ->
       let pruned_block = {
@@ -248,7 +248,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
             ) >>= fun () ->
           return last_checkpoint_hash
   end >>=? fun checkpoint_block_hash ->
-  begin Store.Block.Header.read_opt
+  begin State.Block.Header.read_opt
       (block_store, checkpoint_block_hash) >>= function
     | None ->
         fail (Wrong_block_export (checkpoint_block_hash, `Cannot_be_found))
@@ -263,7 +263,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
         (* Get block precessor's block header*)
         Store.Block.Predecessors.read
           (block_store, checkpoint_block_hash) 0 >>=? fun pred_block_hash ->
-        Store.Block.Header.read
+        State.Block.Header.read
           (block_store, pred_block_hash) >>=? fun pred_block_header ->
         (* Get operation list*)
         let validations_passes = block_header.shell.validation_passes in
@@ -535,11 +535,11 @@ let reconstruct_contexts
         else
           begin
             let block_hash, pb = history.(level) in
-            Store.Block.Header.read
+            State.Block.Header.read
               (block_store, block_hash) >>=? fun block_header ->
             let operations = List.rev (List.map snd pb.operations) in
             let predecessor_block_hash = pb.block_header.shell.predecessor in
-            Store.Block.Header.read
+            State.Block.Header.read
               (block_store, predecessor_block_hash) >>=? fun pred_block_header ->
             let context_hash = pred_block_header.shell.context in
             Context.checkout_exn context_index context_hash >>= fun pred_context ->

@@ -144,6 +144,7 @@ module Block : sig
   val iter: store -> (Block_hash.t -> unit Lwt.t) -> unit Lwt.t
 
   type contents = {
+    header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
@@ -151,6 +152,12 @@ module Block : sig
     metadata: MBytes.t ;
   }
 
+  (** Block header storage used for pruned blocks.
+      Blocks that are not pruned have their header
+      stored in their contents (see {!Store.Block.Contents}).
+      For an abstraction over a block header, please see
+      the {!State.Block.Header} module.
+  *)
   module Header : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := Block_header.t
@@ -158,10 +165,6 @@ module Block : sig
   module Contents : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := contents
-
-  module Contents_0_0_1 : SINGLE_STORE
-    with type t := store * Block_hash.t
-     and type value := Block_header.t * contents
 
   module Operation_hashes : MAP_STORE
     with type t = store * Block_hash.t
