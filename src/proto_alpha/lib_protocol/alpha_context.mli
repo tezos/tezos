@@ -65,11 +65,13 @@ module Period : sig
 
   include BASIC_DATA
   type period = t
+  val rpc_arg: period RPC_arg.arg
 
   val of_seconds: int64 -> period tzresult
   val to_seconds: period -> int64
   val mult: int32 -> period -> period tzresult
 
+  val zero: period
   val one_second: period
   val one_minute: period
   val one_hour: period

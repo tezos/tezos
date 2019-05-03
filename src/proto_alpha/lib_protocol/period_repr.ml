@@ -28,6 +28,8 @@ type period = t
 include (Compare.Int64 : Compare.S with type t := t)
 let encoding = Data_encoding.int64
 
+let rpc_arg = RPC_arg.int64
+
 let pp ppf v = Format.fprintf ppf "%Ld" v
 
 type error += (* `Permanent *)

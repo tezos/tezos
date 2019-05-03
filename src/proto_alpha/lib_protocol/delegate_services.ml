@@ -548,8 +548,6 @@ module Endorsing_power = struct
     | _ ->
         failwith "Operation is not an endorsement"
 
-  (* TODO replace by a get service *)
-
   module S = struct
     let endorsing_power =
       let open Data_encoding in
@@ -581,30 +579,36 @@ module Required_endorsements = struct
     in
     return minimum
 
-  (* TODO replace by a get service *)
-
   module S = struct
+
+    type t = { priority : int ;
+               block_delay : Period.t }
+
+    let required_endorsements_query =
+      let open RPC_query in
+      query (fun priority block_delay ->
+          { priority ; block_delay })
+      |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
+      |+ field "block_delay" Period.rpc_arg Period.zero (fun t -> t.block_delay)
+      |> seal
+
     let required_endorsements =
       let open Data_encoding in
-      RPC_service.post_service
+      RPC_service.get_service
         ~description:"Minimum number of endorsements for a block to be valid."
-        ~query: RPC_query.empty
-        ~input:
-          (obj2
-             (req "priority" int31)
-             (req "block_delay" Period.encoding))
+        ~query: required_endorsements_query
         ~output: int31
         RPC_path.(open_root / "required_endorsements")
   end
 
   let register () =
     let open Services_registration in
-    register0 S.required_endorsements begin fun ctxt () (priority, delay) ->
-      required_endorsements ctxt priority delay
+    register0 S.required_endorsements begin fun ctxt ({ priority ; block_delay }) () ->
+      required_endorsements ctxt priority block_delay
     end
 
-  let get ctxt block priority delay =
-    RPC_context.make_call0 S.required_endorsements ctxt block () (priority, delay)
+  let get ctxt block priority block_delay =
+    RPC_context.make_call0 S.required_endorsements ctxt block { priority ; block_delay } ()
 
 end
 
@@ -615,28 +619,35 @@ module Minimal_valid_time = struct
       ~priority ~endorsing_power
 
   module S = struct
+
+    type t = { priority : int ;
+               endorsing_power : int }
+
+    let minimal_valid_time_query =
+      let open RPC_query in
+      query (fun priority endorsing_power ->
+          {  priority ; endorsing_power })
+      |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
+      |+ field "endorsing_power" RPC_arg.int 0 (fun t -> t.endorsing_power)
+      |> seal
+
     let minimal_valid_time =
-      let open Data_encoding in
-      RPC_service.post_service
-        ~description: "Minimal valid time for a block given an \
-                       endorsing power."
-        ~query: RPC_query.empty
-        ~input:
-          (obj2
-             (req "priority" int31)
-             (req "endorsing_power" int31))
+      RPC_service.get_service
+        ~description: "Minimal valid time for a block given a priority \
+                       and an endorsing power."
+        ~query: minimal_valid_time_query
         ~output: Time.encoding
         RPC_path.(open_root / "minimal_valid_time")
   end
 
   let register () =
     let open Services_registration in
-    register0 S.minimal_valid_time begin fun ctxt () (priority, endorsing_power) ->
+    register0 S.minimal_valid_time begin fun ctxt { priority ; endorsing_power } () ->
       minimal_valid_time ctxt ~priority ~endorsing_power
     end
 
   let get ctxt block priority endorsing_power =
-    RPC_context.make_call0 S.minimal_valid_time ctxt block () (priority, endorsing_power)
+    RPC_context.make_call0 S.minimal_valid_time ctxt block { priority ; endorsing_power } ()
 end
 
 let register () =

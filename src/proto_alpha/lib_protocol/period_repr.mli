@@ -27,6 +27,7 @@ type t
 type period = t
 include Compare.S with type t := t
 val encoding : period Data_encoding.t
+val rpc_arg : period RPC_arg.t
 val pp: Format.formatter -> period -> unit
 
 
