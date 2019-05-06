@@ -970,7 +970,7 @@ module Block = struct
 
   let known_valid chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash)
+      Header.known (store, hash)
     end
   let known_invalid chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
@@ -1002,14 +1002,6 @@ module Block = struct
         store block.hash block.header checkpoint
     end
 
-  let known chain_state hash =
-    Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash) >>= fun known ->
-      if known then
-        Lwt.return_true
-      else
-        Store.Block.Invalid_block.known store hash
-    end
 
   let read_predecessor chain_state ~pred ?(below_save_point = false) hash =
     Shared.use chain_state.block_store begin fun store ->
@@ -1168,7 +1160,7 @@ module Block = struct
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash) >>= fun known_valid ->
+      Header.known (store, hash) >>= fun known_valid ->
       fail_when known_valid (failure "Known valid") >>=? fun () ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->
       if known_invalid then
@@ -1277,6 +1269,15 @@ module Block = struct
     | Forking _ -> Lwt.return (status, Some block)
     | Not_running -> Lwt.return (status, None)
 
+  let known chain_state hash =
+    Shared.use chain_state.block_store begin fun store ->
+      Header.known (store, hash) >>= fun known ->
+      if known then
+        Lwt.return_true
+      else
+        Store.Block.Invalid_block.known store hash
+    end
+
   let block_validity chain_state block : Block_locator.validity Lwt.t =
     known chain_state block >>= function
     | false ->
@@ -1290,15 +1291,6 @@ module Block = struct
             Lwt.return Block_locator.Known_invalid
         | false ->
             Lwt.return Block_locator.Known_valid
-
-  let known chain_state hash =
-    Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash) >>= fun known ->
-      if known then
-        Lwt.return_true
-      else
-        Store.Block.Invalid_block.known store hash
-    end
 
   let known_ancestor chain_state locator =
     Shared.use chain_state.global_state.global_data begin fun { global_store ; _ } ->

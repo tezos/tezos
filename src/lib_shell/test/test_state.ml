@@ -236,6 +236,9 @@ let test_set_checkpoint_then_purge_full (s : state) =
   assert (Int32.compare checkpoint_lvl la1 = -1) ;
   assert (Int32.compare checkpoint_lvl lb1 = -1) ;
   assert (Int32.compare checkpoint_lvl lb2 = -1) ;
+  State.Chain.store s.chain >>= fun chain_store ->
+  let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
+  let block_store = Store.Block.get chain_store in
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
   State.Chain.set_checkpoint_then_purge_full s.chain (State.Block.header b2)
   >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
@@ -247,7 +250,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
     end
   end
   >>= fun () -> (* Assert b1 has been pruned.. *)
-  begin State.Block.known s.chain hb1 >|= fun b -> assert (not b) end
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
   >>= fun () -> (* pruned, so we can still access its header. *)
   begin
     State.Block.read_opt s.chain hb1 >|= function
@@ -255,7 +258,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
     | None -> assert false
   end
   >>= fun () -> (* Assert a1 has also been pruned .. *)
-  begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
+  begin Store.Block.Contents.known (block_store, ha1) >|= fun b -> assert (not b) end
   >>= fun () -> (* and we can also access its header. *)
   begin
     State.Block.read_opt s.chain ha1 >|= function
@@ -263,9 +266,6 @@ let test_set_checkpoint_then_purge_full (s : state) =
     | None -> assert false
   end
   >>= fun () -> (* and is accesible in Store.Block.Header *)
-  State.Chain.store s.chain >>= fun chain_store ->
-  let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
-  let block_store = Store.Block.get chain_store in
   begin Store.Block.Header.known (block_store, ha1) >|= fun b -> assert b end
   >>= fun () -> return_unit
 
@@ -324,7 +324,7 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
     end
   end
   >>= fun () -> (* Assert b1 has been pruned.. *)
-  begin State.Block.known s.chain hb1 >|= fun b -> assert (not b) end
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
   >>= fun () -> (* pruned, so we can still access its header. *)
   begin
     State.Block.read_opt s.chain hb1 >|= function
