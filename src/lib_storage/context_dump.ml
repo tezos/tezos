@@ -126,12 +126,13 @@ module type S = sig
 
   val dump_contexts_fd :
     index ->
-    (block_header * block_data *
+    (block_header * block_data * History_mode.t *
      (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 
   val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
-    (block_header * block_data * pruned_block list * protocol_data list) tzresult Lwt.t
+    (block_header * block_data * History_mode.t *
+     pruned_block list * protocol_data list) tzresult Lwt.t
 end
 
 type error += Writing_error of string
@@ -408,18 +409,23 @@ module Make (I:Dump_interface) = struct
 
   type version = {
     name : string ;
+    mode : Tezos_shell_services.History_mode.t ;
   }
 
   let version_encoding =
     let open Data_encoding in
     conv
-      (fun {name} -> (name))
-      (fun (name) -> {name} )
-      (obj1
-         (req "version" string))
+      (fun {name ; mode} -> (name, mode))
+      (fun (name, mode) -> {name ; mode})
+      (obj2
+         (req "version" string)
+         (req "mode" Tezos_shell_services.History_mode.encoding))
 
-  let write_version buf =
-    let version = { name = version_name } in
+  let write_version ~mode buf =
+    let version = {
+      name = version_name ;
+      mode = mode ;
+    } in
     let bytes =
       Data_encoding.(Binary.to_bytes_exn version_encoding version) in
     set_mbytes buf bytes
@@ -498,8 +504,8 @@ module Make (I:Dump_interface) = struct
       fold_tree_path ctxt path_rev tree
     in
     Lwt.catch begin fun () ->
-      write_version buf ;
-      let bh, block_data, pruned_iterator = data in
+      let bh, block_data, mode, pruned_iterator = data in
+      write_version ~mode buf ;
       I.get_context idx bh >>= function
       | None ->
           fail @@ Context_not_found (I.Block_header.to_bytes bh)
@@ -591,54 +597,57 @@ module Make (I:Dump_interface) = struct
               return tree
     in
 
-    let rec loop ctxt pruned_blocks protocol_datas acc cpt =
-      Tezos_stdlib.Utils.display_progress
-        ~refresh_rate:(cpt, 1_000)
-        "Context: %dK elements, %dMiB read"
-        (cpt / 1_000) (!read / 1_048_576) ;
-      get_command rbuf >>= function
-      | Root { block_header ; info ; parents ; block_data } ->
-          begin I.set_context ~info ~parents ctxt block_header >>= function
-            | None -> fail @@ Bad_read "context_hash does not correspond for block"
-            | Some block_header ->
-                let new_acc =
-                  Some (block_header,
-                        block_data,
-                        List.rev pruned_blocks,
-                        List.rev protocol_datas)
-                in
-                loop (I.make_context index) [] [] new_acc cpt
-          end
-      | Node { hash = `Node h ; path ; contents } ->
-          Lwt.return (I.hash_import `Node h) >>=? fun hash ->
-          add_dir ctxt hash path contents >>=? fun tree ->
-          loop (I.update_context ctxt tree) pruned_blocks protocol_datas acc (succ cpt)
-      | Blob { hash = `Blob h; path ; data } ->
-          Lwt.return (I.hash_import `Blob h) >>=? fun hash ->
-          add_blob ctxt path hash data >>=? fun tree ->
-          loop (I.update_context ctxt tree) pruned_blocks protocol_datas acc (succ cpt)
-      | Proot { pruned_block } ->
-          loop ctxt
-            (pruned_block :: pruned_blocks) protocol_datas
-            acc (succ cpt)
-      | Loot { protocol_data } ->
-          loop ctxt
-            pruned_blocks (protocol_data :: protocol_datas)
-            acc (succ cpt)
-      | End ->
-          if pruned_blocks <> [] || protocol_datas <> [] then
-            fail (Bad_read "ill-formed snapshot: end mark not expected")
-          else
-            begin match acc with
-              | Some res -> return res
-              | None -> fail (Bad_read "ill-formed snapshot: no root")
+    let loop ctxt history_mode =
+      let rec loop ctxt pruned_blocks protocol_datas acc cpt =
+        Tezos_stdlib.Utils.display_progress
+          ~refresh_rate:(cpt, 1_000)
+          "Context: %dK elements, %dMiB read"
+          (cpt / 1_000) (!read / 1_048_576) ;
+        get_command rbuf >>= function
+        | Root { block_header ; info ; parents ; block_data } ->
+            begin I.set_context ~info ~parents ctxt block_header >>= function
+              | None -> fail @@ Bad_read "context_hash does not correspond for block"
+              | Some block_header ->
+                  let new_acc =
+                    Some (block_header,
+                          block_data,
+                          history_mode,
+                          List.rev pruned_blocks,
+                          List.rev protocol_datas)
+                  in
+                  loop (I.make_context index) [] [] new_acc cpt
             end
-    in
+        | Node { hash = `Node h ; path ; contents } ->
+            Lwt.return (I.hash_import `Node h) >>=? fun hash ->
+            add_dir ctxt hash path contents >>=? fun tree ->
+            loop (I.update_context ctxt tree) pruned_blocks protocol_datas acc (succ cpt)
+        | Blob { hash = `Blob h; path ; data } ->
+            Lwt.return (I.hash_import `Blob h) >>=? fun hash ->
+            add_blob ctxt path hash data >>=? fun tree ->
+            loop (I.update_context ctxt tree) pruned_blocks protocol_datas acc (succ cpt)
+        | Proot { pruned_block } ->
+            loop ctxt
+              (pruned_block :: pruned_blocks) protocol_datas
+              acc (succ cpt)
+        | Loot { protocol_data } ->
+            loop ctxt
+              pruned_blocks (protocol_data :: protocol_datas)
+              acc (succ cpt)
+        | End ->
+            if pruned_blocks <> [] || protocol_datas <> [] then
+              fail (Bad_read "ill-formed snapshot: end mark not expected")
+            else
+              begin match acc with
+                | Some res -> return res
+                | None -> fail (Bad_read "ill-formed snapshot: no root")
+              end
+      in
+      loop ctxt [] [] None 0 in
     (* Check snapshot version *)
     read_version rbuf >>= fun version ->
     check_version version >>=? fun () ->
     Lwt.catch begin fun () ->
-      loop (I.make_context index) [] [] None 0
+      loop (I.make_context index) version.mode
     end
       begin function
         | Unix.Unix_error (e,_,_) ->

@@ -253,9 +253,10 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
     | None ->
         fail (Wrong_block_export (checkpoint_block_hash, `Cannot_be_found))
     | Some block_header ->
+        let export_mode = (if export_rolling then History_mode.Rolling else Full) in
         lwt_log_notice Tag.DSL.(fun f ->
             f "Dumping a snapshot in mode %a, targeting block hash \"%a\" at level %a"
-            -%a History_mode.tag (if export_rolling then Rolling else Full)
+            -%a History_mode.tag export_mode
             -%a block_hash_tag checkpoint_block_hash
             -%a block_level_tag (Int32.to_int block_header.shell.level)
           ) >>= fun () ->
@@ -273,7 +274,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
           block_store chain_data_store block_header export_rolling >>=? fun export_limit ->
         let iterator = pruned_block_iterator context_index block_store export_limit in
         let block_data = { Context.Block_data.block_header ; operations } in
-        return (pred_block_header, block_data, iterator)
+        return (pred_block_header, block_data, export_mode, iterator)
   end >>=? fun data_to_dump ->
   lwt_log_notice (fun f -> f "Now loading data") >>= fun () ->
   Context.dump_contexts context_index data_to_dump ~filename >>=? fun () ->
@@ -445,19 +446,16 @@ let check_context_hash_consistency
        block_header.shell.context)
     (Snapshot_import_failure "Resulting context hash does not match")
 
-let is_snapshot_full history =
-  (snd history.(0)).Context.Pruned_block.block_header.shell.level = 1l
-
-let set_history_mode store history =
-  let history_mode =
-    if is_snapshot_full history
-    then History_mode.Full
-    else History_mode.Rolling in
-  lwt_log_notice Tag.DSL.(fun f ->
-      f "Setting history-mode to %a"
-      -%a History_mode.tag history_mode
-    ) >>= fun () ->
-  Store.Configuration.History_mode.store store history_mode
+let set_history_mode store history_mode =
+  match history_mode with
+  | History_mode.Full | History_mode.Rolling ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Setting history-mode to %a"
+          -%a History_mode.tag history_mode
+        ) >>= fun () ->
+      Store.Configuration.History_mode.store store history_mode >>= fun () -> return_unit
+  | _ ->
+      fail (Snapshot_import_failure "Wrong history mode")
 
 let store_new_head
     chain_state chain_data
@@ -634,7 +632,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
 
        (* Process data imported from snapshot *)
        begin fun ((predecessor_block_header : Block_header.t),
-                  meta, old_blocks, protocol_data) ->
+                  meta, history_mode, old_blocks, protocol_data) ->
          let ({ block_header ; operations } :
                 Block_data.t) = meta in
          let block_hash = Block_header.hash block_header in
@@ -694,8 +692,8 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
              check_history_consistency
                ~genesis:genesis.block block_header history >>=? fun () ->
 
-             (* ... we set the history mode to full if it looks like a full snapshot ... *)
-             set_history_mode store history >>= fun () ->
+             (* ... we set the history mode regarding the snapshot version hint ... *)
+             set_history_mode store history_mode >>=? fun () ->
 
              (* ... and we import protocol data...*)
              import_protocol_data_list
@@ -727,7 +725,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
              (* Reconstruct all the contexts if requested *)
              match reconstruct with
              | true ->
-                 if is_snapshot_full history then
+                 if (function History_mode.Full -> true | _ -> false) history_mode then
                    reconstruct_contexts store context_index chain_id block_store history
                  else
                    fail Wrong_reconstrcut_mode
