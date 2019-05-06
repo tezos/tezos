@@ -399,15 +399,12 @@ let all_ops_valid (results: error Preapply_result.t list) =
       && is_empty result.branch_delayed)
     results
 
-let decode_priority cctxt chain block = function
+let decode_priority cctxt chain block ~priority ~endorsing_power =
+  match priority with
   | `Set priority -> begin
-      Alpha_services.Delegate.Baking_rights.get cctxt
-        ~all:true ~max_priority:(priority+1) (chain, block) >>=? fun rights ->
-      let time =
-        Option.apply
-          ~f:(fun r -> r.Alpha_services.Delegate.Baking_rights.timestamp)
-          (List.nth_opt rights priority) in
-      return (priority, time)
+      Alpha_services.Delegate.Minimal_valid_time.get cctxt
+        (chain, block) priority endorsing_power >>=? fun minimal_timestamp ->
+      return (priority, minimal_timestamp)
     end
   | `Auto (src_pkh, max_priority) ->
       Alpha_services.Helpers.current_level
@@ -418,22 +415,21 @@ let decode_priority cctxt chain block = function
         ~delegates:[src_pkh]
         (chain, block)  >>=? fun possibilities ->
       try
-        let { Alpha_services.Delegate.Baking_rights.priority = prio ;
-              timestamp = time ; _ } =
+        let { Alpha_services.Delegate.Baking_rights.priority = prio ; _ } =
           List.find
             (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
             possibilities in
-        return (prio, time)
+        Alpha_services.Delegate.Minimal_valid_time.get cctxt
+          (chain, block) prio endorsing_power >>=? fun minimal_timestamp ->
+        return (prio, minimal_timestamp)
       with Not_found ->
         failwith "No slot found at level %a" Raw_level.pp level
 
 let unopt_timestamp timestamp minimal_timestamp =
-  match timestamp, minimal_timestamp with
-  | None, None -> return (Time.now ())
-  | None, Some timestamp -> return timestamp
-  | Some timestamp, None -> return timestamp
-  | Some timestamp, Some minimal_timestamp ->
-      if timestamp < minimal_timestamp then
+  match timestamp with
+  | None -> return minimal_timestamp
+  | Some timestamp ->
+      if Time.(timestamp < minimal_timestamp) then
         failwith
           "Proposed timestamp %a is earlier than minimal timestamp %a"
           Time.pp_hum timestamp
@@ -613,7 +609,8 @@ let forge_block
     block =
   (* making the arguments usable *)
   unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
-  decode_priority cctxt chain block priority >>=? fun (priority, minimal_timestamp) ->
+  compute_endorsing_power cctxt ~chain ~block operations_arg >>=? fun endorsing_power ->
+  decode_priority cctxt chain block ~priority ~endorsing_power >>=? fun (priority, minimal_timestamp) ->
   unopt_timestamp timestamp minimal_timestamp >>=? fun timestamp ->
 
   (* get basic building blocks *)
