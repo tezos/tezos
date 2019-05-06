@@ -32,7 +32,8 @@ PARAMETERS = {
     "blocks_per_roll_snapshot": 32,
     "blocks_per_voting_period": 16,
     "preserved_cycles": 1,
-    "proof_of_work_threshold": "-1"
+    "proof_of_work_threshold": "-1",
+    "minimum_endorsements_per_priority": []
 }
 
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"

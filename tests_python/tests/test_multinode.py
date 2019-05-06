@@ -15,8 +15,10 @@ class TestManualBaking:
     . check inclusion of transfer and endorsement operations
     """
 
-    def test_level(self, clients):
+    def test_level(self, clients, session):
         level = 1
+        session["init_bal"] = clients[0].get_balance(
+            'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
         for client in clients:
             assert utils.check_level(client, level)
 
@@ -36,7 +38,10 @@ class TestManualBaking:
 
     def test_transfer(self, clients, session):
         client_id = 3 % len(clients)
-        transfer = clients[client_id].transfer(500, 'bootstrap1', 'bootstrap3')
+        session["transfer_sum"] = 500
+        transfer = clients[client_id].transfer(session["transfer_sum"],
+                                               'bootstrap1',
+                                               'bootstrap3')
         session["transfer_hash"] = transfer.operation_hash
 
     def test_bake(self, clients):
@@ -49,6 +54,14 @@ class TestManualBaking:
         for client in clients:
             assert utils.check_contains_operations(client, operation_hashes)
 
-    def test_balance(self, clients):
+    def test_balance(self, clients, session):
         bal = clients[0].get_balance('tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
-        assert bal == 3998987.998727
+        constants = clients[0].rpc(
+            'get',
+            '/chains/main/blocks/head/context/constants')
+        bsd = float(constants['block_security_deposit'])/1000000
+        transaction_fee = 0.001273
+        b_a = session["init_bal"] - bsd
+        b_a = b_a - transaction_fee
+        b_a = b_a - session["transfer_sum"]
+        assert bal == b_a
