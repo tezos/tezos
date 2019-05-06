@@ -320,11 +320,13 @@ let duplicate_endorsement () =
   end
 
 (** Apply a single endorsement from the slot 0 endorser *)
-let no_enough_for_deposit () =
-  Context.init 5 ~endorsers_per_block:1 >>=? fun (b, contracts) ->
+let not_enough_for_deposit () =
+  Context.init 5 ~endorsers_per_block:1 >>=? fun (b_init, contracts) ->
   Error_monad.map_s (fun c ->
-      Context.Contract.manager (B b) c >>=? fun m -> return (m, c)) contracts >>=?
+      Context.Contract.manager (B b_init) c >>=? fun m -> return (m, c)) contracts >>=?
   fun managers ->
+  Block.bake b_init >>=? fun b ->
+  (* retrieve the level 2's endorser *)
   Context.get_endorser (B b) >>=? fun (endorser, slots) ->
   let _, contract_other_than_endorser =
     List.find (fun (c, _) -> not (Signature.Public_key_hash.equal c.Account.pkh endorser))
@@ -334,15 +336,17 @@ let no_enough_for_deposit () =
     List.find (fun (c, _) -> (Signature.Public_key_hash.equal c.Account.pkh endorser))
       managers
   in
-  Op.endorsement ~delegate:(endorser, List.hd slots) (B b) () >>=? fun op_endo ->
   Context.Contract.balance (B b)
     (Contract.implicit_contract endorser) >>=? fun initial_balance ->
-  Op.transaction (B b) contract_of_endorser contract_other_than_endorser initial_balance >>=? fun op_trans ->
+  (* Empty the future endorser account *)
+  Op.transaction (B b_init) contract_of_endorser contract_other_than_endorser initial_balance >>=? fun op_trans ->
+  Block.bake ~operation:op_trans b_init >>=? fun b ->
+  (* Endorse with a zero balance *)
+  Op.endorsement ~delegate:(endorser, List.hd slots) (B b) () >>=? fun op_endo ->
   Block.bake
     ~policy:(Excluding [endorser])
-    ~operations:[Operation.pack op_endo; op_trans]
+    ~operation:(Operation.pack op_endo)
     b >>= fun res ->
-
   Assert.proto_error ~loc:__LOC__ res begin function
     | Delegate_storage.Balance_too_low_for_deposit _ -> true
     | _ -> false
@@ -415,5 +419,5 @@ let tests = [
   Test.tztest "Wrong endorsement predecessor" `Quick wrong_endorsement_predecessor ;
   Test.tztest "Invalid endorsement level" `Quick invalid_endorsement_level ;
   Test.tztest "Duplicate endorsement" `Quick duplicate_endorsement ;
-  Test.tztest "Not enough for deposit" `Quick no_enough_for_deposit ;
+  Test.tztest "Not enough for deposit" `Quick not_enough_for_deposit ;
 ]
