@@ -138,6 +138,10 @@ class TestRPCs:
     def test_network_stat(self, sandbox):
         sandbox.client(1).rpc('get', f'/network/stat')
 
+    def test_network_version(self, sandbox):
+        sandbox.client(1).rpc('get', f'/network/version')
+
+    @pytest.mark.skip
     def test_network_versions(self, sandbox):
         sandbox.client(1).rpc('get', f'/network/versions')
 

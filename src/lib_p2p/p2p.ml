@@ -631,6 +631,12 @@ let build_rpc_directory net =
   (* Network : Global *)
 
   let dir =
+    RPC_directory.register0 dir P2p_services.S.version begin fun () () ->
+      return net.announced_version
+    end in
+
+  let dir =
+    (* DEPRECATED: use [version] instead. *)
     RPC_directory.register0 dir P2p_services.S.versions begin fun () () ->
       return [net.announced_version]
     end in
