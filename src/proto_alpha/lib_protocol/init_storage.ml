@@ -46,5 +46,5 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   | Alpha_previous ->
       return ctxt
 
-let prepare ctxt ~level ~timestamp ~fitness =
-  Raw_context.prepare ~level ~timestamp ~fitness ctxt
+let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
+  Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt

@@ -30,6 +30,7 @@ type t = {
   constants: Constants_repr.parametric ;
   first_level: Raw_level_repr.t ;
   level: Level_repr.t ;
+  predecessor_timestamp: Time.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
   deposits: Tez_repr.t Signature.Public_key_hash.Map.t ;
@@ -51,6 +52,7 @@ type context = t
 type root_context = t
 
 let current_level ctxt = ctxt.level
+let predecessor_timestamp ctxt = ctxt.predecessor_timestamp
 let current_timestamp ctxt = ctxt.timestamp
 let current_fitness ctxt = ctxt.fitness
 let first_level ctxt = ctxt.first_level
@@ -436,7 +438,7 @@ let check_inited ctxt =
       else
         storage_error (Incompatible_protocol_version s)
 
-let prepare ~level ~timestamp ~fitness ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   Lwt.return (Raw_level_repr.of_int32 level) >>=? fun level ->
   Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
   check_inited ctxt >>=? fun () ->
@@ -451,6 +453,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
       level in
   return {
     context = ctxt ; constants ; level ;
+    predecessor_timestamp ;
     timestamp ; fitness ; first_level ;
     allowed_endorsements = Signature.Public_key_hash.Map.empty ;
     included_endorsements = 0 ;
@@ -500,7 +503,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
   end >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
-  prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
+  prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness >>=? fun ctxt ->
   return (previous_proto, ctxt)
 
 let activate ({ context = c ; _ } as s) h =
@@ -517,6 +520,7 @@ let register_resolvers enc resolve =
       constants = Constants_repr.default ;
       first_level = Raw_level_repr.root ;
       level =  Level_repr.root Raw_level_repr.root ;
+      predecessor_timestamp = Time.of_seconds 0L ;
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
       allowed_endorsements = Signature.Public_key_hash.Map.empty ;

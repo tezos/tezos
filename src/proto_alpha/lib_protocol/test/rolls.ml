@@ -52,6 +52,7 @@ let check_rolls b (account:Account.t) =
   let expected_rolls = Int64.div (Tez.to_mutez staking_balance) (Tez.to_mutez token_per_roll) in
   Raw_context.prepare b.context
     ~level:b.header.shell.level
+    ~predecessor_timestamp:b.header.shell.timestamp
     ~timestamp:b.header.shell.timestamp
     ~fitness:b.header.shell.fitness >>= wrap >>=? fun ctxt ->
   get_rolls ctxt account.pkh >>=? fun rolls ->
@@ -60,6 +61,7 @@ let check_rolls b (account:Account.t) =
 let check_no_rolls (b : Block.t) (account:Account.t) =
   Raw_context.prepare b.context
     ~level:b.header.shell.level
+    ~predecessor_timestamp:b.header.shell.timestamp
     ~timestamp:b.header.shell.timestamp
     ~fitness:b.header.shell.fitness >>= wrap >>=? fun ctxt ->
   get_rolls ctxt account.pkh >>=? fun rolls ->

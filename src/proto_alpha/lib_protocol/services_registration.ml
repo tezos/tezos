@@ -35,7 +35,11 @@ let rpc_init ({ block_hash ; block_header ; context } : Updater.rpc_context) =
   let level = block_header.level in
   let timestamp = block_header.timestamp in
   let fitness = block_header.fitness in
-  Alpha_context.prepare ~level ~timestamp ~fitness context >>=? fun context ->
+  Alpha_context.prepare
+    ~level
+    ~predecessor_timestamp:timestamp
+    ~timestamp
+    ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; context }
 
 let rpc_services = ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
