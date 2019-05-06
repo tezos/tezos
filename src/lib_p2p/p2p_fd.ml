@@ -86,7 +86,7 @@ let write t buf =
   Lwt_utils_unix.write_mbytes t.fd buf >>= fun () ->
   t.nwrit <- t.nwrit + len ;
   log t "written: %d (%d)" len t.nwrit ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let connect t saddr =
   log t "connect: %s" (string_of_sockaddr saddr);

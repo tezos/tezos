@@ -331,25 +331,25 @@ module Make(Prefix : sig val id : string end) = struct
           (function Error x -> Some x | _ -> None)
           (fun errs -> Error errs) ]
 
-  let return v = Lwt.return (Ok v)
+  let return v = Lwt.return_ok v
 
-  let return_unit = Lwt.return (Ok ())
+  let return_unit = Lwt.return_ok ()
 
-  let return_none = Lwt.return (Ok None)
+  let return_none = Lwt.return_ok None
 
-  let return_some x = Lwt.return (Ok (Some x))
+  let return_some x = Lwt.return_ok (Some x)
 
-  let return_nil = Lwt.return (Ok [])
+  let return_nil = Lwt.return_ok []
 
-  let return_true = Lwt.return (Ok true)
+  let return_true = Lwt.return_ok true
 
-  let return_false = Lwt.return (Ok false)
+  let return_false = Lwt.return_ok false
 
   let error s = Error [ s ]
 
   let ok v = Ok v
 
-  let fail s = Lwt.return (Error [ s ])
+  let fail s = Lwt.return_error [ s ]
 
   let (>>?) v f =
     match v with
@@ -361,7 +361,7 @@ module Make(Prefix : sig val id : string end) = struct
     | Error _ as err -> Lwt.return err
     | Ok v -> f v
 
-  let (>>|?) v f = v >>=? fun v -> Lwt.return (Ok (f v))
+  let (>>|?) v f = v >>=? fun v -> Lwt.return_ok (f v)
   let (>|=) = Lwt.(>|=)
 
   let (>|?) v f = v >>? fun v -> Ok (f v)
@@ -394,10 +394,10 @@ module Make(Prefix : sig val id : string end) = struct
         tx >>= fun x ->
         tl >>= fun l ->
         match x, l with
-        | Ok x, Ok l -> Lwt.return (Ok (x :: l))
-        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok x, Ok l -> Lwt.return_ok (x :: l)
+        | Error exn1, Error exn2 -> Lwt.return_error (exn1 @ exn2)
         | Ok _, Error exn
-        | Error exn, Ok _ -> Lwt.return (Error exn)
+        | Error exn, Ok _ -> Lwt.return_error exn
 
   let mapi_p f l =
     let rec mapi_p f i l =
@@ -409,10 +409,10 @@ module Make(Prefix : sig val id : string end) = struct
           tx >>= fun x ->
           tl >>= fun l ->
           match x, l with
-          | Ok x, Ok l -> Lwt.return (Ok (x :: l))
-          | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+          | Ok x, Ok l -> Lwt.return_ok (x :: l)
+          | Error exn1, Error exn2 -> Lwt.return_error (exn1 @ exn2)
           | Ok _, Error exn
-          | Error exn, Ok _ -> Lwt.return (Error exn) in
+          | Error exn, Ok _ -> Lwt.return_error exn in
     mapi_p f 0 l
 
   let rec map2_s f l1 l2 =
@@ -503,10 +503,10 @@ module Make(Prefix : sig val id : string end) = struct
         tx >>= fun tx_res ->
         tl >>= fun tl_res ->
         match tx_res, tl_res with
-        | Ok (), Ok () -> Lwt.return (Ok ())
-        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok (), Ok () -> Lwt.return_ok ()
+        | Error exn1, Error exn2 -> Lwt.return_error (exn1 @ exn2)
         | Ok (), Error exn
-        | Error exn, Ok () -> Lwt.return (Error exn)
+        | Error exn, Ok () -> Lwt.return_error exn
 
   let rec iter2_p f l1 l2 =
     match l1, l2 with
@@ -517,10 +517,10 @@ module Make(Prefix : sig val id : string end) = struct
         tx >>= fun tx_res ->
         tl >>= fun tl_res ->
         match tx_res, tl_res with
-        | Ok (), Ok () -> Lwt.return (Ok ())
-        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok (), Ok () -> Lwt.return_ok ()
+        | Error exn1, Error exn2 -> Lwt.return_error (exn1 @ exn2)
         | Ok (), Error exn
-        | Error exn, Ok () -> Lwt.return (Error exn)
+        | Error exn, Ok () -> Lwt.return_error exn
 
   let iteri2_p f l1 l2 =
     let rec iteri2_p i f l1 l2 =
@@ -532,10 +532,10 @@ module Make(Prefix : sig val id : string end) = struct
           tx >>= fun tx_res ->
           tl >>= fun tl_res ->
           match tx_res, tl_res with
-          | Ok (), Ok () -> Lwt.return (Ok ())
-          | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+          | Ok (), Ok () -> Lwt.return_ok ()
+          | Error exn1, Error exn2 -> Lwt.return_error (exn1 @ exn2)
           | Ok (), Error exn
-          | Error exn, Ok () -> Lwt.return (Error exn)
+          | Error exn, Ok () -> Lwt.return_error exn
     in
     iteri2_p 0 f l1 l2
 
@@ -570,7 +570,7 @@ module Make(Prefix : sig val id : string end) = struct
 
   let trace err f =
     f >>= function
-    | Error errs -> Lwt.return (Error (err :: errs))
+    | Error errs -> Lwt.return_error (err :: errs)
     | ok -> Lwt.return ok
 
   let record_trace_eval mk_err result =
@@ -584,7 +584,7 @@ module Make(Prefix : sig val id : string end) = struct
     f >>= function
     | Error errs ->
         mk_err () >>=? fun err ->
-        Lwt.return (Error (err :: errs))
+        Lwt.return_error (err :: errs)
     | ok -> Lwt.return ok
 
   let fail_unless cond exn =
@@ -715,7 +715,7 @@ let protect ?on_error ?canceler t =
         Option.unopt_map canceler ~default:false ~f:Lwt_canceler.canceled in
       let err = if canceled then [Canceled] else err in
       match on_error with
-      | None -> Lwt.return (Error err)
+      | None -> Lwt.return_error err
       | Some on_error ->
           Lwt.catch (fun () -> on_error err) (fun exn -> fail (Exn exn))
 

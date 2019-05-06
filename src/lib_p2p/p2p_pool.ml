@@ -767,7 +767,7 @@ let rec connect ?timeout pool point =
       match err with
       | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
           fail P2p_errors.Connection_refused
-      | err -> Lwt.return (Error err)
+      | err -> Lwt.return_error err
     end >>=? fun () ->
     lwt_debug "connect: %a -> authenticate" P2p_point.Id.pp point >>= fun () ->
     authenticate pool ~point_info canceler fd point
@@ -826,7 +826,7 @@ and raw_authenticate pool ?point_info canceler fd point =
       P2p_point.Table.remove pool.incoming point
     else
       Option.iter ~f:P2p_point_state.set_disconnected point_info ;
-    Lwt.return (Error err)
+    Lwt.return_error err
   end >>=? fun (info, auth_fd) ->
   (* Authentication correct! *)
   lwt_debug "authenticate: %a -> auth %a"
@@ -918,7 +918,7 @@ and raw_authenticate pool ?point_info canceler fd point =
         Option.iter connection_point_info
           ~f:P2p_point_state.set_disconnected ;
         P2p_peer_state.set_disconnected peer_info ;
-        Lwt.return (Error err)
+        Lwt.return_error err
       end >>=? fun conn ->
       let id_point =
         match info.id_point, Option.map ~f:P2p_point_state.Info.point point_info with

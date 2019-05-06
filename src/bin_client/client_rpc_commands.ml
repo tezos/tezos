@@ -138,17 +138,17 @@ let random_fill_in ?(show_optionals=true) schema =
        fill_in ~show_optionals
          { int ; float ; string ; bool ; display ; continue }
          schema >>= fun json ->
-       Lwt.return (Ok json))
+       Lwt.return_ok json)
     (fun e ->
        let msg = Printf.sprintf "Fill-in failed %s\n%!" (Printexc.to_string e) in
-       Lwt.return (Error msg))
+       Lwt.return_error msg)
 
 let editor_fill_in ?(show_optionals=true) schema =
   let tmp = Filename.temp_file "tezos_rpc_call_" ".json" in
   let rec init () =
     (* write a temp file with instructions *)
     random_fill_in ~show_optionals schema >>= function
-    | Error msg -> Lwt.return (Error msg)
+    | Error msg -> Lwt.return_error msg
     | Ok json ->
         Lwt_io.(with_file ~mode:Output tmp (fun fp ->
             write_line fp (Data_encoding.Json.to_string json))) >>= fun () ->
@@ -175,13 +175,13 @@ let editor_fill_in ?(show_optionals=true) schema =
     | Unix.WSIGNALED x | Unix.WSTOPPED x | Unix.WEXITED x ->
         let msg = Printf.sprintf "FAILED %d \n%!" x in
         delete () >>= fun () ->
-        Lwt.return (Error msg)
+        Lwt.return_error msg
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file ~mode:Input tmp (fun fp -> read fp)) >>= fun text ->
     match Data_encoding.Json.from_string text with
-    | Ok r -> Lwt.return (Ok r)
-    | Error msg -> Lwt.return (Error (Printf.sprintf "bad input: %s" msg))
+    | Ok r -> Lwt.return_ok r
+    | Error msg -> Lwt.return_error (Format.asprintf "bad input: %s" msg)
   and delete () =
     (* and delete the temp file *)
     Lwt_unix.unlink tmp
@@ -371,8 +371,8 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
 let fill_in ?(show_optionals=true) schema =
   let open Json_schema in
   match (root schema).kind with
-  | Null -> Lwt.return (Ok `Null)
-  | Any | Object { properties = [] ; _ } -> Lwt.return (Ok (`O []))
+  | Null -> Lwt.return_ok `Null
+  | Any | Object { properties = [] ; _ } -> Lwt.return_ok (`O [])
   | _ -> editor_fill_in ~show_optionals schema
 
 let display_answer (cctxt : #Client_context.full) = function

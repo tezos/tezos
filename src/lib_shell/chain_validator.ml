@@ -199,7 +199,7 @@ let may_switch_test_chain w active_chains spawn_child block =
             genesis in
     begin
       match nv.parameters.max_child_ttl with
-      | None -> Lwt.return false
+      | None -> Lwt.return_false
       | Some ttl ->
           let forking_block_timestamp =
             (State.Block.shell_header forking_block).Block_header.timestamp
@@ -393,7 +393,7 @@ let on_close w =
          | Error _ ->
              P2p_peer.Table.remove nv.active_peers peer_id ;
              acc)
-      nv.active_peers (Lwt.return [])
+      nv.active_peers (Lwt.return_nil)
   end >>= fun pvs ->
   Lwt.join
     (begin match nv.prevalidator with
@@ -498,7 +498,7 @@ let rec create
     let on_launch = on_launch start_prevalidator
     let on_request w = on_request w start_testchain active_chains spawn_child
     let on_close = on_close
-    let on_error _ _ _ errs = Lwt.return (Error errs)
+    let on_error _ _ _ errs = Lwt.return_error errs
     let on_completion = on_completion
     let on_no_request _ = return_unit
   end in

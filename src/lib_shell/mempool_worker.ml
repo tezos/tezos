@@ -546,7 +546,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
   let on_error w r st errs =
     Worker.record_event w (Event.Request (r, st, Some errs)) ;
-    Lwt.return (Error errs)
+    Lwt.return_error errs
 
   let on_completion w r _ st =
     Worker.record_event w (Event.Request (Request.view r, st, None)) ;

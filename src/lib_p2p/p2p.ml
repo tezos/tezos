@@ -320,7 +320,7 @@ module Real = struct
           P2p_peer.Id.pp
           (P2p_pool.Connection.info conn).peer_id
           pp_print_error err >>= fun () ->
-        Lwt.return (Error err)
+        Lwt.return_error err
 
   let try_send _net conn v =
     match P2p_pool.write_now conn v with

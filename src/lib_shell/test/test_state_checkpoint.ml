@@ -191,7 +191,7 @@ let wrap_state_init f base_dir =
       genesis >>=? fun (state, chain, _index) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->
-    return ()
+    return_unit
   end
 
 (*******************************************************)
@@ -223,7 +223,7 @@ let test_checkpoint_genesis s =
   then
     Assert.fail_msg "unexpected checkpoint"
   else
-    return ()
+    return_unit
 
 let test_basic_checkpoint s =
   let block = vblock s "A1" in
@@ -235,7 +235,7 @@ let test_basic_checkpoint s =
      Int32.equal c_level level
   then
     Assert.fail_msg "unexpected checkpoint"
-  else return ()
+  else return_unit
 
   (*
    - cp: checkpoint
@@ -260,7 +260,7 @@ let test_acceptable_block s =
   let header = State.Block.header head in
   State.Chain.acceptable_block s.chain hash header >>= fun is_accepted_block ->
   if is_accepted_block
-  then return ()
+  then return_unit
   else Assert.fail_msg "unacceptable block"
 
  (*
@@ -284,7 +284,7 @@ let test_is_valid_checkpoint s =
   *)
   State.Block.is_valid_for_checkpoint (vblock s "B3") (c_level, c_block) >>= fun is_valid ->
   if is_valid
-  then return ()
+  then return_unit
   else Assert.fail_msg "invalid checkpoint"
 
 (* return a block with the best fitness amongst the known blocks which
@@ -299,7 +299,7 @@ let test_best_know_head_for_checkpoint s =
   Chain.set_head s.chain (vblock s "B3") >>= fun _head ->
   State.best_known_head_for_checkpoint s.chain checkpoint >>= fun _block ->
   (* the block returns with the best fitness is B3 at level 5 *)
-  return ()
+  return_unit
 
 (*
    setting checkpoint in the future does not remove anything
@@ -318,7 +318,7 @@ let test_future_checkpoint s =
   State.Chain.checkpoint s.chain >>= fun (c_level, c_block) ->
   if Int32.equal c_level level && not (Block_hash.equal c_block block_hash)
   then Assert.fail_msg "unexpected checkpoint"
-  else return ()
+  else return_unit
 
 (*
    setting checkpoint in the future does not remove anything
@@ -348,7 +348,7 @@ let test_future_checkpoint_bad_good_block s =
     State.Block.is_valid_for_checkpoint
       (vblock s "B2") (c_level, c_block) >>= fun is_valid ->
     if is_valid
-    then return ()
+    then return_unit
     else Assert.fail_msg "invalid checkpoint"
 
 (* check if the checkpoint can be reached
@@ -401,7 +401,7 @@ let test_reach_checkpoint s =
           test_mem s "A2" >>= fun () ->
           test_not_mem s "A3" >>= fun () ->
           test_not_mem s "B1" >>= fun () ->
-          return ()
+          return_unit
         else Assert.fail_msg "checkpoint error"
       else
         Assert.fail_msg "checkpoint error"
@@ -449,7 +449,7 @@ let test_may_update_checkpoint s =
   Chain.set_head s.chain (vblock s "A4") >>= fun _ ->
   Chain.head s.chain >>= fun head ->
   may_update_checkpoint s.chain head >>= fun () ->
-  return ()
+  return_unit
 
 (* Check function may_update_checkpoint in Node.ml
 
@@ -486,7 +486,7 @@ let test_note_may_update_checkpoint s =
   let level = State.Block.level block in
   let checkpoint = level, block_hash in
   note_may_update_checkpoint s.chain (Some checkpoint) >>= fun () ->
-  return ()
+  return_unit
 
 (**********************************************************)
 

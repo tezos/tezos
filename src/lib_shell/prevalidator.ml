@@ -672,7 +672,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       match r with
       | Request.(View (Inject _)) -> return_unit
-      | _ -> Lwt.return (Error errs)
+      | _ -> Lwt.return_error errs
 
     let on_completion w r _ st =
       Worker.record_event w (Event.Request (Request.view r, st, None)) ;

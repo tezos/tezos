@@ -158,7 +158,7 @@ module Scheduler(IO : IO) = struct
                   "@[Unexpected error in connection (push: %d, %s):@ %a@]"
                   conn.id IO.name pp_print_error err >>= fun () ->
                 cancel conn err >>= fun () ->
-                Lwt.return (Error err)
+                Lwt.return_error err
           end ;
           let len = MBytes.length msg in
           lwt_debug "Handle: %d (%d, %s)" len conn.id IO.name >>= fun () ->

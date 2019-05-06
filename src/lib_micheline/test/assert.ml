@@ -25,8 +25,8 @@
 
 (* Mini compatibility layer to avoid circular dependency *)
 module Compat = struct
-  let failwith fmt = Format.kasprintf (fun s -> Lwt.return (Error s)) fmt
-  let return_unit = Lwt.return (Ok ())
+  let failwith fmt = Format.kasprintf (fun s -> Lwt.return_error s) fmt
+  let return_unit = Lwt.return_ok ()
   let (>>=) = Lwt.bind
   let (>>=?) v f =
     v >>= function
@@ -41,10 +41,10 @@ module Compat = struct
         tx >>= fun tx_res ->
         tl >>= fun tl_res ->
         match tx_res, tl_res with
-        | Ok (), Ok () -> Lwt.return (Ok ())
+        | Ok (), Ok () -> Lwt.return_ok ()
         | Error exn1, Error exn2 -> failwith "%s -- %s" exn1 exn2
         | Ok (), Error exn
-        | Error exn, Ok () -> Lwt.return (Error exn)
+        | Error exn, Ok () -> Lwt.return_error exn
 end
 
 open Compat

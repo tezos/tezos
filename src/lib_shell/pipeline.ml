@@ -72,11 +72,11 @@ let map_out_err m = function
   | Async_s f ->
       Async_s (fun x -> f x >>= function
         | Ok _ as ok -> Lwt.return ok
-        | Error e -> Lwt.return (Error (m e)))
+        | Error e -> Lwt.return_error (m e))
   | Async_p f ->
       Async_p (fun x -> f x >>= function
         | Ok _ as ok -> Lwt.return ok
-        | Error e -> Lwt.return (Error (m e)))
+        | Error e -> Lwt.return_error (m e))
 let with_err = function
   | Async_s f -> Async_s (function | Ok v -> f v | Error e -> Lwt.return_error e)
   | Async_p f -> Async_p (function | Ok v -> f v | Error e -> Lwt.return_error e)

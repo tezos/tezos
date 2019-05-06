@@ -250,7 +250,7 @@ let genesis_with_parameters
           else return acc
         ) Tez_repr.zero initial_accounts >>=? fun _ ->
       failwith "Insufficient tokens in initial accounts to create one roll"
-    with Exit -> return ()
+    with Exit -> return_unit
   end >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
   let hash =

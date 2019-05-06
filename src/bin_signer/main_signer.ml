@@ -330,4 +330,4 @@ end
 let () =
   Client_main_run.run
     (module C)
-    ~select_commands:(fun _ _ -> return [])
+    ~select_commands:(fun _ _ -> return_nil)

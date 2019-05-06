@@ -298,7 +298,7 @@ let on_error w r st errs =
       debug w "%a" Error_monad.pp_print_error errors ;
       Worker.trigger_shutdown w ;
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return (Error errs)
+      Lwt.return_error errs
   | [Block_validator_errors.System_error _ ] as errs ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       return_unit
@@ -320,11 +320,11 @@ let on_error w r st errs =
             P2p_peer.Id.pp_short pv.peer_id
             Protocol_hash.pp_short protocol ;
           Worker.record_event w (Event.Request (r, st, Some errs)) ;
-          Lwt.return (Error errs)
+          Lwt.return_error errs
     end
   | _ ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return (Error errs)
+      Lwt.return_error errs
 
 let on_close w =
   let pv = Worker.state w in

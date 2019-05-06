@@ -59,8 +59,8 @@ let rec may_run_idle_tasks w =
 
 let wrap_error f =
   Lwt.catch
-    (fun () -> f () >>= fun r -> Lwt.return (Ok r))
-    (fun exn -> Lwt.return (Error exn))
+    (fun () -> f () >>= fun r -> Lwt.return_ok r)
+    (fun exn -> Lwt.return_error exn)
 
 let unwrap_error = function
   | Ok r -> Lwt.return r

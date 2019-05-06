@@ -198,7 +198,7 @@ let main
         (match parsed_args with
          | Some parsed_args ->
              select_commands (client_config :> RPC_client.http_ctxt) parsed_args
-         | None -> return [])
+         | None -> return_nil)
         >>=? fun other_commands ->
         let commands =
           Clic.add_manual

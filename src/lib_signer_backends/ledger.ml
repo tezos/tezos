@@ -869,9 +869,9 @@ let baking_commands group = Clic.[
            ~default:"ASK-LEDGER"
            (parameter
               (fun _ -> function
-                 | "ASK-LEDGER" -> return None
+                 | "ASK-LEDGER" -> return_none
                  | s ->
-                     try return (Some (Int32.of_string s)) with _ ->
+                     try return_some (Int32.of_string s) with _ ->
                        failwith "Parameter %S should be a 32-bits integer" s))
        in
        args3

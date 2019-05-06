@@ -577,27 +577,27 @@ module Make (Context : CONTEXT) = struct
 
       let make_opt_call0 s ctxt block q i =
         make_call0 s ctxt block q i >>= function
-        | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+        | Error [RPC_context.Not_found _] -> Lwt.return_ok None
         | Error _ as v -> Lwt.return v
-        | Ok v -> Lwt.return (Ok (Some v))
+        | Ok v -> Lwt.return_ok (Some v)
 
       let make_opt_call1 s ctxt block a1 q i =
         make_call1 s ctxt block a1 q i >>= function
-        | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+        | Error [RPC_context.Not_found _] -> Lwt.return_ok None
         | Error _ as v -> Lwt.return v
-        | Ok v -> Lwt.return (Ok (Some v))
+        | Ok v -> Lwt.return_ok (Some v)
 
       let make_opt_call2 s ctxt block a1 a2 q i =
         make_call2 s ctxt block a1 a2 q i >>= function
-        | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+        | Error [RPC_context.Not_found _] -> Lwt.return_ok None
         | Error _ as v -> Lwt.return v
-        | Ok v -> Lwt.return (Ok (Some v))
+        | Ok v -> Lwt.return_ok (Some v)
 
       let make_opt_call3 s ctxt block a1 a2 a3 q i =
         make_call3 s ctxt block a1 a2 a3 q i >>= function
-        | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+        | Error [RPC_context.Not_found _] -> Lwt.return_ok None
         | Error _ as v -> Lwt.return v
-        | Ok v -> Lwt.return (Ok (Some v))
+        | Ok v -> Lwt.return_ok (Some v)
 
     end
     module Micheline = struct

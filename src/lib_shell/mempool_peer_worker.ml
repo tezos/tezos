@@ -364,7 +364,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
 
     let on_error t view st errs =
       Worker.record_event t (Event.End_error (view, st, errs)) ;
-      Lwt.return (Error errs)
+      Lwt.return_error errs
 
     let on_completion
       : type a. self -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t

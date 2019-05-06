@@ -319,11 +319,11 @@ module Query = struct
                Lwt_unix.readdir dirhandle >>= fun d ->
                with_file_kind path d
                >>=? fun wk ->
-               return (Some wk))
+               return_some wk)
             (function
               | End_of_file ->
                   Lwt_unix.closedir dirhandle >>= fun () ->
-                  return None
+                  return_none
               | (e : exn) ->
                   failwith "ERROR while folding %s: %s"
                     path (Printexc.to_string e)))

@@ -257,7 +257,7 @@ module Alias = functor (Entity : Entity) -> struct
                 | Error s_errs ->
                     let all_errs =
                       List.flatten [ a_errs ; r_errs ; s_errs ] in
-                    Lwt.return (Error all_errs)
+                    Lwt.return_error all_errs
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =

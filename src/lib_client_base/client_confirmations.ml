@@ -173,7 +173,7 @@ let wait_for_operation_inclusion
                     | Error err ->
                         Lwt.fail (WrapError err)) stream >>= return)
             (function
-              | WrapError e -> Lwt.return (Error e)
+              | WrapError e -> Lwt.return_error e
               | exn -> Lwt.fail exn) >>=? function
           | None ->
               failwith "..."

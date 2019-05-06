@@ -175,7 +175,7 @@ let on_launch _ _ (limits, start_testchain, db, validation_kind) =
 
 let on_error w r st errs =
   Worker.record_event w (Validation_failure (r, st, errs)) ;
-  Lwt.return (Error errs)
+  Lwt.return_error errs
 
 let on_completion
   : type a. t -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t

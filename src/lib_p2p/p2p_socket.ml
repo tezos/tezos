@@ -569,7 +569,7 @@ let accept
     match err with
     | [ P2p_errors.Connection_closed ] -> fail P2p_errors.Rejected_socket_connection
     | [ P2p_errors.Decipher_error ] -> fail P2p_errors.Invalid_auth
-    | err -> Lwt.return (Error err)
+    | err -> Lwt.return_error err
   end >>=? function
   | Ack ->
       let canceler = Lwt_canceler.create () in

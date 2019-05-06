@@ -315,7 +315,7 @@ module Socket = struct
                   let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
                   protect ~on_error:begin fun e ->
                     Lwt_unix.close sock >>= fun () ->
-                    Lwt.return (Error e)
+                    Lwt.return_error e
                   end begin fun () ->
                     with_timeout (Lwt_unix.sleep timeout) (fun _c ->
                         Lwt_unix.connect sock ai_addr >>= fun () ->
@@ -411,7 +411,7 @@ end
 
 let rec retry ?(log=(fun _ -> Lwt.return_unit)) ?(n=5) ?(sleep=1.) f =
   f () >>= function
-  | Ok r -> Lwt.return (Ok r)
+  | Ok r -> Lwt.return_ok r
   | (Error error) as x ->
       if n > 0 then
         begin
