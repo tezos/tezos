@@ -62,9 +62,16 @@ module Script_int = Script_int_repr
 module Script_timestamp = struct
   include Script_timestamp_repr
   let now ctxt =
-    Raw_context.current_timestamp ctxt
-    |> Timestamp.to_seconds
-    |> of_int64
+    let { Constants_repr.time_between_blocks ; _ } =
+      Raw_context.constants ctxt in
+    match time_between_blocks with
+    | [] -> failwith "Internal error: 'time_between_block' constants \
+                      is an empty list."
+    | first_delay :: _ ->
+        let current_timestamp = Raw_context.predecessor_timestamp ctxt in
+        Time.add current_timestamp (Period_repr.to_seconds first_delay)
+        |> Timestamp.to_seconds
+        |> of_int64
 end
 module Script = struct
   include Michelson_v1_primitives
