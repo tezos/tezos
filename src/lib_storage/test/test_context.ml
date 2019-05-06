@@ -230,6 +230,7 @@ let test_dump { idx ; block3b; _ } =
   Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir2 ->
     let dumpfile = base_dir2 // "dump" in
     let ctxt_hash = block3b in
+    let history_mode = Tezos_shell_services.History_mode.Full in
     let empty_block_header context =
       Block_header.{
         protocol_data = MBytes.empty;
@@ -252,6 +253,7 @@ let test_dump { idx ; block3b; _ } =
       (fun context ->
          empty_block_header context,
          Context.Block_data.empty,
+         history_mode,
          (fun _ -> return (None, None))
       ) ctxt_hash
     in
@@ -259,7 +261,7 @@ let test_dump { idx ; block3b; _ } =
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
     Context.restore_contexts idx2 ~filename:dumpfile >>=? fun imported ->
-    let expected_ctxt_hash = (fun (bh,_, _,_) -> bh.Block_header.shell.context) imported in
+    let expected_ctxt_hash = (fun (bh,_,_, _,_) -> bh.Block_header.shell.context) imported in
     assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
     return ()
   end
