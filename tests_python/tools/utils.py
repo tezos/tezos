@@ -5,6 +5,7 @@ Assertions are retried to avoid using arbitrary time constants in test.
 from typing import List  # pylint: disable=unused-import
 import time
 import re
+import requests
 from client.client import Client
 from . import constants
 
@@ -142,3 +143,33 @@ def activate_alpha(client, parameters=None):
         parameters = constants.PARAMETERS
     proto = constants.ALPHA
     client.activate_protocol_json(proto, parameters)
+
+
+def rpc(server: str, port: int, verb: str, path: str, data: dict = None,
+        headers: dict = None):
+    """Calls a REST API
+
+    Simple wrapper over `requests` methods.
+    See `https://2.python-requests.org/en/master/`.
+
+    Parameters:
+        server (str): server name/IP
+        port (int):  server port
+        verb (str): 'get', 'post' or 'options'
+        path (str): path of the RPC
+        data (dict): json data if post method is used
+        headers (dicts): optional headers
+
+    Returns:
+        A `Response` object."""
+
+    assert verb in {'get', 'post', 'options'}
+    full_path = f'http://{server}:{port}/{path}'
+    print(f'# calling RPC {verb} {full_path}')
+    if verb == 'get':
+        res = requests.get(full_path, headers=headers)
+    elif verb == 'post':
+        res = requests.post(full_path, json=data, headers=headers)
+    else:
+        res = requests.options(full_path, json=data, headers=headers)
+    return res
