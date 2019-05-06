@@ -201,9 +201,6 @@ let () = register_error_kind `Permanent
 module Make (I:Dump_interface) = struct
 
   type command =
-    | Version of {
-        version_name : string
-      }
     | Root of {
         block_header: I.Block_header.t ;
         info: I.commit_info ;
@@ -312,14 +309,6 @@ module Make (I:Dump_interface) = struct
       (fun (block_header, info, parents, block_data) ->
          Root { block_header ; info ; parents ; block_data })
 
-  let version_encoding =
-    let open Data_encoding in
-    case ~title:"version" (Tag (Char.code 'v'))
-      (obj1
-         (req "version" string))
-      (function Version v -> Some v.version_name | _ -> None)
-      (fun version_name -> Version {version_name})
-
   let command_encoding = Data_encoding.union [
       blob_encoding ;
       node_encoding ;
@@ -327,7 +316,6 @@ module Make (I:Dump_interface) = struct
       loot_encoding ;
       proot_encoding ;
       root_encoding ;
-      version_encoding ;
     ]
 
   (* IO toolkit. *)
@@ -381,12 +369,6 @@ module Make (I:Dump_interface) = struct
     get_mbytes rbuf >|= fun bytes ->
     Data_encoding.Binary.of_bytes_exn command_encoding bytes
 
-  let set_version buf =
-    let bytes =
-      Data_encoding.Binary.to_bytes_exn command_encoding (Version {version_name})
-    in
-    set_mbytes buf bytes
-
   let set_root buf block_header info parents block_data =
     let root = Root { block_header ; info ; parents ; block_data ; } in
     let bytes = Data_encoding.Binary.to_bytes_exn command_encoding root in
@@ -421,6 +403,35 @@ module Make (I:Dump_interface) = struct
   let set_end buf =
     let bytes = Data_encoding.Binary.to_bytes_exn command_encoding End in
     set_mbytes buf bytes
+
+  (* Version *)
+
+  type version = {
+    name : string ;
+  }
+
+  let version_encoding =
+    let open Data_encoding in
+    conv
+      (fun {name} -> (name))
+      (fun (name) -> {name} )
+      (obj1
+         (req "version" string))
+
+  let write_version buf =
+    let version = { name = version_name } in
+    let bytes =
+      Data_encoding.(Binary.to_bytes_exn version_encoding version) in
+    set_mbytes buf bytes
+
+  let read_version rbuf =
+    get_mbytes rbuf >|= fun bytes ->
+    Data_encoding.(Binary.of_bytes_exn version_encoding) bytes
+
+  let check_version v =
+    fail_when
+      (v.name <> version_name)
+      (Bad_read "wrong version")
 
   let dump_contexts_fd idx data ~fd =
     (* Dumping *)
@@ -487,7 +498,7 @@ module Make (I:Dump_interface) = struct
       fold_tree_path ctxt path_rev tree
     in
     Lwt.catch begin fun () ->
-      set_version buf ;
+      write_version buf ;
       let bh, block_data, pruned_iterator = data in
       I.get_context idx bh >>= function
       | None ->
@@ -550,12 +561,6 @@ module Make (I:Dump_interface) = struct
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
 
-    let check_version v =
-      if v <> version_name
-      then fail @@ Bad_read "wrong version"
-      else return ()
-    in
-
     (* Check if a hash is right for you *)
     let check_hash his hshould =
       if I.hash_equal his hshould
@@ -586,8 +591,6 @@ module Make (I:Dump_interface) = struct
               return tree
     in
 
-    let version_is_checked = ref false in
-
     let rec loop ctxt pruned_blocks protocol_datas acc cpt =
       Tezos_stdlib.Utils.display_progress
         ~refresh_rate:(cpt, 1_000)
@@ -606,14 +609,6 @@ module Make (I:Dump_interface) = struct
                 in
                 loop (I.make_context index) [] [] new_acc cpt
           end
-      | Version { version_name } ->
-          check_version version_name >>=? fun () ->
-          if !version_is_checked then
-            fail @@ Bad_read "numerous version names are providen"
-          else begin
-            version_is_checked := true ;
-            loop ctxt pruned_blocks protocol_datas acc cpt
-          end
       | Node { hash = `Node h ; path ; contents } ->
           Lwt.return (I.hash_import `Node h) >>=? fun hash ->
           add_dir ctxt hash path contents >>=? fun tree ->
@@ -631,18 +626,17 @@ module Make (I:Dump_interface) = struct
             pruned_blocks (protocol_data :: protocol_datas)
             acc (succ cpt)
       | End ->
-          if not !version_is_checked then
-            fail @@ Bad_read "snapshot version name is not provided"
-          else begin
-            if pruned_blocks <> [] || protocol_datas <> [] then
-              fail (Bad_read "ill-formed snapshot: end mark not expected")
-            else
-              begin match acc with
-                | Some res -> return res
-                | None -> fail (Bad_read "ill-formed snapshot: no root")
-              end
-          end
+          if pruned_blocks <> [] || protocol_datas <> [] then
+            fail (Bad_read "ill-formed snapshot: end mark not expected")
+          else
+            begin match acc with
+              | Some res -> return res
+              | None -> fail (Bad_read "ill-formed snapshot: no root")
+            end
     in
+    (* Check snapshot version *)
+    read_version rbuf >>= fun version ->
+    check_version version >>=? fun () ->
     Lwt.catch begin fun () ->
       loop (I.make_context index) [] [] None 0
     end
