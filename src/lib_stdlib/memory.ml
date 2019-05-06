@@ -22,13 +22,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rpc_directory () =
-  let dir = RPC_directory.empty in
-  RPC_directory.gen_register dir Stat_services.S.gc begin fun () () () ->
-    RPC_answer.return @@ Gc.stat () end |> fun dir ->
+type proc_statm = {
+  page_size : int ;
+  size : int64;
+  resident : int64 ;
+  shared : int64 ;
+  text : int64 ;
+  lib : int64 ;
+  data : int64 ;
+  dt : int64
+}
 
-  RPC_directory.gen_register dir Stat_services.S.memory begin fun () () () ->
-    Sys_info.memory_stats () >>= function
-    | Ok stats ->
-        RPC_answer.return stats
-    | Error err -> RPC_answer.fail [err] end
+type ps_stats = {
+  page_size : int ;
+  mem : float ;
+  resident : int64 }
+
+type mem_stats =
+  | Statm of proc_statm
+  | Ps of ps_stats

@@ -72,29 +72,8 @@ let gc_stat_encoding =
              (req "stack_size" int31)))
     )
 
-type linux_proc_statm = {
-  page_size : int ;
-  size : int64;
-  resident : int64 ;
-  shared : int64 ;
-  text : int64 ;
-  lib : int64 ;
-  data : int64 ;
-  dt : int64
-}
-
-type darwin_ps_stats = {
-  page_size : int ;
-  mem : float ;
-  resident : int64 }
-
-type unix = Linux | Darwin
-
-type mem_stat =
-  | Statm of linux_proc_statm
-  | Ps of darwin_ps_stats
-
 let proc_stat_encoding =
+  let open Memory in
   let open  Data_encoding in
   union
     ~tag_size:`Uint8

@@ -22,13 +22,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rpc_directory () =
-  let dir = RPC_directory.empty in
-  RPC_directory.gen_register dir Stat_services.S.gc begin fun () () () ->
-    RPC_answer.return @@ Gc.stat () end |> fun dir ->
-
-  RPC_directory.gen_register dir Stat_services.S.memory begin fun () () () ->
-    Sys_info.memory_stats () >>= function
-    | Ok stats ->
-        RPC_answer.return stats
-    | Error err -> RPC_answer.fail [err] end
+val memory_stats : unit -> (Memory.mem_stats, error) result Lwt.t
