@@ -260,7 +260,7 @@ class TestExample:
     def test_wait_sync_proto(self, sandbox):
         clients = sandbox.all_clients()
         for client in clients:
-            proto = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+            proto = "PtG6cmhhWF8AY5gVQhCaUASbgu8CGebkGPdNSX26m3CSnxvih9v"
             assert utils.check_protocol(client, proto)
 
     def test_transfer(self, sandbox, session):
@@ -330,7 +330,7 @@ Alternatively, one can use the `skip` annotation:
 
 ### Testing on `zeronet`, `alphanet`,...
 
-On `master`, protocol alpha is named `ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK`, and deamons binary
+On `master`, protocol alpha is named `PtG6cmhhWF8AY5gVQhCaUASbgu8CGebkGPdNSX26m3CSnxvih9v`, and deamons binary
 name are suffixed with `alpha` (`tezos-baker-alpha`,
 `tezos-endorser-alpha`...). However, on *production* branches, an actual hash
 of the protocol is used, and a shortened string is used to specify deamons.

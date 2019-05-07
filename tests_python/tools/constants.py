@@ -85,5 +85,5 @@ IDENTITIES_SHORT = {
     }
 }
 
-ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+ALPHA = "PtG6cmhhWF8AY5gVQhCaUASbgu8CGebkGPdNSX26m3CSnxvih9v"
 ALPHA_DEAMON = "alpha"  # tezos-baker-alpha
