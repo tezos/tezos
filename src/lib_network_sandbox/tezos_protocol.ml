@@ -205,7 +205,10 @@ type t =
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int
   ; preserved_cycles: int
-  ; proof_of_work_threshold: int }
+  ; minimum_endorsements_per_priority : int list
+  ; delay_per_missing_endorsement : int
+  ; proof_of_work_threshold: int
+  }
 
 let compare a b = String.compare a.id b.id
 
@@ -225,7 +228,11 @@ let default () =
   ; blocks_per_voting_period= 16
   ; blocks_per_cycle= 8
   ; preserved_cycles= 2
-  ; proof_of_work_threshold= -1 }
+  ; proof_of_work_threshold= -1
+  ; minimum_endorsements_per_priority = [ 0 ; 0 ]
+  (* low values so it doesn't catch the real timestamp that fast *)
+  ; delay_per_missing_endorsement = 1
+  }
 
 let protocol_parameters_json t : Ezjsonm.t =
   let open Ezjsonm in
@@ -247,6 +254,8 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ("blocks_per_voting_period", int t.blocks_per_voting_period)
     ; ("blocks_per_cycle", int t.blocks_per_cycle)
     ; ("preserved_cycles", int t.preserved_cycles)
+    ; ("minimum_endorsements_per_priority", list int t.minimum_endorsements_per_priority)
+    ; ("delay_per_missing_endorsement", (ksprintf string "%d") t.delay_per_missing_endorsement)
     ; ( "proof_of_work_threshold"
       , ksprintf string "%d" t.proof_of_work_threshold ) ]
 
