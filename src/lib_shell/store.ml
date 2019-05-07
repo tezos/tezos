@@ -176,12 +176,24 @@ module Block = struct
                 (req "header" Block_header.encoding))
        end))
 
-  module Header = struct
+  type pruned_contents = {
+    header : Block_header.t ;
+  }
+
+  module Pruned_contents = struct
     include
       Store_helpers.Make_single_store
         (Indexed_store.Store)
-        (struct let name = ["header"] end)
-        (Store_helpers.Make_value(Block_header))
+        (struct let name = ["pruned_contents"] end)
+        (Store_helpers.Make_value(struct
+           type t = pruned_contents
+           let encoding =
+             let open Data_encoding in
+             conv
+               (fun { header } -> header)
+               (fun header -> { header })
+               (obj1 (req "header" Block_header.encoding))
+         end))
   end
 
   module Operations_index =

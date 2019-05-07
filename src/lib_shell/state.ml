@@ -108,23 +108,23 @@ and block = {
 module Header = struct
 
   let read (store, hash) =
-    Store.Block.Header.read (store, hash) >>= function
-    | Ok h -> return h
+    Store.Block.Pruned_contents.read (store, hash) >>= function
+    | Ok { header } -> return header
     | Error _ -> (* The block was not pruned yet *)
         Store.Block.Contents.read (store, hash) >>= begin function
           | Ok c -> return c.header
           | Error errs -> Lwt.return (Error errs)
         end
 
-  let read_opt (store, hash) = Store.Block.Header.read_opt (store, hash) >>= function
-    | Some h -> Lwt.return_some h
+  let read_opt (store, hash) = Store.Block.Pruned_contents.read_opt (store, hash) >>= function
+    | Some { header } -> Lwt.return_some header
     | None -> begin Store.Block.Contents.read_opt (store, hash) >>= function
       | None -> Lwt.return_none
       | Some c -> Lwt.return_some c.header
       end
 
   let known (store, hash) =
-    Store.Block.Header.known (store, hash) >>= function
+    Store.Block.Pruned_contents.known (store, hash) >>= function
     | true -> Lwt.return true
     | false -> (* The block was not pruned yet *)
         Store.Block.Contents.known (store, hash)
@@ -402,8 +402,8 @@ let prune_block store block_hash =
 let store_header_and_prune_block store block_hash =
   let st = (store, block_hash) in
   Store.Block.Contents.read_opt st >>= begin function
-    | Some contents ->
-        Store.Block.Header.store st contents.header
+    | Some { header ; _ } ->
+        Store.Block.Pruned_contents.store st { header }
     | None -> assert false
   end >>= fun () ->
   prune_block store block_hash
@@ -411,7 +411,7 @@ let store_header_and_prune_block store block_hash =
 let delete_block store block_hash =
   prune_block store block_hash >>= fun () ->
   let st = (store, block_hash) in
-  Store.Block.Header.remove st >>= fun () ->
+  Store.Block.Pruned_contents.remove st >>= fun () ->
   Store.Block.Operations.remove_all st >>= fun () ->
   Store.Block.Operation_hashes.remove_all st >>= fun () ->
   Store.Block.Predecessors.remove_all st

@@ -152,19 +152,24 @@ module Block : sig
     metadata: MBytes.t ;
   }
 
+  module Contents : SINGLE_STORE
+    with type t = store * Block_hash.t
+     and type value := contents
+
   (** Block header storage used for pruned blocks.
       Blocks that are not pruned have their header
       stored in their contents (see {!Store.Block.Contents}).
       For an abstraction over a block header, please see
       the {!State.Block.Header} module.
   *)
-  module Header : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := Block_header.t
 
-  module Contents : SINGLE_STORE
+  type pruned_contents = {
+    header: Block_header.t ;
+  }
+
+  module Pruned_contents : SINGLE_STORE
     with type t = store * Block_hash.t
-     and type value := contents
+     and type value := pruned_contents
 
   module Operation_hashes : MAP_STORE
     with type t = store * Block_hash.t

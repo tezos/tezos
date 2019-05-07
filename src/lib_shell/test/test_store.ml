@@ -135,8 +135,8 @@ let check_block s h b =
   Store.Block.Contents.read (s, h) >>= function
   | Ok bc' ->
       begin
-        Store.Block.Header.read (s, h) >>= function
-        | Ok bh' when  equal b (bh',bc') ->
+        Store.Block.Pruned_contents.read (s, h) >>= function
+        | Ok { header } when  equal b (header, bc') ->
             Lwt.return_unit
         | Ok _ ->
             Format.eprintf
@@ -161,9 +161,9 @@ let test_block s =
   Block.Contents.store (s, bh1) b1_contents >>= fun () ->
   Block.Contents.store (s, bh2) b2_contents >>= fun () ->
   Block.Contents.store (s, bh3) b3_contents >>= fun () ->
-  Block.Header.store (s, bh1) b1_header >>= fun () ->
-  Block.Header.store (s, bh2) b2_header >>= fun () ->
-  Block.Header.store (s, bh3) b3_header >>= fun () ->
+  Block.Pruned_contents.store (s, bh1) { header = b1_header } >>= fun () ->
+  Block.Pruned_contents.store (s, bh2) { header = b2_header } >>= fun () ->
+  Block.Pruned_contents.store (s, bh3) { header = b3_header } >>= fun () ->
   check_block s bh1 b1 >>= fun () ->
   check_block s bh2 b2 >>= fun () ->
   check_block s bh3 b3
@@ -175,10 +175,10 @@ let test_expand s =
   Block.Contents.store (s, bh2) b2_contents >>= fun () ->
   Block.Contents.store (s, bh3) b3_contents >>= fun () ->
   Block.Contents.store (s, bh3') b3_contents >>= fun () ->
-  Block.Header.store (s, bh1) b1_header >>= fun () ->
-  Block.Header.store (s, bh2) b2_header >>= fun () ->
-  Block.Header.store (s, bh3) b3_header >>= fun () ->
-  Block.Header.store (s, bh3') b3_header >>= fun () ->
+  Block.Pruned_contents.store (s, bh1) { header = b1_header } >>= fun () ->
+  Block.Pruned_contents.store (s, bh2) { header = b2_header } >>= fun () ->
+  Block.Pruned_contents.store (s, bh3) { header = b3_header } >>= fun () ->
+  Block.Pruned_contents.store (s, bh3') { header = b3_header } >>= fun () ->
   Base58.complete (Block_hash.to_short_b58check bh1) >>= fun res ->
   Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b58check bh1] ;
   Base58.complete (Block_hash.to_short_b58check bh2) >>= fun res ->

@@ -409,8 +409,8 @@ let store_pruned_blocks
             (cpt / 1000)
             (nb_blocks / 1000) ;
           let pruned_block_hash, {Context.Pruned_block.block_header ; operations ; operation_hashes } = history.(cpt) in
-          Store.Block.Header.store
-            (block_store, Block_header.hash block_header) block_header >>= fun () ->
+          Store.Block.Pruned_contents.store
+            (block_store, Block_header.hash block_header) { header = block_header } >>= fun () ->
           Lwt_list.iter_s
             (fun (i, v) -> Store.Block.Operations.store (block_store, pruned_block_hash) i v)
             operations >>= fun () ->

@@ -266,7 +266,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
     | None -> assert false
   end
   >>= fun () -> (* and is accesible in Store.Block.Header *)
-  begin Store.Block.Header.known (block_store, ha1) >|= fun b -> assert b end
+  begin Store.Block.Pruned_contents.known (block_store, ha1) >|= fun b -> assert b end
   >>= fun () -> return_unit
 
 (** Chain.set_checkpoint_then_purge_rolling *)
@@ -305,9 +305,9 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   State.Chain.store s.chain >>= fun chain_store ->
   let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
   let block_store = Store.Block.get chain_store in
-  begin Store.Block.Header.known (block_store, hb1) >|= fun b -> assert (not b) end
-  (* But accessible with State.Block.Header *)
+  begin Store.Block.Pruned_contents.known (block_store, hb1) >|= fun b -> assert (not b) end
   >>= fun () ->
+  (* But accessible with State.Block.Header *)
   begin State.Block.known s.chain hb1 >|= fun b -> assert b end
   (* And Store.Block.Contents *)
   >>= fun () ->
@@ -333,7 +333,7 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   end
   >>= fun () ->
   (* Assert b1 is now in Store.Block.Header since it has been pruned *)
-  begin Store.Block.Header.known (block_store, hb1) >|= fun b -> assert b end
+  begin Store.Block.Pruned_contents.known (block_store, hb1) >|= fun b -> assert b end
   >>= fun () ->
   (* And also accessible with State.Block.Header *)
   begin State.Block.Header.known (block_store, hb1) >|= fun b -> assert b end
@@ -349,8 +349,8 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
     | None -> assert true
   end
   >>= fun () ->
-  (* Assert a1 is not in Store.Block.Header since it has been deleted *)
-  begin Store.Block.Header.known (block_store, ha1) >|= fun b -> assert (not b) end
+  (* Assert b1 is now in Store.Block.Header since it has been pruned *)
+  begin Store.Block.Pruned_contents.known (block_store, ha1) >|= fun b -> assert (not b) end
   >>= fun () ->
   (* And not in State.Block.Header *)
   begin State.Block.Header.known (block_store, ha1) >|= fun b -> assert (not b) end
