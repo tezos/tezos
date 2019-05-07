@@ -51,8 +51,8 @@ module Script = struct
             Tezos_client_alpha.Proto_alpha.Script_repr.encoding json
         in
         let ( (expr_code :
-                Tezos_client_alpha.Proto_alpha.Michelson_v1_primitives.prim
-                Tezos_micheline.Micheline.canonical)
+                 Tezos_client_alpha.Proto_alpha.Michelson_v1_primitives.prim
+                   Tezos_micheline.Micheline.canonical)
             , _ ) =
           Tezos_client_alpha.Proto_alpha.Script_repr.(force_decode repr.code)
           |> exn_shell "decoding script-repr"
@@ -139,22 +139,22 @@ module Script = struct
   let test () =
     let faucet_like =
       {mich| {parameter key_hash ;
-  storage timestamp ;
-  code { { { DUP ; CAR ; DIP { CDR } } } ;
-         SWAP ;
-         PUSH int 300 ;
-         ADD @FIVE_MINUTES_LATER ;
-         NOW ;
-         { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
-         IMPLICIT_ACCOUNT ;
-         PUSH mutez 1000000 ;
-         UNIT ;
-         TRANSFER_TOKENS ;
-         NIL operation ;
-         SWAP ;
-         CONS ;
-         DIP { NOW } ;
-         PAIR }} |mich}
+             storage timestamp ;
+             code { { { DUP ; CAR ; DIP { CDR } } } ;
+             SWAP ;
+             PUSH int 300 ;
+             ADD @FIVE_MINUTES_LATER ;
+             NOW ;
+             { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+             IMPLICIT_ACCOUNT ;
+             PUSH mutez 1000000 ;
+             UNIT ;
+             TRANSFER_TOKENS ;
+             NIL operation ;
+             SWAP ;
+             CONS ;
+             DIP { NOW } ;
+             PAIR }} |mich}
     in
     print (parse faucet_like) (parse "0") ;
     let original = code_of_json_exn original_json in
@@ -325,24 +325,24 @@ let cli_term () =
   $ Arg.(
       pure (fun x -> `Time_between_blocks x)
       $ value
-          (opt
-             (some (list ~sep:',' int))
-             None
-             (info ["time-between-blocks"] ~docv:"COMMA-SEPARATED-SECONDS"
-                ~doc:
-                  "Set the time between blocks bootstrap-parameter, e.g. \
-                   `2,3,2`.")))
+        (opt
+           (some (list ~sep:',' int))
+           None
+           (info ["time-between-blocks"] ~docv:"COMMA-SEPARATED-SECONDS"
+              ~doc:
+                "Set the time between blocks bootstrap-parameter, e.g. \
+                 `2,3,2`.")))
   $ Arg.(
       pure (fun l ->
           List.map l ~f:(fun ((name, pubkey, pubkey_hash, private_key), tez) ->
               (Account.key_pair name ~pubkey ~pubkey_hash ~private_key, tez) )
-      )
+        )
       $ value
-          (opt_all
-             (pair ~sep:'@' (t4 ~sep:',' string string string string) int)
-             []
-             (info ["add-bootstrap-account"]
-                ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
-                ~doc:
-                  "Add a custom bootstrap account, e.g. \
-                   `LedgerBaker,edpku...,tz1YPS...,ledger://crouching-tiger.../ed25519/0'/0'@20_000_000_000`.")))
+        (opt_all
+           (pair ~sep:'@' (t4 ~sep:',' string string string string) int)
+           []
+           (info ["add-bootstrap-account"]
+              ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
+              ~doc:
+                "Add a custom bootstrap account, e.g. \
+                 `LedgerBaker,edpku...,tz1YPS...,ledger://crouching-tiger.../ed25519/0'/0'@20_000_000_000`.")))

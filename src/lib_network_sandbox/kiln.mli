@@ -12,7 +12,7 @@ val default_docker_image : string
 val default : t
 
 val start :
-     ?network_id:string
+  ?network_id:string
   -> < application_name: string
      ; console: Console.t
      ; paths: Paths.t
@@ -26,7 +26,7 @@ val start :
   -> ( Running_processes.State.process_state
        * Running_processes.State.process_state
      , [> `Lwt_exn of exn | `Waiting_for of string * [`Time_out]] )
-     Asynchronous_result.t
+    Asynchronous_result.t
 (** Start the Kiln and Postgres processes. [~network_id] is usually
     the chain-id of the sandbox, [~node_uris] is the list or URIs given to
     the ["--nodes"] option, if [~bakers] is not [[]] the test will force

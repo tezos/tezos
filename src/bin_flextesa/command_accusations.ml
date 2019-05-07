@@ -71,27 +71,27 @@ let little_mesh_with_bakers ?base_port ?kiln state ~starting_level ~node_exec
           ( List.map baker_list ~f:(fun (account, _) ->
                 Tezos_protocol.Account.(name account, pubkey_hash account) )
             @ List.map [baker_0; baker_1; baker_2] ~f:(fun bak ->
-                  ( bak.key_name
-                  , Tezos_protocol.Key.Of_name.pubkey_hash bak.key_name ) )
-          |> List.dedup_and_sort ~compare:(fun (_, a) (_, b) ->
-                 String.compare a b ) )
+                ( bak.key_name
+                , Tezos_protocol.Key.Of_name.pubkey_hash bak.key_name ) )
+            |> List.dedup_and_sort ~compare:(fun (_, a) (_, b) ->
+                String.compare a b ) )
         ~node_uris:
           (List.map all_nodes ~f:(fun {Tezos_node.rpc_port; _} ->
                sprintf "http://localhost:%d" rpc_port ))
       >>= fun (pg, kiln) ->
       Interactive_test.Pauser.generic state EF.[af "Started Kiln with its DB."]
-  )
+    )
   >>= fun (_ : unit option) ->
   let bake msg baker = Tezos_client.Keyed.bake state baker msg in
   List.fold
     (List.init (starting_level - 1) ~f:(fun n -> n))
     ~init:(return ()) (* We are already at level 1, we bake 7 times: *)
     ~f:(fun pm n ->
-      pm
-      >>= fun () ->
-      bake
-        (sprintf "first bakes: [%d/%d]" (n + 1) (starting_level - 1))
-        baker_0 )
+        pm
+        >>= fun () ->
+        bake
+          (sprintf "first bakes: [%d/%d]" (n + 1) (starting_level - 1))
+          baker_0 )
   >>= fun () ->
   Test_scenario.Queries.wait_for_all_levels_to_be state
     ~attempts:default_attempts ~seconds:8. all_nodes (`Equal_to starting_level)
@@ -121,7 +121,7 @@ let wait_for_operation_in_mempools state ~nodes:all_nodes ~kind ~client_exec
       | false ->
           return
             (`Not_done
-              (sprintf "Waiting for %S to show up in the mempool" kind)) )
+               (sprintf "Waiting for %S to show up in the mempool" kind)) )
 
 let simple_double_baking ~starting_level ?kiln ~state ~base_port node_exec
     client_exec () =
@@ -221,8 +221,8 @@ let simple_double_baking ~starting_level ?kiln ~state ~base_port node_exec
       | false ->
           return
             (`Not_done
-              (sprintf "Waiting for accusation to show up in block %d"
-                 last_level)) )
+               (sprintf "Waiting for accusation to show up in block %d"
+                  last_level)) )
   >>= fun () -> say state EF.(af "Test done.")
 
 let find_endorsement_in_mempool state ~client =
@@ -230,8 +230,8 @@ let find_endorsement_in_mempool state ~client =
       Tezos_client.find_applied_in_mempool state ~client ~f:(fun o ->
           Jqo.field o ~k:"contents"
           |> Jqo.list_exists ~f:(fun op ->
-                 (* Dbg.e EF.(ef_json "op" op) ; *)
-                 Jqo.field op ~k:"kind" = `String "endorsement" ) )
+              (* Dbg.e EF.(ef_json "op" op) ; *)
+              Jqo.field op ~k:"kind" = `String "endorsement" ) )
       >>= function
       | None -> return (`Not_done (sprintf "No endorsement so far"))
       | Some e -> return (`Done e) )
@@ -360,12 +360,12 @@ let simple_double_endorsement ~starting_level ?kiln ~state ~base_port node_exec
       | false ->
           return
             (`Not_done
-              (sprintf "Waiting for accusation to show up in block %d"
-                 last_level)) )
+               (sprintf "Waiting for accusation to show up in block %d"
+                  last_level)) )
   >>= fun () -> say state EF.(af "Test done.")
 
 let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
-    =
+  =
   Helpers.clear_root state
   >>= fun () ->
   let block_interval = 2 in
@@ -407,9 +407,9 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
     let bak =
       Tezos_client.Keyed.make client ~key_name
         ~secret_key:(Tezos_protocol.Account.private_key (fst baker_0_account))
-      (* ~secret_key:
-         *   (Tezos_protocol.Key.Of_name.private_key
-         *      (fst baker_0 |> Tezos_protocol.name_to_string)) *)
+        (* ~secret_key:
+           *   (Tezos_protocol.Key.Of_name.private_key
+           *      (fst baker_0 |> Tezos_protocol.name_to_string)) *)
     in
     Tezos_client.Keyed.initialize state bak >>= fun _ -> return (client, bak)
   in
@@ -429,14 +429,14 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
       Kiln.start state ~network_id k
         ~bakers:
           [ Tezos_protocol.Account.(
-              let acc = fst baker_0_account in
-              (name acc, pubkey_hash acc)) ]
+                let acc = fst baker_0_account in
+                (name acc, pubkey_hash acc)) ]
         ~node_uris:
           (List.map all_nodes ~f:(fun {Tezos_node.rpc_port; _} ->
                sprintf "http://localhost:%d" rpc_port ))
       >>= fun (pg, kiln) ->
       Interactive_test.Pauser.generic state EF.[af "Started Kiln with its DB."]
-  )
+    )
   >>= fun (_ : unit option) ->
   Interactive_test.Pauser.add_commands state
     Interactive_test.Commands.(
@@ -451,10 +451,10 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
     (List.init (starting_level - 1) ~f:(fun n -> n))
     ~init:(return ()) (* We are already at level 1, we bake 7 times: *)
     ~f:(fun pm n ->
-      pm
-      >>= fun () ->
-      Tezos_client.Keyed.bake state baker_0
-        (sprintf "first bakes: [%d/%d]" (n + 1) (starting_level - 1)) )
+        pm
+        >>= fun () ->
+        Tezos_client.Keyed.bake state baker_0
+          (sprintf "first bakes: [%d/%d]" (n + 1) (starting_level - 1)) )
   >>= fun () ->
   Test_scenario.Queries.wait_for_all_levels_to_be state
     ~attempts:default_attempts ~seconds:8. all_nodes (`Equal_to starting_level)
@@ -568,7 +568,7 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
       | false ->
           return
             (`Not_done
-              (sprintf "Waiting for accusation to show up in the mempool")) )
+               (sprintf "Waiting for accusation to show up in the mempool")) )
   >>= fun () ->
   Tezos_client.Keyed.bake state baker_2
     (sprintf "all at lvl %d" (starting_level + number_of_lonely_bakes + 1))
@@ -582,8 +582,8 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
       | false ->
           return
             (`Not_done
-              (sprintf "Waiting for accusation to show up in block %d" level))
-  )
+               (sprintf "Waiting for accusation to show up in block %d" level))
+    )
   >>= fun () ->
   pause
     EF.
@@ -622,48 +622,48 @@ let cmd ~pp_error () =
   Test_command_line.Run_command.make ~pp_error
     ( pure
         (fun test
-        base_port
-        (`Starting_level starting_level)
-        bnod
-        bcli
-        accex
-        kiln
-        state
-        ->
-          let actual_test =
-            match test with
-            | `With_accusers -> with_accusers ~state bnod accex bcli ~base_port
-            | `Simple_double_baking ->
-                simple_double_baking ~state bnod bcli ~base_port ?kiln
-                  ~starting_level
-            | `Simple_double_endorsing ->
-                simple_double_endorsement ~state bnod bcli ~base_port ?kiln
-                  ~starting_level
-          in
-          (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
-      )
-    $ Arg.(
-        required
-          (pos 0
-             (some (enum (List.map tests ~f:(fun (v, n, _, _) -> (n, v)))))
-             None
-             (info [] ~docv:"TEST-NAME" ~doc:"Choose which test to run.")))
-    $ Arg.(
-        value & opt int 30_000
-        & info ["base-port"] ~doc:"Base port number to build upon.")
-    $ Arg.(
-        pure (fun l -> `Starting_level l)
-        $ value
+          base_port
+          (`Starting_level starting_level)
+          bnod
+          bcli
+          accex
+          kiln
+          state
+          ->
+            let actual_test =
+              match test with
+              | `With_accusers -> with_accusers ~state bnod accex bcli ~base_port
+              | `Simple_double_baking ->
+                  simple_double_baking ~state bnod bcli ~base_port ?kiln
+                    ~starting_level
+              | `Simple_double_endorsing ->
+                  simple_double_endorsement ~state bnod bcli ~base_port ?kiln
+                    ~starting_level
+            in
+            (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
+        )
+      $ Arg.(
+          required
+            (pos 0
+               (some (enum (List.map tests ~f:(fun (v, n, _, _) -> (n, v)))))
+               None
+               (info [] ~docv:"TEST-NAME" ~doc:"Choose which test to run.")))
+      $ Arg.(
+          value & opt int 30_000
+          & info ["base-port"] ~doc:"Base port number to build upon.")
+      $ Arg.(
+          pure (fun l -> `Starting_level l)
+          $ value
             (opt int 5
                (info ["starting-level"]
                   ~doc:
                     "Initial block-level to reach before actually starting \
                      the test.")))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Accuser "tezos"
-    $ Kiln.cli_term ()
-    $ Test_command_line.cli_state ~name:"accusing" () )
+      $ Tezos_executable.cli_term `Node "tezos"
+      $ Tezos_executable.cli_term `Client "tezos"
+      $ Tezos_executable.cli_term `Accuser "tezos"
+      $ Kiln.cli_term ()
+      $ Test_command_line.cli_state ~name:"accusing" () )
     (let doc = "Sandbox networks which record double-bakings." in
      let man : Manpage.block list =
        [ `S "ACCUSATION TESTS"

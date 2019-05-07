@@ -22,7 +22,7 @@ let bootstrapped_script t ~state =
   let cmd =
     loop_until_true ~attempts:5 ~sleep:1
       ~on_failed_attempt:(fun _ ->
-        eprintf (str "Bootstrap attempt failed\\n") [] )
+          eprintf (str "Bootstrap attempt failed\\n") [] )
       (succeeds (client_command t ~state ["bootstrapped"]))
   in
   seq
@@ -54,14 +54,14 @@ let activate_protocol_script t ~state protocol =
           ~how:
             [ ( "activate"
               , client_command t ~state @@ opt "block" "genesis"
-                @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"
-                  ; "fitness"
-                  ; sprintf "%d" protocol.Tezos_protocol.expected_pow
-                  ; "and"; "key"
-                  ; Tezos_protocol.dictator_name protocol
-                  ; "and"; "parameters"
-                  ; Tezos_protocol.protocol_parameters_path ~config:state
-                      protocol ] ) ] ) ]
+                                           @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"
+                                             ; "fitness"
+                                             ; sprintf "%d" protocol.Tezos_protocol.expected_pow
+                                             ; "and"; "key"
+                                             ; Tezos_protocol.dictator_name protocol
+                                             ; "and"; "parameters"
+                                             ; Tezos_protocol.protocol_parameters_path ~config:state
+                                                 protocol ] ) ] ) ]
 
 let import_secret_key t ~state name key =
   Running_processes.run_genspio state
@@ -75,8 +75,8 @@ let register_as_delegate t ~state keyname =
     Genspio.EDSL.(
       if_seq
         ( succeeds
-        @@ client_command t ~state
-             ["register"; "key"; keyname; "as"; "delegate"] )
+          @@ client_command t ~state
+            ["register"; "key"; keyname; "as"; "delegate"] )
         ~t:[say "SUCCESS: Registering %s as delegate" [str keyname]]
         ~e:[say "FAILURE: Registering %s as delegate" [str keyname]])
   >>= fun _ -> return ()
@@ -106,7 +106,7 @@ open Console
 let successful_client_cmd state ~client args =
   Running_processes.run_cmdf state "sh -c %s"
     ( client_command client ~state args
-    |> Genspio.Compile.to_one_liner |> Filename.quote )
+      |> Genspio.Compile.to_one_liner |> Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
   >>= function
@@ -127,18 +127,18 @@ let rpc state ~client meth ~path =
     let json = Jqo.of_string output in
     return json
   with e -> (
-    try
-      Ezjsonm.from_string (sprintf "[ %s ]" output)
-      |> function `A [one] -> return one | _ -> raise e
-    with e ->
-      say state
-        EF.(
-          list
-            [ desc (shout "Output:") (markdown_verbatim output)
-            ; desc (shout "Error:")
-                (markdown_verbatim (String.concat ~sep:"\n" res#err)) ])
-      >>= fun () ->
-      failf ~args "RPC failure cannot parse json: %s" Exn.(to_string e) )
+      try
+        Ezjsonm.from_string (sprintf "[ %s ]" output)
+        |> function `A [one] -> return one | _ -> raise e
+      with e ->
+        say state
+          EF.(
+            list
+              [ desc (shout "Output:") (markdown_verbatim output)
+              ; desc (shout "Error:")
+                  (markdown_verbatim (String.concat ~sep:"\n" res#err)) ])
+        >>= fun () ->
+        failf ~args "RPC failure cannot parse json: %s" Exn.(to_string e) )
 
 let find_applied_in_mempool state ~client ~f =
   successful_client_cmd state ~client
@@ -162,7 +162,7 @@ let mempool_has_operation state ~client ~kind =
   find_applied_in_mempool state ~client ~f:(fun o ->
       Jqo.field o ~k:"contents"
       |> Jqo.list_exists ~f:(fun op -> Jqo.field op ~k:"kind" = `String kind)
-  )
+    )
   >>= fun found_or_not -> return (found_or_not <> None)
 
 let block_has_operation state ~client ~level ~kind =
@@ -176,7 +176,7 @@ let block_has_operation state ~client ~level ~kind =
           Jqo.list_exists olist ~f:(fun o ->
               Jqo.field o ~k:"contents"
               |> Jqo.list_exists ~f:(fun op ->
-                     Jqo.field op ~k:"kind" = `String kind ) ) )
+                  Jqo.field op ~k:"kind" = `String kind ) ) )
     in
     say state
       EF.(

@@ -29,8 +29,8 @@ module Commands = struct
             Base.Sexp.(
               function
               | List [Atom "port"; Atom p] -> (
-                try Some (`Ok (Int.of_string p))
-                with _ -> Some (`Not_an_int p) )
+                  try Some (`Ok (Int.of_string p))
+                  with _ -> Some (`Not_an_int p) )
               | List (Atom "port" :: other) -> Some (`Wrong_option other)
               | _other -> None)
       with
@@ -42,11 +42,11 @@ module Commands = struct
               desc
                 (shout "Error parsing port option:")
                 ( match other with
-                | `Not_an_int s ->
-                    af "This is not an integer: %S, using default: %d" s
-                      default_port
-                | `Wrong_option _sexps ->
-                    af "Usage (port <int>), using default: %d" default_port ))
+                  | `Not_an_int s ->
+                      af "This is not an integer: %S, using default: %d" s
+                        default_port
+                  | `Wrong_option _sexps ->
+                      af "Usage (port <int>), using default: %d" default_port ))
           >>= fun () -> return default_port
   end
 
@@ -55,16 +55,16 @@ module Commands = struct
       EF.(af "Run du -sh on %s" (Paths.root state))
       ["d"; "du-root"]
       (fun () ->
-        Running_processes.run_cmdf state "du -sh %s" (Paths.root state)
-        >>= fun du ->
-        display_errors_of_command state du
-        >>= function
-        | true ->
-            say state
-              EF.(
-                desc (haf "Disk-Usage:")
-                  (af "%s" (String.concat ~sep:" " du#out)))
-        | false -> return () )
+         Running_processes.run_cmdf state "du -sh %s" (Paths.root state)
+         >>= fun du ->
+         display_errors_of_command state du
+         >>= function
+         | true ->
+             say state
+               EF.(
+                 desc (haf "Disk-Usage:")
+                   (af "%s" (String.concat ~sep:" " du#out)))
+         | false -> return () )
 
   let processes state =
     Prompt.unit_and_loop
@@ -72,8 +72,8 @@ module Commands = struct
         af "Display status of processes-manager ('all' to include non-running)")
       ["p"; "processes"]
       (fun sxp ->
-        let all = flag "all" sxp in
-        say state (Running_processes.ef ~all state) )
+         let all = flag "all" sxp in
+         say state (Running_processes.ef ~all state) )
 
   let curl ?(jq = ".") state ~port ~path =
     Running_processes.run_cmdf state "curl http://localhost:%d%s | jq %s" port
@@ -91,16 +91,16 @@ module Commands = struct
              [Sexp_options.port_number_doc state ~default_port]))
       cmd
       (fun sexps ->
-        Sexp_options.port_number state sexps ~default_port
-        >>= fun port ->
-        curl ?jq state ~port ~path
-        >>= function
-        | `Success res ->
-            say state
-              EF.(
-                desc (af "Curl-Node :%d" port)
-                  (af "\"%s\"" (String.concat ~sep:"\n" res)))
-        | `Error -> return () )
+         Sexp_options.port_number state sexps ~default_port
+         >>= fun port ->
+         curl ?jq state ~port ~path
+         >>= function
+         | `Success res ->
+             say state
+               EF.(
+                 desc (af "Curl-Node :%d" port)
+                   (af "\"%s\"" (String.concat ~sep:"\n" res)))
+         | `Error -> return () )
 
   let curl_metadata state ~default_port =
     curl_unit_display state ["m"; "metadata"] ~default_port
@@ -122,19 +122,19 @@ module Commands = struct
       EF.(af "Get all the levels")
       ["al"; "all-levels"]
       (fun () ->
-        Test_scenario.Queries.all_levels state ~nodes
-        >>= fun results ->
-        say state
-          EF.(
-            desc (af "Node-levels:")
-              (list
-                 (List.map results ~f:(fun (id, result) ->
-                      desc (haf "%s" id)
-                        ( match result with
-                        | `Failed -> af "Failed"
-                        | `Level i -> af "[%d]" i
-                        | `Null -> af "{Null}"
-                        | `Unknown s -> af "¿%s?" s ) )))) )
+         Test_scenario.Queries.all_levels state ~nodes
+         >>= fun results ->
+         say state
+           EF.(
+             desc (af "Node-levels:")
+               (list
+                  (List.map results ~f:(fun (id, result) ->
+                       desc (haf "%s" id)
+                         ( match result with
+                           | `Failed -> af "Failed"
+                           | `Level i -> af "[%d]" i
+                           | `Null -> af "{Null}"
+                           | `Unknown s -> af "¿%s?" s ) )))) )
 
   let show_process state =
     Prompt.unit_and_loop
@@ -178,18 +178,18 @@ module Commands = struct
       EF.(af "Show the protocol's “bootstrap” accounts")
       ["boa"; "bootstrap-accounts"]
       (fun () ->
-        say state
-          EF.(
-            desc (af "Secret Keys:")
-              (ocaml_list
-                 (List.map (Tezos_protocol.bootstrap_accounts protocol)
-                    ~f:(fun acc ->
-                      let open Tezos_protocol.Account in
-                      ocaml_tuple
-                        [ atom (name acc)
-                        ; af "Pub:%s" (pubkey acc)
-                        ; af "Hash:%s" (pubkey_hash acc)
-                        ; atom (private_key acc) ] )))) )
+         say state
+           EF.(
+             desc (af "Secret Keys:")
+               (ocaml_list
+                  (List.map (Tezos_protocol.bootstrap_accounts protocol)
+                     ~f:(fun acc ->
+                         let open Tezos_protocol.Account in
+                         ocaml_tuple
+                           [ atom (name acc)
+                           ; af "Pub:%s" (pubkey acc)
+                           ; af "Hash:%s" (pubkey_hash acc)
+                           ; atom (private_key acc) ] )))) )
 
   let show_connections state nodes =
     unit_loop_no_args
@@ -206,61 +206,61 @@ module Commands = struct
              [Sexp_options.port_number_doc state ~default_port]))
       ["sb"; "show-balances"]
       (fun sexps ->
-        Sexp_options.port_number state sexps ~default_port
-        >>= fun port ->
-        curl state ~port ~path:"/chains/main/blocks/head/context/contracts"
-        >>= (function
-              | `Success res -> (
-                try
-                  let json =
-                    Ezjsonm.from_string (String.concat ~sep:"\n" res)
-                  in
-                  let contracts =
-                    match json with
-                    | `A sl ->
-                        List.map sl ~f:(function
-                          | `String s -> s
-                          | _ -> failwith "Not a string list" )
-                    | _ -> failwith "Not a string list"
-                  in
-                  return contracts
-                with e ->
-                  say state
-                    EF.(
-                      desc_list
-                        (shout "Found not contracts!")
-                        [ desc (af "output") (ocaml_string_list res)
-                        ; desc (af "exn") (exn e) ])
-                  >>= fun () -> return [] )
-              | `Error -> return [])
-        >>= fun contracts ->
-        let balance block contract =
-          let path =
-            sprintf "/chains/main/blocks/%s/context/contracts/%s/balance" block
-              contract
-          in
-          curl state ~port ~path
-          >>= function
-          | `Success res -> return (Some (String.concat ~sep:"" res))
-          | `Error -> return None
-        in
-        List.fold contracts ~init:(return []) ~f:(fun prevm hsh ->
-            prevm
-            >>= fun prev ->
-            balance "1" hsh
-            >>= fun init ->
-            balance "head" hsh
-            >>= fun current -> return ((hsh, init, current) :: prev) )
-        >>= fun results ->
-        say state
-          EF.(
-            desc_list
-              (af "Balances (from :%d)" port)
-              (List.map results ~f:(fun (hsh, init, cur) ->
-                   desc (haf "%S" hsh)
-                     (af "%s → %s"
-                        (Option.value init ~default:"???")
-                        (Option.value cur ~default:"???")) ))) )
+         Sexp_options.port_number state sexps ~default_port
+         >>= fun port ->
+         curl state ~port ~path:"/chains/main/blocks/head/context/contracts"
+         >>= (function
+             | `Success res -> (
+                 try
+                   let json =
+                     Ezjsonm.from_string (String.concat ~sep:"\n" res)
+                   in
+                   let contracts =
+                     match json with
+                     | `A sl ->
+                         List.map sl ~f:(function
+                             | `String s -> s
+                             | _ -> failwith "Not a string list" )
+                     | _ -> failwith "Not a string list"
+                   in
+                   return contracts
+                 with e ->
+                   say state
+                     EF.(
+                       desc_list
+                         (shout "Found not contracts!")
+                         [ desc (af "output") (ocaml_string_list res)
+                         ; desc (af "exn") (exn e) ])
+                   >>= fun () -> return [] )
+             | `Error -> return [])
+         >>= fun contracts ->
+         let balance block contract =
+           let path =
+             sprintf "/chains/main/blocks/%s/context/contracts/%s/balance" block
+               contract
+           in
+           curl state ~port ~path
+           >>= function
+           | `Success res -> return (Some (String.concat ~sep:"" res))
+           | `Error -> return None
+         in
+         List.fold contracts ~init:(return []) ~f:(fun prevm hsh ->
+             prevm
+             >>= fun prev ->
+             balance "1" hsh
+             >>= fun init ->
+             balance "head" hsh
+             >>= fun current -> return ((hsh, init, current) :: prev) )
+         >>= fun results ->
+         say state
+           EF.(
+             desc_list
+               (af "Balances (from :%d)" port)
+               (List.map results ~f:(fun (hsh, init, cur) ->
+                    desc (haf "%S" hsh)
+                      (af "%s → %s"
+                         (Option.value init ~default:"???")
+                         (Option.value cur ~default:"???")) ))) )
 
   let arbitrary_command_on_clients ?make_admin
       ?(command_names = ["cc"; "client-command"]) state ~clients =
@@ -269,12 +269,12 @@ module Commands = struct
         desc
           (wf "Run a tezos-client command on %s"
              ( match clients with
-             | [] -> "NO CLIENT, so this is useless…"
-             | [one] -> sprintf "the %S client." one.Tezos_client.id
-             | more ->
-                 sprintf "all the following clients: %s."
-                   ( List.map more ~f:(fun c -> c.Tezos_client.id)
-                   |> String.concat ~sep:", " ) ))
+               | [] -> "NO CLIENT, so this is useless…"
+               | [one] -> sprintf "the %S client." one.Tezos_client.id
+               | more ->
+                   sprintf "all the following clients: %s."
+                     ( List.map more ~f:(fun c -> c.Tezos_client.id)
+                       |> String.concat ~sep:", " ) ))
           Sexp_options.(
             option_list_doc
               [ option_doc "(only <name1> <name2>)"
@@ -285,83 +285,83 @@ module Commands = struct
               ]))
       command_names
       (fun sexps ->
-        let args =
-          let open Base.Sexp in
-          List.filter_map sexps ~f:(function Atom s -> Some s | _ -> None)
-        in
-        let subset_of_clients =
-          let open Base.Sexp in
-          List.find_map sexps ~f:(function
-            | List (Atom "only" :: l) ->
-                Some
-                  (List.map l ~f:(function
-                    | Atom a -> a
-                    | other ->
-                        ksprintf failwith
-                          "Option `only` only accepts a list of names: %s"
-                          (to_string_hum other) ))
-            | _ -> None )
-          |> function
-          | None -> clients
-          | Some more ->
-              List.filter clients ~f:(fun c ->
-                  List.mem more c.Tezos_client.id ~equal:String.equal )
-        in
-        let use_admin =
-          match make_admin with
-          | None -> `Client
-          | Some of_client ->
-              if
-                List.exists sexps
-                  ~f:
-                    Base.Sexp.(
-                      function List [Atom "admin"] -> true | _ -> false)
-              then `Admin of_client
-              else `Client
-        in
-        List.fold ~init:(return []) subset_of_clients ~f:(fun prevm client ->
-            prevm
-            >>= fun prev ->
-            Running_processes.run_cmdf state "sh -c %s"
-              ( ( match use_admin with
-                | `Client -> Tezos_client.client_command client ~state args
-                | `Admin mkadm ->
-                    Tezos_admin_client.make_command (mkadm client) state args
-                )
-              |> Genspio.Compile.to_one_liner |> Filename.quote )
-            >>= fun res ->
-            display_errors_of_command state res
-            >>= function
-            | true -> return ((client, String.concat ~sep:"\n" res#out) :: prev)
-            | false -> return prev )
-        >>= fun results ->
-        let different_results =
-          List.dedup_and_sort results ~compare:(fun (_, a) (_, b) ->
-              String.compare a b )
-        in
-        say state
-          EF.(
-            desc_list (af "Done")
-              [ desc (haf "Command:")
-                  (ocaml_string_list
-                     ( ( match use_admin with
-                       | `Client -> "<client>"
-                       | `Admin _ -> "<admin>" )
-                     :: args ))
-              ; desc (haf "Results")
-                  (list
-                     (List.map different_results ~f:(fun (_, res) ->
-                          let clients =
-                            List.filter_map results ~f:(function
-                              | c, r when res = r -> Some c.Tezos_client.id
-                              | _ -> None )
-                          in
-                          desc
-                            (haf "Client%s %s:"
-                               ( if List.length subset_of_clients = 1 then ""
-                               else "s" )
-                               (String.concat ~sep:", " clients))
-                            (markdown_verbatim res) ))) ]) )
+         let args =
+           let open Base.Sexp in
+           List.filter_map sexps ~f:(function Atom s -> Some s | _ -> None)
+         in
+         let subset_of_clients =
+           let open Base.Sexp in
+           List.find_map sexps ~f:(function
+               | List (Atom "only" :: l) ->
+                   Some
+                     (List.map l ~f:(function
+                          | Atom a -> a
+                          | other ->
+                              ksprintf failwith
+                                "Option `only` only accepts a list of names: %s"
+                                (to_string_hum other) ))
+               | _ -> None )
+           |> function
+           | None -> clients
+           | Some more ->
+               List.filter clients ~f:(fun c ->
+                   List.mem more c.Tezos_client.id ~equal:String.equal )
+         in
+         let use_admin =
+           match make_admin with
+           | None -> `Client
+           | Some of_client ->
+               if
+                 List.exists sexps
+                   ~f:
+                     Base.Sexp.(
+                       function List [Atom "admin"] -> true | _ -> false)
+               then `Admin of_client
+               else `Client
+         in
+         List.fold ~init:(return []) subset_of_clients ~f:(fun prevm client ->
+             prevm
+             >>= fun prev ->
+             Running_processes.run_cmdf state "sh -c %s"
+               ( ( match use_admin with
+                     | `Client -> Tezos_client.client_command client ~state args
+                     | `Admin mkadm ->
+                         Tezos_admin_client.make_command (mkadm client) state args
+                   )
+                 |> Genspio.Compile.to_one_liner |> Filename.quote )
+             >>= fun res ->
+             display_errors_of_command state res
+             >>= function
+             | true -> return ((client, String.concat ~sep:"\n" res#out) :: prev)
+             | false -> return prev )
+         >>= fun results ->
+         let different_results =
+           List.dedup_and_sort results ~compare:(fun (_, a) (_, b) ->
+               String.compare a b )
+         in
+         say state
+           EF.(
+             desc_list (af "Done")
+               [ desc (haf "Command:")
+                   (ocaml_string_list
+                      ( ( match use_admin with
+                            | `Client -> "<client>"
+                            | `Admin _ -> "<admin>" )
+                        :: args ))
+               ; desc (haf "Results")
+                   (list
+                      (List.map different_results ~f:(fun (_, res) ->
+                           let clients =
+                             List.filter_map results ~f:(function
+                                 | c, r when res = r -> Some c.Tezos_client.id
+                                 | _ -> None )
+                           in
+                           desc
+                             (haf "Client%s %s:"
+                                ( if List.length subset_of_clients = 1 then ""
+                                  else "s" )
+                                (String.concat ~sep:", " clients))
+                             (markdown_verbatim res) ))) ]) )
 
   let all_defaults state ~nodes =
     let default_port = (List.hd_exn nodes).Tezos_node.rpc_port in
@@ -402,28 +402,28 @@ module Interactivity = struct
       $ Arg.(
           value
           & opt bool
-              ( match default with
+            ( match default with
               | `None | `On_error | `At_end -> false
               | `Full -> true )
           & info ["interactive"] ~doc:"Add all pauses with command prompts.")
       $ Arg.(
           value
           & opt bool
-              ( match default with
+            ( match default with
               | `None | `On_error -> false
               | `At_end | `Full -> true )
           & info ["pause-at-end"]
-              ~doc:"Add a pause with a command prompt at the end of the test.")
+            ~doc:"Add a pause with a command prompt at the end of the test.")
       $ Arg.(
           value
           & opt bool
-              ( match default with
+            ( match default with
               | `None -> false
               | `At_end | `Full | `On_error -> true )
           & info ["pause-on-error"]
-              ~doc:
-                "Add a pause with a command prompt at the end of the test, \
-                 only in case of test failure."))
+            ~doc:
+              "Add a pause with a command prompt at the end of the test, \
+               only in case of test failure."))
 end
 
 module Pauser = struct
@@ -474,19 +474,19 @@ module Pauser = struct
       EF.(wf "Running test %s on %s" state#application_name (Paths.root state)) ;
     Asynchronous_result.bind_on_error
       ( (try Lwt.pick [f (); wait ()] with e -> fail (`Lwt_exn e))
-      >>= fun () ->
-      ( match (Interactivity.pause_on_success state, default_end state) with
-      | true, _ -> generic state ~force:true EF.[af "Scenario done; pausing"]
-      | false, `Sleep n ->
-          say state EF.(wf "Test done, sleeping %.02f seconds" n)
-          >>= fun () -> System.sleep n )
-      >>= fun () -> finish () )
-      ~f:(fun {error_value; attachments} ->
-        generic state
-          ~force:(Interactivity.pause_on_error state)
-          EF.
-            [ haf "Last pause before the test will Kill 'Em All and Quit."
-            ; desc (shout "Error:") (af "%a" pp_error error_value) ]
         >>= fun () ->
-        finish () >>= fun () -> fail error_value ~attach:attachments )
+        ( match (Interactivity.pause_on_success state, default_end state) with
+          | true, _ -> generic state ~force:true EF.[af "Scenario done; pausing"]
+          | false, `Sleep n ->
+              say state EF.(wf "Test done, sleeping %.02f seconds" n)
+              >>= fun () -> System.sleep n )
+        >>= fun () -> finish () )
+      ~f:(fun {error_value; attachments} ->
+          generic state
+            ~force:(Interactivity.pause_on_error state)
+            EF.
+              [ haf "Last pause before the test will Kill 'Em All and Quit."
+              ; desc (shout "Error:") (af "%a" pp_error error_value) ]
+          >>= fun () ->
+          finish () >>= fun () -> fail error_value ~attach:attachments )
 end

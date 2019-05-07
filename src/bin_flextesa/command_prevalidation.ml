@@ -30,7 +30,7 @@ let cmd ~pp_error () =
   let open Term in
   Test_command_line.Run_command.make ~pp_error
     ( pure (fun bnod bcli state -> (state, run state bnod bcli))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Test_command_line.cli_state ~name:"prevalidation" () )
+      $ Tezos_executable.cli_term `Node "tezos"
+      $ Tezos_executable.cli_term `Client "tezos"
+      $ Test_command_line.cli_state ~name:"prevalidation" () )
     (info ~doc:"Work-in-progress." "prevalidation")

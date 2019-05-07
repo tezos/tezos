@@ -15,7 +15,7 @@ module Command_error : sig
   type t = [`Admin_command_error of string * string list option]
 
   val failf :
-       ?args:string list
+    ?args:string list
     -> ('a, unit, string, ('b, [> t]) Asynchronous_result.t) format4
     -> 'a
 
@@ -23,7 +23,7 @@ module Command_error : sig
 end
 
 val successful_command :
-     t
+  t
   -> < application_name: string
      ; console: Console.t
      ; paths: Paths.t
@@ -32,4 +32,4 @@ val successful_command :
   -> string list
   -> ( Process_result.t
      , [> Command_error.t | `Lwt_exn of exn] )
-     Asynchronous_result.t
+    Asynchronous_result.t

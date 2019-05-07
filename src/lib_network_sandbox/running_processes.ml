@@ -54,12 +54,12 @@ let output_path t process which =
   in
   Paths.root t
   // ( "output"
-     // sanitize process.Process.id
-     //
-     match which with
-     | `Stdout -> "stdout.log"
-     | `Stderr -> "stderr.log"
-     | `Meta -> "meta.log" )
+       // sanitize process.Process.id
+       //
+       match which with
+       | `Stdout -> "stdout.log"
+       | `Stderr -> "stderr.log"
+       | `Meta -> "meta.log" )
 
 let ef_procesess state processes =
   EF.(
@@ -86,19 +86,19 @@ let ef ?(all = false) state =
     let all_procs =
       Hashtbl.fold
         (fun _ {process; lwt} prev ->
-          match (all, lwt#state) with
-          | true, _ | false, Lwt_process.Running ->
-              ( process.id
-              , list ~delimiters:("{", "}")
-                  [ haf "%s:" process.id
-                  ; desc (af "pid:") (af "%d" lwt#pid)
-                  ; desc (af "state:") (ef_lwt_state lwt#state)
-                  ; desc (af "kind:")
-                      ( match process.kind with
-                      | `Docker n -> af "docker:%s" n
-                      | `Process_group -> af "process-group" ) ] )
-              :: prev
-          | _, _ -> prev )
+           match (all, lwt#state) with
+           | true, _ | false, Lwt_process.Running ->
+               ( process.id
+               , list ~delimiters:("{", "}")
+                   [ haf "%s:" process.id
+                   ; desc (af "pid:") (af "%d" lwt#pid)
+                   ; desc (af "state:") (ef_lwt_state lwt#state)
+                   ; desc (af "kind:")
+                       ( match process.kind with
+                         | `Docker n -> af "docker:%s" n
+                         | `Process_group -> af "process-group" ) ] )
+               :: prev
+           | _, _ -> prev )
         (State.processes state) []
       |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
       |> List.map ~f:snd
@@ -117,7 +117,7 @@ let start t process =
           Lwt_unix.file_exists f
           >>= fun exists ->
           ( if exists then Lwt_unix.rename f (sprintf "%s.saved-%s" f date)
-          else Lwt.return () )
+            else Lwt.return () )
           >>= fun () ->
           Lwt_unix.(
             openfile f [O_CREAT; O_WRONLY; O_APPEND] 0o600 >|= unix_file_descr))
@@ -129,19 +129,19 @@ let start t process =
   >>= fun stderr ->
   Lwt_exception.catch
     (fun () ->
-      Lwt_io.with_file ~mode:Lwt_io.output
-        ~flags:Unix.[O_CREAT; O_WRONLY; O_APPEND]
-        (output_path t process `Meta)
-        (fun chan ->
-          let msg =
-            let sep = String.make 80 '=' in
-            sprintf "\n%s\nDate: %s\nStarting: %s\nCmd: [%s]\n%s\n" sep date
-              process.Process.id
-              ( List.map process.command ~f:(sprintf "%S")
-              |> String.concat ~sep:"; " )
-              sep
-          in
-          Lwt_io.write chan msg ) )
+       Lwt_io.with_file ~mode:Lwt_io.output
+         ~flags:Unix.[O_CREAT; O_WRONLY; O_APPEND]
+         (output_path t process `Meta)
+         (fun chan ->
+            let msg =
+              let sep = String.make 80 '=' in
+              sprintf "\n%s\nDate: %s\nStarting: %s\nCmd: [%s]\n%s\n" sep date
+                process.Process.id
+                ( List.map process.command ~f:(sprintf "%S")
+                  |> String.concat ~sep:"; " )
+                sep
+            in
+            Lwt_io.write chan msg ) )
     ()
   >>= fun () ->
   let proc =
@@ -160,12 +160,12 @@ let kill _t {lwt; process} =
   | `Process_group ->
       Lwt_exception.catch
         (fun () ->
-          let signal = Sys.sigterm in
-          let pid = ~-(lwt#pid) (* Assumes “in session” *) in
-          ( try Unix.kill pid signal with
-          | Unix.Unix_error (Unix.ESRCH, _, _) -> ()
-          | e -> raise e ) ;
-          Lwt.return () )
+           let signal = Sys.sigterm in
+           let pid = ~-(lwt#pid) (* Assumes “in session” *) in
+           ( try Unix.kill pid signal with
+             | Unix.Unix_error (Unix.ESRCH, _, _) -> ()
+             | e -> raise e ) ;
+           Lwt.return () )
         ()
   | `Docker name -> (
       Lwt_exception.catch Lwt_unix.system (sprintf "docker kill %s" name)
@@ -224,34 +224,34 @@ let run_cmdf state fmt =
   in
   ksprintf
     (fun s ->
-      let id = fresh_id state "cmd" ~seed:s in
-      let proc = Process.make_in_session id ["sh"; "-c"; s] in
-      start state proc
-      >>= fun proc ->
-      wait state proc
-      >>= fun status ->
-      get_file (output_path state proc.process `Stdout)
-      >>= fun out_lines ->
-      get_file (output_path state proc.process `Stderr)
-      >>= fun err_lines ->
-      return
-        (object
+       let id = fresh_id state "cmd" ~seed:s in
+       let proc = Process.make_in_session id ["sh"; "-c"; s] in
+       start state proc
+       >>= fun proc ->
+       wait state proc
+       >>= fun status ->
+       get_file (output_path state proc.process `Stdout)
+       >>= fun out_lines ->
+       get_file (output_path state proc.process `Stderr)
+       >>= fun err_lines ->
+       return
+         (object
            method out = out_lines
 
            method err = err_lines
 
            method status = status
-        end) )
+         end) )
     fmt
 
 let run_successful_cmdf state fmt =
   ksprintf
     (fun cmd ->
-      run_cmdf state "%s" cmd
-      >>= fun res ->
-      Process_result.Error.fail_if_non_zero res
-        (sprintf "Shell command: %S" cmd)
-      >>= fun () -> return res )
+       run_cmdf state "%s" cmd
+       >>= fun res ->
+       Process_result.Error.fail_if_non_zero res
+         (sprintf "Shell command: %S" cmd)
+       >>= fun () -> return res )
     fmt
 
 let run_genspio state name genspio =

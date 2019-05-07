@@ -21,12 +21,12 @@ module Script : sig
     string -> Tezos_client_alpha.Proto_alpha.Alpha_context.Script.expr
 
   val code_of_json_exn :
-       string
+    string
     -> Tezos_client_alpha.Proto_alpha.Michelson_v1_primitives.prim
-       Tezos_micheline.Micheline.canonical
+      Tezos_micheline.Micheline.canonical
 
   val json_script_repr :
-       Tezos_client_alpha.Proto_alpha.Script_repr.expr
+    Tezos_client_alpha.Proto_alpha.Script_repr.expr
     -> Tezos_client_alpha.Proto_alpha.Script_repr.expr
     -> Ezjsonm.t
 
@@ -34,7 +34,7 @@ module Script : sig
   val faucet_tz : string
 
   val print :
-       Tezos_client_alpha.Proto_alpha.Script_repr.expr
+    Tezos_client_alpha.Proto_alpha.Script_repr.expr
     -> Tezos_client_alpha.Proto_alpha.Script_repr.expr
     -> unit
 
@@ -78,6 +78,8 @@ type t =
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int
   ; preserved_cycles: int
+  ; minimum_endorsements_per_priority : int list
+  ; delay_per_missing_endorsement : int
   ; proof_of_work_threshold: int }
 
 val compare : t -> t -> int
@@ -99,7 +101,7 @@ val ensure_script :
     bootstrap-parameters JSON file. *)
 
 val ensure :
-     t
+  t
   -> config:< paths: Paths.t ; .. >
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 (** Run the script created by [ensure_script], i.e. create the JSON

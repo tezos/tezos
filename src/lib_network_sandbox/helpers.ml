@@ -16,7 +16,7 @@ let dump_connections state nodes =
   let conns = Tezos_node.connections nodes in
   say state
     (let open EF in
-    desc_list (haf "Connections:") (List.map conns ~f:dump_connection))
+     desc_list (haf "Connections:") (List.map conns ~f:dump_connection))
 
 let clear_root state =
   let root = Paths.(root state) in
@@ -48,8 +48,8 @@ let kill_node state nod =
     ~f:(( = ) nod.Tezos_node.id)
   >>= fun states ->
   ( match states with
-  | [one] -> return one
-  | _ -> System_error.fail "Expecting one state for node %s" nod.Tezos_node.id
+    | [one] -> return one
+    | _ -> System_error.fail "Expecting one state for node %s" nod.Tezos_node.id
   )
   >>= fun node_state_0 -> Running_processes.kill state node_state_0
 
@@ -78,8 +78,8 @@ module Counter_log = struct
     List.rev_map
       ((total, sum t) :: !t)
       ~f:(fun (cmt, n) ->
-        sprintf "| %s %s|% 8d|" cmt
-          (String.make (String.length longest - String.length cmt + 2) '.')
-          n )
+          sprintf "| %s %s|% 8d|" cmt
+            (String.make (String.length longest - String.length cmt + 2) '.')
+            n )
     |> String.concat ~sep:"\n"
 end

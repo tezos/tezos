@@ -38,7 +38,7 @@ open Command_error
 let successful_command admin state args =
   Running_processes.run_cmdf state "sh -c %s"
     ( make_command admin state args
-    |> Genspio.Compile.to_one_liner |> Filename.quote )
+      |> Genspio.Compile.to_one_liner |> Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
   >>= function

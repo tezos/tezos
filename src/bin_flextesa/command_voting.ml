@@ -44,8 +44,8 @@ let setup_baking_ledger state uri ~client =
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
 type voting_period =
-                    Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period
-                    .kind =
+  Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period
+  .kind =
   | Proposal
   | Testing_vote
   | Testing
@@ -66,7 +66,7 @@ let transfer state ~client ~src ~dst ~amount =
     ; "--fee"; "0.05"; "--burn-cap"; "0.3" ]
 
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
-    =
+  =
   let client = baker.Tezos_client.Keyed.client in
   let period_name = voting_period_to_string period in
   Helpers.wait_for state ~attempts ~seconds:0.5 (fun nth ->
@@ -139,17 +139,17 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
   let initial_level = first_bakes + 1 in
   Counter_log.add level_counter "initial_level" initial_level ;
   ( match with_ledger with
-  | None ->
-      Console.say state EF.(wf "No ledger.")
-      >>= fun () ->
-      let account = Tezos_protocol.Account.of_name "special-baker" in
-      let baker =
-        Tezos_client.Keyed.make (client 0)
-          ~key_name:(Tezos_protocol.Account.name account)
-          ~secret_key:(Tezos_protocol.Account.private_key account)
-      in
-      Tezos_client.Keyed.initialize state baker >>= fun _ -> return baker
-  | Some uri -> setup_baking_ledger state ~client:(client 0) uri )
+    | None ->
+        Console.say state EF.(wf "No ledger.")
+        >>= fun () ->
+        let account = Tezos_protocol.Account.of_name "special-baker" in
+        let baker =
+          Tezos_client.Keyed.make (client 0)
+            ~key_name:(Tezos_protocol.Account.name account)
+            ~secret_key:(Tezos_protocol.Account.private_key account)
+        in
+        Tezos_client.Keyed.initialize state baker >>= fun _ -> return baker
+    | Some uri -> setup_baking_ledger state ~client:(client 0) uri )
   >>= fun special_baker ->
   Interactive_test.Pauser.add_commands state
     Interactive_test.Commands.
@@ -248,11 +248,11 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       [ af "Network up"
       ; desc (haf "Protcols")
         @@ list
-             (List.map after_injections_protocols ~f:(fun p ->
-                  af "`%s` (%s)" p
-                    ( if List.mem default_protocols p ~equal:String.equal then
-                      "previously known"
-                    else "injected" ) )) ]
+          (List.map after_injections_protocols ~f:(fun p ->
+               af "`%s` (%s)" p
+                 ( if List.mem default_protocols p ~equal:String.equal then
+                     "previously known"
+                   else "injected" ) )) ]
   >>= fun () ->
   let new_protocols =
     List.filter after_injections_protocols ~f:(fun ph ->
@@ -280,10 +280,10 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
     >>= fun _ -> return ()
   in
   ( match serialize_proposals with
-  | false -> submit_proposals special_baker new_protocols
-  | true ->
-      List_sequential.iter new_protocols ~f:(fun one ->
-          submit_proposals special_baker [one] ) )
+    | false -> submit_proposals special_baker new_protocols
+    | true ->
+        List_sequential.iter new_protocols ~f:(fun one ->
+            submit_proposals special_baker [one] ) )
   >>= fun () ->
   let winner = List.hd_exn new_protocols in
   Tezos_client.successful_client_cmd state ~client:baker_0.client
@@ -306,8 +306,8 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       if current_proposal_json <> `String winner then
         return
           (`Not_done
-            (sprintf "Waiting for current_proposal_json to be %s (%s)" winner
-               Ezjsonm.(to_string (wrap current_proposal_json))))
+             (sprintf "Waiting for current_proposal_json to be %s (%s)" winner
+                Ezjsonm.(to_string (wrap current_proposal_json))))
       else return (`Done ()) )
   >>= fun () ->
   Tezos_client.successful_client_cmd state ~client:baker_0.client
@@ -346,13 +346,13 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
         | other ->
             return
               (`Not_done
-                (sprintf "Wrong protocol: %s" Ezjsonm.(to_string (wrap other))))
+                 (sprintf "Wrong protocol: %s" Ezjsonm.(to_string (wrap other))))
       with e ->
         return
           (`Not_done
-            (sprintf "Cannot get test-chain protocol: %s → %s"
-               (Exn.to_string e)
-               Ezjsonm.(to_string (wrap metadata_json)))) )
+             (sprintf "Cannot get test-chain protocol: %s → %s"
+                (Exn.to_string e)
+                Ezjsonm.(to_string (wrap metadata_json)))) )
   >>= fun () ->
   bake_until_voting_period state ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
@@ -382,7 +382,7 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
   let ballot_bakes = 1 in
   Loop.n_times ballot_bakes (fun _ ->
       Tezos_client.Keyed.bake state baker_0 "Baking the promotion vote ballots"
-  )
+    )
   >>= fun () ->
   Counter_log.add level_counter "bake-the-ballots" ballot_bakes ;
   Tezos_client.successful_client_cmd state ~client:(client 0)
@@ -400,28 +400,28 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
   >>= fun () ->
   Helpers.wait_for state ~seconds:0.5
     ~attempts:(1 + protocol.blocks_per_voting_period) (fun nth ->
-      let client = baker_0.client in
-      Running_processes.run_successful_cmdf state
-        "curl http://localhost:%d/chains/main/blocks/head/metadata" client.port
-      >>= fun curl_res ->
-      let json_string = curl_res#out |> String.concat ~sep:"\n" in
-      let json_metadata = Ezjsonm.from_string json_string in
-      match Jqo.field json_metadata ~k:"next_protocol" with
-      | `String p when p = winner -> return (`Done (nth - 1))
-      | other ->
-          transfer state ~client ~amount:1
-            ~src:baker_0.Tezos_client.Keyed.key_name
-            ~dst:special_baker.Tezos_client.Keyed.key_name
-          >>= fun _ ->
-          ksprintf
-            (Tezos_client.Keyed.bake state baker_0)
-            "Baker %s bakes %d/%d waiting for next protocol: %S" client.id nth
-            attempts winner
-          >>= fun () ->
-          return
-            (`Not_done
-              (sprintf "Waiting for next_protocol: %S (≠ %s)" winner
-                 Ezjsonm.(to_string (wrap other)))) )
+        let client = baker_0.client in
+        Running_processes.run_successful_cmdf state
+          "curl http://localhost:%d/chains/main/blocks/head/metadata" client.port
+        >>= fun curl_res ->
+        let json_string = curl_res#out |> String.concat ~sep:"\n" in
+        let json_metadata = Ezjsonm.from_string json_string in
+        match Jqo.field json_metadata ~k:"next_protocol" with
+        | `String p when p = winner -> return (`Done (nth - 1))
+        | other ->
+            transfer state ~client ~amount:1
+              ~src:baker_0.Tezos_client.Keyed.key_name
+              ~dst:special_baker.Tezos_client.Keyed.key_name
+            >>= fun _ ->
+            ksprintf
+              (Tezos_client.Keyed.bake state baker_0)
+              "Baker %s bakes %d/%d waiting for next protocol: %S" client.id nth
+              attempts winner
+            >>= fun () ->
+            return
+              (`Not_done
+                 (sprintf "Waiting for next_protocol: %S (≠ %s)" winner
+                    Ezjsonm.(to_string (wrap other)))) )
   >>= fun extra_bakes_waiting_for_next_protocol ->
   Counter_log.add level_counter "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
@@ -429,16 +429,16 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       List.find client_protocols_result#out ~f:(fun prefix ->
           String.is_prefix winner ~prefix )
     with
-  | Some p -> Console.say state EF.(wf "The client knows about %s" winner)
-  (* 
+    | Some p -> Console.say state EF.(wf "The client knows about %s" winner)
+    (*
      TODO:
      - make winner a protocol that the client knows
      - bake on test chain
      - test protocol switch
      - test ≠ not-enough-votes “failures”
  *)
-  | None ->
-      Console.say state EF.(wf "The client does not know about %s" winner) )
+    | None ->
+        Console.say state EF.(wf "The client does not know about %s" winner) )
   >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.
@@ -454,51 +454,51 @@ let cmd ~pp_error () =
   Test_command_line.Run_command.make ~pp_error
     ( pure
         (fun demo_path
-        node_exec
-        client_exec
-        admin_exec
-        size
-        (`Base_port base_port)
-        (`With_ledger with_ledger)
-        (`Serialize_proposals serialize_proposals)
-        state
-        ->
-          ( state
-          , Interactive_test.Pauser.run_test state ~pp_error
-              (run state ~serialize_proposals ~demo_path ~node_exec ~size
-                 ~admin_exec ~base_port ~client_exec ?with_ledger) ) )
-    $ Arg.(
-        required
-          (pos 0 (some string) None
-             (info [] ~docv:"PROTOCOL-PATH"
-                ~doc:
-                  "The protocol to inject, e.g. `./src/bin_client/test/demo/`.")))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Admin "tezos"
-    $ Arg.(value (opt int 5 (info ["size"; "S"] ~doc:"Size of the Network.")))
-    $ Arg.(
-        pure (fun p -> `Base_port p)
-        $ value
+          node_exec
+          client_exec
+          admin_exec
+          size
+          (`Base_port base_port)
+          (`With_ledger with_ledger)
+          (`Serialize_proposals serialize_proposals)
+          state
+          ->
+            ( state
+            , Interactive_test.Pauser.run_test state ~pp_error
+                (run state ~serialize_proposals ~demo_path ~node_exec ~size
+                   ~admin_exec ~base_port ~client_exec ?with_ledger) ) )
+      $ Arg.(
+          required
+            (pos 0 (some string) None
+               (info [] ~docv:"PROTOCOL-PATH"
+                  ~doc:
+                    "The protocol to inject, e.g. `./src/bin_client/test/demo/`.")))
+      $ Tezos_executable.cli_term `Node "tezos"
+      $ Tezos_executable.cli_term `Client "tezos"
+      $ Tezos_executable.cli_term `Admin "tezos"
+      $ Arg.(value (opt int 5 (info ["size"; "S"] ~doc:"Size of the Network.")))
+      $ Arg.(
+          pure (fun p -> `Base_port p)
+          $ value
             (opt int 46_000
                (info ["base-port"] ~doc:"Base port number to build upon.")))
-    $ Arg.(
-        pure (fun x -> `With_ledger x)
-        $ value
+      $ Arg.(
+          pure (fun x -> `With_ledger x)
+          $ value
             (opt (some string) None
                (info ["with-ledger"] ~docv:"ledger://..."
                   ~doc:
                     "Do the test with a Ledger Nano S as one of the \
                      bakers/voters.")))
-    $ Arg.(
-        pure (fun x -> `Serialize_proposals x)
-        $ value
+      $ Arg.(
+          pure (fun x -> `Serialize_proposals x)
+          $ value
             (flag
                (info ["serialize-proposals"]
                   ~doc:
                     "Run the proposals one-by-one instead of all together \
                      (preferred by the Ledger).")))
-    $ Test_command_line.cli_state ~name:"voting" () )
+      $ Test_command_line.cli_state ~name:"voting" () )
     (let doc = "Sandbox network with a full round of voting." in
      let man : Manpage.block list =
        let pf fmt = ksprintf (fun s -> `P s) fmt in

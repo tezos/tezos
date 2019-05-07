@@ -30,7 +30,7 @@ module State : sig
 end
 
 val output_path :
-     < paths: Paths.t ; .. >
+  < paths: Paths.t ; .. >
   -> Process.t
   -> [ `Meta | `Stderr | `Stdout]
   -> string
@@ -43,17 +43,17 @@ val ef_procesess :
 val ef : ?all:bool -> < runner: State.t ; .. > -> Easy_format.t
 
 val start :
-     < paths: Paths.t ; runner: State.t ; .. >
+  < paths: Paths.t ; runner: State.t ; .. >
   -> Process.t
   -> (State.process_state, [> `Lwt_exn of exn]) Asynchronous_result.t
 
 val wait :
-     < runner: State.t ; .. >
+  < runner: State.t ; .. >
   -> State.process_state
   -> (Lwt_unix.process_status, [> `Lwt_exn of exn]) Asynchronous_result.t
 
 val kill :
-     < runner: State.t ; .. >
+  < runner: State.t ; .. >
   -> State.process_state
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 
@@ -64,34 +64,34 @@ val kill_all :
   < runner: State.t ; .. > -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 
 val find_process_by_id :
-     ?only_running:bool
+  ?only_running:bool
   -> < runner: State.t ; .. >
   -> f:(string -> bool)
   -> (State.process_state list, [> ]) Asynchronous_result.t
 
 val run_cmdf :
-     < paths: Paths.t ; runner: State.t ; .. >
+  < paths: Paths.t ; runner: State.t ; .. >
   -> ( 'a
      , unit
      , string
      , (Process_result.t, [> `Lwt_exn of exn]) Asynchronous_result.t )
-     format4
+    format4
   -> 'a
 (** Run a shell command and wait for its end. *)
 
 val run_successful_cmdf :
-     < paths: Paths.t ; runner: State.t ; .. >
+  < paths: Paths.t ; runner: State.t ; .. >
   -> ( 'a
      , unit
      , string
      , ( Process_result.t
        , [> `Lwt_exn of exn | Process_result.Error.t] )
        Asynchronous_result.t )
-     format4
+    format4
   -> 'a
 
 val run_genspio :
-     < paths: Paths.t ; runner: State.t ; .. >
+  < paths: Paths.t ; runner: State.t ; .. >
   -> string
   -> 'a Genspio.Language.t
   -> (Lwt_unix.process_status, [> `Lwt_exn of exn]) Asynchronous_result.t

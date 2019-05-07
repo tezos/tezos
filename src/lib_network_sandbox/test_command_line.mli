@@ -5,16 +5,16 @@ open Internal_pervasives
 (** Make {!Cmdliner} commands from {!Asynchronous_result} functions. *)
 module Run_command : sig
   val make :
-       pp_error:(Format.formatter -> ([> ] as 'a) -> unit)
+    pp_error:(Format.formatter -> ([> ] as 'a) -> unit)
     -> ( < application_name: string ; console: Console.t ; .. >
-       * (unit -> (unit, 'a) Asynchronous_result.t) )
-       Cmdliner.Term.t
+         * (unit -> (unit, 'a) Asynchronous_result.t) )
+      Cmdliner.Term.t
     -> 'b
     -> unit Cmdliner.Term.t * 'b
 end
 
 val cli_state :
-     ?default_interactivity:Interactive_test.Interactivity.t
+  ?default_interactivity:Interactive_test.Interactivity.t
   -> ?disable_interactivity:bool
   -> name:string
   -> unit
@@ -25,5 +25,5 @@ val cli_state :
      ; pauser: Interactive_test.Pauser.t
      ; runner: Running_processes.State.t
      ; test_interactivity: Interactive_test.Interactivity.t >
-     Cmdliner.Term.t
+    Cmdliner.Term.t
 (** Create a full [state] value for test-scenarios. *)

@@ -12,21 +12,21 @@ type t = private
   ; args: args }
 
 val of_node :
-     Tezos_node.t
+  Tezos_node.t
   -> args
   -> exec:kind Tezos_executable.t
   -> client:Tezos_client.t
   -> t
 
 val baker_of_node :
-     Tezos_node.t
+  Tezos_node.t
   -> key:string
   -> exec:kind Tezos_executable.t
   -> client:Tezos_client.t
   -> t
 
 val endorser_of_node :
-     Tezos_node.t
+  Tezos_node.t
   -> key:string
   -> exec:kind Tezos_executable.t
   -> client:Tezos_client.t

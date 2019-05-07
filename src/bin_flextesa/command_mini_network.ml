@@ -19,7 +19,7 @@ let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
         ~bakers:
           (List.map protocol.Tezos_protocol.bootstrap_accounts
              ~f:(fun (account, _) ->
-               Tezos_protocol.Account.(name account, pubkey_hash account) ))
+                 Tezos_protocol.Account.(name account, pubkey_hash account) ))
         ~node_uris:
           (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
                sprintf "http://localhost:%d" rpc_port ))
@@ -42,13 +42,13 @@ let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
     in
     Tezos_protocol.bootstrap_accounts protocol
     |> List.mapi ~f:(fun idx acc ->
-           let node, client = pick_a_node_and_client idx in
-           let key = Tezos_protocol.Account.name acc in
-           ( acc
-           , client
-           , [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key
-             ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client node
-                 ~key ] ) )
+        let node, client = pick_a_node_and_client idx in
+        let key = Tezos_protocol.Account.name acc in
+        ( acc
+        , client
+        , [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key
+          ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client node
+              ~key ] ) )
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
       Tezos_client.bootstrapped ~state client
@@ -95,21 +95,21 @@ let cmd ~pp_error () =
             run state ~size ~base_port ~protocol bnod bcli bak endo accu ?kiln
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
-      )
-    $ Arg.(
-        value & opt int 5
-        & info ["size"; "S"] ~doc:"Set the size of the network.")
-    $ Arg.(
-        value & opt int 20_000
-        & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
-    $ Tezos_protocol.cli_term ()
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Baker "tezos"
-    $ Tezos_executable.cli_term `Endorser "tezos"
-    $ Tezos_executable.cli_term `Accuser "tezos"
-    $ Kiln.cli_term ()
-    $ Test_command_line.cli_state ~name:"mininet" () )
+        )
+      $ Arg.(
+          value & opt int 5
+          & info ["size"; "S"] ~doc:"Set the size of the network.")
+      $ Arg.(
+          value & opt int 20_000
+          & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
+      $ Tezos_protocol.cli_term ()
+      $ Tezos_executable.cli_term `Node "tezos"
+      $ Tezos_executable.cli_term `Client "tezos"
+      $ Tezos_executable.cli_term `Baker "tezos"
+      $ Tezos_executable.cli_term `Endorser "tezos"
+      $ Tezos_executable.cli_term `Accuser "tezos"
+      $ Kiln.cli_term ()
+      $ Test_command_line.cli_state ~name:"mininet" () )
     (let doc = "Small network sandbox with bakers, endorsers, and accusers." in
      let man : Manpage.block list =
        [ `P

@@ -1,6 +1,6 @@
 (** Local “Pervasives” module for flextesa.
 
-See also ["docs/tutorials/flextesa.rst"]. *)
+    See also ["docs/tutorials/flextesa.rst"]. *)
 
 module List = Base.List
 module String = Base.String
@@ -127,14 +127,14 @@ module Asynchronous_result = struct
 
   let transform_error o ~f =
     Lwt.bind o (function
-      | Ok o -> return o
-      | Error {Error.error_value; attachments} -> f error_value attachments )
+        | Ok o -> return o
+        | Error {Error.error_value; attachments} -> f error_value attachments )
 
   let bind_on_result :
-         ('ok, 'error) t
-      -> f:(('ok, 'error Error.t) result -> ('ok2, 'error2) t)
-      -> ('ok2, 'error2) t =
-   fun o ~f -> Lwt.bind o f
+    ('ok, 'error) t
+    -> f:(('ok, 'error Error.t) result -> ('ok2, 'error2) t)
+    -> ('ok2, 'error2) t =
+    fun o ~f -> Lwt.bind o f
 
   (** The module opened everywhere. *)
   module Std = struct let ( >>= ) = bind let return = return let fail = fail

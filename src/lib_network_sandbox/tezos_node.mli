@@ -11,7 +11,7 @@ val ef : t -> Easy_format.t
 val pp : Format.formatter -> t -> unit
 
 val make :
-     exec:[`Node] Tezos_executable.t
+  exec:[`Node] Tezos_executable.t
   -> ?protocol:Tezos_protocol.t
   -> string
   -> expected_connections:int
@@ -27,7 +27,7 @@ val log_output : config:< paths: Paths.t ; .. > -> t -> string
 val exec_path : config:< paths: Paths.t ; .. > -> t -> string
 
 val node_command :
-     t
+  t
   -> config:< paths: Paths.t ; .. >
   -> string list
   -> string list

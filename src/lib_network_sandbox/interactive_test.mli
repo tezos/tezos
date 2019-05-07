@@ -5,11 +5,11 @@ open Internal_pervasives
 (** Implementations of common {!Console.Prompt.item}. *)
 module Commands : sig
   val cmdline_fail :
-       ( 'a
-       , Format.formatter
-       , unit
-       , ('b, [> `Command_line of string]) Asynchronous_result.t )
-       format4
+    ( 'a
+    , Format.formatter
+    , unit
+    , ('b, [> `Command_line of string]) Asynchronous_result.t )
+      format4
     -> 'a
 
   val no_args :
@@ -18,31 +18,31 @@ module Commands : sig
   val flag : string -> Sexplib0.Sexp.t list -> bool
 
   val unit_loop_no_args :
-       Easy_format.t
+    Easy_format.t
     -> string list
     -> (   unit
-        -> ( unit
-           , [`Command_line of string | `Lwt_exn of exn] )
-           Asynchronous_result.t)
+           -> ( unit
+              , [`Command_line of string | `Lwt_exn of exn] )
+             Asynchronous_result.t)
     -> Console.Prompt.item
 
   val du_sh_root :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> Console.Prompt.item
 
   val processes :
-       < application_name: string
-       ; console: Console.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> Console.Prompt.item
 
   val curl :
-       ?jq:string
+    ?jq:string
     -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t
@@ -52,10 +52,10 @@ module Commands : sig
     -> path:string
     -> ( [> `Error | `Success of string list]
        , [> `Lwt_exn of exn] )
-       Asynchronous_result.t
+      Asynchronous_result.t
 
   val curl_unit_display :
-       ?jq:string
+    ?jq:string
     -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t
@@ -68,59 +68,59 @@ module Commands : sig
     -> Console.Prompt.item
 
   val curl_metadata :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> default_port:int
     -> Console.Prompt.item
 
   val curl_level :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> default_port:int
     -> Console.Prompt.item
 
   val curl_baking_rights :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> default_port:int
     -> Console.Prompt.item
 
   val all_levels :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> nodes:Tezos_node.t list
     -> Console.Prompt.item
 
   val show_process :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> Console.Prompt.item
 
   val kill_all :
     < runner: Running_processes.State.t ; .. > -> Console.Prompt.item
 
   val secret_keys :
-       < application_name: string ; console: Console.t ; .. >
+    < application_name: string ; console: Console.t ; .. >
     -> protocol:Tezos_protocol.t
     -> Console.Prompt.item
 
   val arbitrary_command_on_clients :
-       ?make_admin:(Tezos_client.t -> Tezos_admin_client.t)
+    ?make_admin:(Tezos_client.t -> Tezos_admin_client.t)
     -> ?command_names:string list
     -> < application_name: string
        ; console: Console.t
@@ -131,11 +131,11 @@ module Commands : sig
     -> Console.Prompt.item
 
   val all_defaults :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; runner: Running_processes.State.t
+    ; .. >
     -> nodes:Tezos_node.t list
     -> Console.Prompt.item list
 end
@@ -164,11 +164,11 @@ module Pauser : sig
   (** Add commands to the current pauser. *)
 
   val generic :
-       < application_name: string
-       ; console: Console.t
-       ; pauser: t
-       ; test_interactivity: Interactivity.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; pauser: t
+    ; test_interactivity: Interactivity.t
+    ; .. >
     -> ?force:bool
     -> Easy_format.t list
     -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
@@ -178,17 +178,17 @@ module Pauser : sig
       {!add_commands}). *)
 
   val run_test :
-       < application_name: string
-       ; console: Console.t
-       ; paths: Paths.t
-       ; pauser: t
-       ; runner: Running_processes.State.t
-       ; test_interactivity: Interactivity.t
-       ; .. >
+    < application_name: string
+    ; console: Console.t
+    ; paths: Paths.t
+    ; pauser: t
+    ; runner: Running_processes.State.t
+    ; test_interactivity: Interactivity.t
+    ; .. >
     -> (unit -> (unit, ([> `Lwt_exn of exn] as 'errors)) Asynchronous_result.t)
     -> pp_error:(Format.formatter -> 'errors -> unit)
     -> unit
     -> (unit, 'errors) Asynchronous_result.t
-  (** Run a test-scenario and deal with potential errors according
-      to [state#test_interactivity]. *)
+    (** Run a test-scenario and deal with potential errors according
+        to [state#test_interactivity]. *)
 end

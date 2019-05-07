@@ -28,7 +28,7 @@ type 'kind t = private
   ; environment: (string * string) list }
 
 val node :
-     ?binary:string
+  ?binary:string
   -> ?unix_files_sink:Unix_files_sink.t
   -> ?environment:(string * string) list
   -> unit

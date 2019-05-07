@@ -29,8 +29,8 @@ let to_script (t : t) ~state =
     Tezos_executable.call t.exec
       ~path:
         ( base_dir
-        // sprintf "exec-%s-%d" (arg_to_string t.args)
-             t.node.Tezos_node.rpc_port )
+          // sprintf "exec-%s-%d" (arg_to_string t.args)
+            t.node.Tezos_node.rpc_port )
       args
   in
   match t.args with

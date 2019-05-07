@@ -37,9 +37,9 @@ open Tezos_executable.Make_cli
 let node_command t ~config cmd options =
   Tezos_executable.call t.exec ~path:(exec_path t ~config)
     ( cmd
-    @ opt "config-file" (config_file ~config t)
-    @ opt "data-dir" (data_dir ~config t)
-    @ options )
+      @ opt "config-file" (config_file ~config t)
+      @ opt "data-dir" (data_dir ~config t)
+      @ options )
 
 let config_options t ~config =
   opt "log-output" (log_output ~config t)
@@ -51,9 +51,9 @@ let run_command t ~config =
   let peers = List.concat_map t.peers ~f:(optf "peer" "127.0.0.1:%d") in
   node_command t ~config ["run"]
     ( flag "private-mode" @ flag "no-bootstrap-peers" @ peers
-    @ optf "bootstrap-threshold" "0"
-    @ optf "connections" "%d" t.expected_connections
-    @ opt "sandbox" (Tezos_protocol.sandbox_path ~config t.protocol) )
+      @ optf "bootstrap-threshold" "0"
+      @ optf "connections" "%d" t.expected_connections
+      @ opt "sandbox" (Tezos_protocol.sandbox_path ~config t.protocol) )
 
 let start_script t ~config =
   let open Genspio.EDSL in

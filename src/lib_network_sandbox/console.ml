@@ -28,12 +28,12 @@ let make with_timestamp color =
         ; mark_close_tag= (fun _ -> "")
         ; print_open_tag=
             (fun tag ->
-              match color_of_tag tag with
-              | Some c -> fprintf formatter "%s" c
-              | None -> () )
+               match color_of_tag tag with
+               | Some c -> fprintf formatter "%s" c
+               | None -> () )
         ; print_close_tag=
             (fun tag ->
-              if color_of_tag tag <> None then fprintf formatter "%s" reset )
+               if color_of_tag tag <> None then fprintf formatter "%s" reset )
         } ;
       pp_set_tags formatter true) ) ;
   {color; buffer= b; channel; formatter; with_timestamp}
@@ -76,7 +76,7 @@ let do_output t =
     ()
 
 let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
-    (_, _) Asynchronous_result.t =
+  (_, _) Asynchronous_result.t =
   let date =
     if o#console.with_timestamp then
       sprintf "[%s]" Tezos_base.Time.(now () |> to_notation)
@@ -114,10 +114,10 @@ module Prompt = struct
     { commands: string list
     ; doc: EF.t
     ; action:
-           Base.Sexp.t list
+        Base.Sexp.t list
         -> ( [`Help | `Quit | `Loop]
            , [`Lwt_exn of exn | `Command_line of string] )
-           Asynchronous_result.t }
+          Asynchronous_result.t }
 
   let item doc commands action = {commands; doc; action}
 
@@ -144,52 +144,52 @@ module Prompt = struct
       let open Base.Sexp in
       match Parsexp.Single.parse_string (sprintf "( %s )" line) with
       | Ok (List (Atom c :: more)) -> (
-        match
-          List.find commands ~f:(fun m ->
-              List.mem m.commands c ~equal:String.equal )
-        with
-        | Some {action; _} -> (
-            Asynchronous_result.bind_on_error (action more) ~f:(fun err ->
-                say state
-                  EF.(
-                    desc (shout "Error in action:")
-                      (custom (fun fmt ->
-                           Error.pp fmt err ~error:(fun fmt -> function
-                             | `Lwt_exn _ as e -> Lwt_exception.pp fmt e
-                             | `Command_line s ->
-                                 Format.fprintf fmt "Wrong command line: %s" s
-                           ) )))
-                >>= fun () -> return `Loop )
-            >>= function
-            | `Loop -> loop ()
-            | `Help ->
-                say state
-                  EF.(
-                    let cmdlist =
-                      list ~sep:"|" ~delimiters:("[", "]")
-                        ~param:
-                          { default_list with
-                            space_after_separator= false
-                          ; space_before_closing= false
-                          ; space_after_opening= false }
-                    in
-                    label (haf "Commands:")
-                      (list
-                         (List.map commands ~f:(fun {commands; doc; _} ->
-                              label
-                                ~param:
-                                  {default_label with space_after_label= false}
-                                (cmdlist (List.map ~f:(af "%S") commands))
-                                (list [haf "->"; doc]) ))))
-                >>= fun () -> loop ()
-            | `Quit -> return () )
-        | None ->
-            say state
-              EF.(
-                desc
-                  (ksprintf shout "Error, unknown command: %S" c)
-                  (custom (fun fmt -> Base.Sexp.pp_hum_indent 4 fmt (List more))))
-            >>= fun () -> loop () )
+          match
+            List.find commands ~f:(fun m ->
+                List.mem m.commands c ~equal:String.equal )
+          with
+          | Some {action; _} -> (
+              Asynchronous_result.bind_on_error (action more) ~f:(fun err ->
+                  say state
+                    EF.(
+                      desc (shout "Error in action:")
+                        (custom (fun fmt ->
+                             Error.pp fmt err ~error:(fun fmt -> function
+                                 | `Lwt_exn _ as e -> Lwt_exception.pp fmt e
+                                 | `Command_line s ->
+                                     Format.fprintf fmt "Wrong command line: %s" s
+                               ) )))
+                  >>= fun () -> return `Loop )
+              >>= function
+              | `Loop -> loop ()
+              | `Help ->
+                  say state
+                    EF.(
+                      let cmdlist =
+                        list ~sep:"|" ~delimiters:("[", "]")
+                          ~param:
+                            { default_list with
+                              space_after_separator= false
+                            ; space_before_closing= false
+                            ; space_after_opening= false }
+                      in
+                      label (haf "Commands:")
+                        (list
+                           (List.map commands ~f:(fun {commands; doc; _} ->
+                                label
+                                  ~param:
+                                    {default_label with space_after_label= false}
+                                  (cmdlist (List.map ~f:(af "%S") commands))
+                                  (list [haf "->"; doc]) ))))
+                  >>= fun () -> loop ()
+              | `Quit -> return () )
+          | None ->
+              say state
+                EF.(
+                  desc
+                    (ksprintf shout "Error, unknown command: %S" c)
+                    (custom (fun fmt -> Base.Sexp.pp_hum_indent 4 fmt (List more))))
+              >>= fun () -> loop () )
       | Ok other ->
           say state
             EF.(
@@ -216,17 +216,17 @@ let display_errors_of_command state ?(should_output = false) cmd =
     if should_output then unix_success && outputs () else unix_success
   in
   ( if success then return ()
-  else
-    say state
-      EF.(
-        let output l =
-          match String.concat ~sep:"\n" l |> String.strip with
-          | "" -> af "NONE"
-          | more -> markdown_verbatim more
-        in
-        desc (shout "Error:")
-          (list
-             [ haf "Command %s" (Process_result.status_to_string cmd#status)
-             ; desc (haf "Stdout:") (output cmd#out)
-             ; desc (haf "Stderr:") (output cmd#err) ])) )
+    else
+      say state
+        EF.(
+          let output l =
+            match String.concat ~sep:"\n" l |> String.strip with
+            | "" -> af "NONE"
+            | more -> markdown_verbatim more
+          in
+          desc (shout "Error:")
+            (list
+               [ haf "Command %s" (Process_result.status_to_string cmd#status)
+               ; desc (haf "Stdout:") (output cmd#out)
+               ; desc (haf "Stderr:") (output cmd#err) ])) )
   >>= fun () -> return success

@@ -36,7 +36,7 @@ let start ?(network_id = "zeronet") state
       | false ->
           return
             (`Not_done
-              (sprintf "Waiting for postgres to be ready (%d)" attempt)) )
+               (sprintf "Waiting for postgres to be ready (%d)" attempt)) )
   >>= fun () ->
   (* We need to use /tmp and not the root-path because of Docker access rights. *)
   let tmp = "/tmp" // sprintf "kiln-config-%d" port in
@@ -45,14 +45,14 @@ let start ?(network_id = "zeronet") state
   >>= fun _ ->
   Lwt_exception.catch
     (fun () ->
-      Lwt_io.with_file ~perm:0o777 ~mode:Lwt_io.output (tmp // "config/loggers")
-        (fun out ->
-          Lwt_io.write out
-            {json|[
-{ "logger":{"Stderr":{}} , "filters": { "SQL":"Error" , "":"Info"}},
-{ "logger":{"File":{"file":"/var/run/bake-monitor/kiln.log"}}, "filters": { "": "Debug" } }
-]|json}
-      ) )
+       Lwt_io.with_file ~perm:0o777 ~mode:Lwt_io.output (tmp // "config/loggers")
+         (fun out ->
+            Lwt_io.write out
+              {json|[
+                    { "logger":{"Stderr":{}} , "filters": { "SQL":"Error" , "":"Info"}},
+                    { "logger":{"File":{"file":"/var/run/bake-monitor/kiln.log"}}, "filters": { "": "Debug" } }
+                    ]|json}
+         ) )
     ()
   >>= fun () ->
   Running_processes.run_cmdf state " chmod -R 777 %s" tmp
@@ -79,30 +79,30 @@ let start ?(network_id = "zeronet") state
         network_id)
   >>= fun () ->
   ( match bakers with
-  | [] -> return ()
-  | _ ->
-      Interactive_test.Pauser.generic state ~force:true
-        EF.
-          [ wf "Importing bakers in Kiln."
-          ; wf
-              "You should open <http://localhost:%d> and import the following \
-               bakers:"
-              kiln_port
-          ; list
-              (List.map bakers ~f:(fun (n, pkh) -> af "Baker: `%s` -> %s" n pkh))
-          ] )
+    | [] -> return ()
+    | _ ->
+        Interactive_test.Pauser.generic state ~force:true
+          EF.
+            [ wf "Importing bakers in Kiln."
+            ; wf
+                "You should open <http://localhost:%d> and import the following \
+                 bakers:"
+                kiln_port
+            ; list
+                (List.map bakers ~f:(fun (n, pkh) -> af "Baker: `%s` -> %s" n pkh))
+            ] )
   >>= fun () -> return (pg_process, kiln_process)
 
 let cli_term () =
   let open Cmdliner in
   Term.(
     pure (fun run port postgres_port -> function
-      | true -> Some (make ~run ~postgres_port ~port) | false -> None )
+        | true -> Some (make ~run ~postgres_port ~port) | false -> None )
     $ Arg.(
         let doc = "Set the Kiln docker image." in
         pure (fun docker_image -> `Docker docker_image)
         $ value
-            (opt string default_docker_image (info ["kiln-docker-image"] ~doc)))
+          (opt string default_docker_image (info ["kiln-docker-image"] ~doc)))
     $ Arg.(
         value
           (opt int default.port (info ["kiln-port"] ~doc:"Set the kiln port.")))

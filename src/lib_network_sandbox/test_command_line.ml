@@ -18,7 +18,7 @@ module Run_command = struct
 end
 
 let cli_state ?default_interactivity ?(disable_interactivity = false) ~name ()
-    =
+  =
   let runner = Running_processes.State.make () in
   let default_root = sprintf "/tmp/%s-test" name in
   let app = sprintf "Flextesa.%s" name in
