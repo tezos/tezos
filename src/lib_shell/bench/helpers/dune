@@ -4,10 +4,9 @@
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
-            tezos-protocol-003-PsddFKi3
+            tezos-protocol-alpha
             alcotest-lwt)
- (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services)))
 

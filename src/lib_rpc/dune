@@ -5,9 +5,7 @@
             tezos-error-monad
             ocplib-resto
             ocplib-resto-directory)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_data_encoding
+ (flags (:standard -open Tezos_data_encoding
                    -open Tezos_error_monad)))
 
 (alias

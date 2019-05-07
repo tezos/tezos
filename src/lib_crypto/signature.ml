@@ -528,6 +528,17 @@ let bytes_of_watermark = function
   | Generic_operation -> MBytes.of_string "\x03"
   | Custom bytes      -> bytes
 
+let pp_watermark ppf =
+  let open Format in
+  function
+  | Block_header chain_id -> fprintf ppf "Block-header: %a" Chain_id.pp chain_id
+  | Endorsement chain_id ->  fprintf ppf "Endorsement: %a" Chain_id.pp chain_id
+  | Generic_operation -> pp_print_string ppf "Generic-operation"
+  | Custom bytes      ->
+      let hexed = MBytes.to_hex bytes |> Hex.show in
+      fprintf ppf "Custom: 0x%s"
+        (try String.sub hexed 0 10 ^ "..." with _ ->  hexed)
+
 let sign ?watermark secret_key message =
   let watermark = Option.map ~f:bytes_of_watermark watermark in
   match secret_key with

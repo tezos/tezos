@@ -1,0 +1,15 @@
+(library
+ (name michelson_parser)
+ (libraries tezos-base
+            tezos-stdlib
+            tezos-error-monad
+            tezos-data-encoding
+            tezos_alpha_test_helpers
+            tezos-micheline)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_alpha_test_helpers)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml*))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

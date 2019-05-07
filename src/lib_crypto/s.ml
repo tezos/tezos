@@ -25,7 +25,7 @@
 
 open Error_monad
 
-(** {2 Hash Types} ************************************************************)
+(** {2 Hash Types} *)
 
 (** The signature of an abstract hash type, as produced by functor
     {!Make_Blake2B}. The {!t} type is abstracted for separating the

@@ -77,11 +77,13 @@ module type T = sig
      and type Types.state = types_state
   type worker = Worker.infinite Worker.queue Worker.t
   val list_pendings:
-    ?maintain_chain_db:Distributed_db.chain_db ->
+    Distributed_db.chain_db ->
     from_block:State.Block.t ->
     to_block:State.Block.t ->
+    live_blocks:Block_hash.Set.t ->
     Operation.t Operation_hash.Map.t ->
-    (Operation.t Operation_hash.Map.t * Block_hash.Set.t * Operation_hash.Set.t) Lwt.t
+    Operation.t Operation_hash.Map.t Lwt.t
+
   val validation_result: types_state -> error Preapply_result.t
 
   val fitness: unit -> Fitness.t Lwt.t
@@ -196,7 +198,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       (Prevalidator_worker_state.Request) (Types)
 
   (** Centralised operation stream for the RPCs *)
-  let notify_operation { operation_stream } result  { Operation.shell ; proto } =
+  let notify_operation { operation_stream ; _ } result  { Operation.shell ; proto } =
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.operation_data_encoding
@@ -210,7 +212,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
   let debug w =
     Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
-  let list_pendings ?maintain_chain_db  ~from_block ~to_block old_mempool =
+  let list_pendings chain_db ~from_block ~to_block ~live_blocks old_mempool =
     let rec pop_blocks ancestor block mempool =
       let hash = State.Block.hash block in
       if Block_hash.equal hash ancestor then
@@ -220,11 +222,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         Lwt_list.fold_left_s
           (Lwt_list.fold_left_s (fun mempool op ->
                let h = Operation.hash op in
-               Lwt_utils.may maintain_chain_db
-                 ~f:begin fun chain_db ->
-                   Distributed_db.inject_operation chain_db h op >>= fun _ ->
-                   Lwt.return_unit
-                 end >>= fun () ->
+               Distributed_db.inject_operation chain_db h op >>= fun (_ : bool) ->
                Lwt.return (Operation_hash.Map.add h op mempool)))
           mempool operations >>= fun mempool ->
         State.Block.predecessor block >>= function
@@ -233,11 +231,9 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     in
     let push_block mempool block =
       State.Block.all_operation_hashes block >|= fun operations ->
-      Option.iter maintain_chain_db
-        ~f:(fun chain_db ->
-            List.iter
-              (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
-              operations) ;
+      List.iter
+        (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
+        operations ;
       List.fold_left
         (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
         mempool operations
@@ -247,21 +243,15 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       (State.Block.hash ancestor)
       from_block old_mempool >>= fun mempool ->
     Lwt_list.fold_left_s push_block mempool path >>= fun new_mempool ->
-    Chain_traversal.live_blocks
-      to_block
-      (State.Block.max_operations_ttl to_block)
-    >>= fun (live_blocks, live_operations) ->
     let new_mempool, outdated =
       Operation_hash.Map.partition
         (fun _oph op ->
            Block_hash.Set.mem op.Operation.shell.branch live_blocks)
         new_mempool in
-    Option.iter maintain_chain_db
-      ~f:(fun chain_db ->
-          Operation_hash.Map.iter
-            (fun oph _op -> Distributed_db.Operation.clear_or_cancel chain_db oph)
-            outdated) ;
-    Lwt.return (new_mempool, live_blocks, live_operations)
+    Operation_hash.Map.iter
+      (fun oph _op -> Distributed_db.Operation.clear_or_cancel chain_db oph)
+      outdated ;
+    Lwt.return new_mempool
 
   let already_handled pv oph =
     Operation_hash.Map.mem oph pv.refusals
@@ -276,38 +266,6 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       branch_refused = state.branch_refusals ;
       refused = Operation_hash.Map.empty }
 
-  let mempool_of_prevalidation_result (r : error Preapply_result.t) : Mempool.t =
-    { Mempool.known_valid = List.map fst r.applied ;
-      pending =
-        Operation_hash.Map.fold
-          (fun k _ s -> Operation_hash.Set.add k s)
-          r.branch_delayed @@
-        Operation_hash.Map.fold
-          (fun k _ s -> Operation_hash.Set.add k s)
-          r.branch_refused @@
-        Operation_hash.Set.empty }
-
-  let merge_validation_results ~old ~neu =
-    let open Preapply_result in
-    let merge _key a b =
-      match a, b with
-      | None, None -> None
-      | Some x, None -> Some x
-      | _, Some y -> Some y in
-    let filter_out s m =
-      List.fold_right (fun (h, _op) -> Operation_hash.Map.remove h) s m in
-    { applied = List.rev_append neu.applied old.applied ;
-      refused = Operation_hash.Map.empty ;
-      branch_refused =
-        Operation_hash.Map.merge merge
-          (* filtering should not be required if the protocol is sound *)
-          (filter_out neu.applied old.branch_refused)
-          neu.branch_refused ;
-      branch_delayed =
-        Operation_hash.Map.merge merge
-          (filter_out neu.applied old.branch_delayed)
-          neu.branch_delayed }
-
   let advertise (w : worker) pv mempool =
     match pv.advertisement with
     | `Pending { Mempool.known_valid ; pending } ->
@@ -319,7 +277,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
         pv.advertisement <- `Pending mempool ;
         Lwt.async (fun () ->
             Lwt_unix.sleep 0.01 >>= fun () ->
-            Worker.push_request_now w Advertise ;
+            Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
 
   let is_endorsement ( op : Prevalidation.operation ) =
@@ -441,7 +399,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       ~timeout:pv.limits.operation_timeout
       pv.chain_db ?peer oph () >>= function
     | Ok op ->
-        Worker.push_request_now w (Arrived (oph, op)) ;
+        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
         Lwt.return_unit
     | Error [ Distributed_db.Operation.Canceled _ ] ->
         debug w
@@ -490,7 +448,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     dir := RPC_directory.gen_register !dir
         (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-        begin fun { applied ; refusals = refused ; branch_refusals = branch_refused ; branch_delays = branch_delayed ; operation_stream } params () ->
+        begin fun { applied ; refusals = refused ; branch_refusals = branch_refused ; branch_delays = branch_delayed ; operation_stream ; _ } params () ->
           let op_stream, stopper = Lwt_watcher.create_stream operation_stream in
           (* Convert ops *)
           let map_op op =
@@ -594,11 +552,17 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
     let on_flush w pv predecessor =
       Lwt_watcher.shutdown_input pv.operation_stream;
+      (State.Block.max_operations_ttl predecessor) >>=? fun max_op_ttl ->
+      Chain_traversal.live_blocks
+        predecessor
+        max_op_ttl >>=? fun (new_live_blocks,
+                             new_live_operations) ->
       list_pendings
-        ~maintain_chain_db:pv.chain_db
+        pv.chain_db
         ~from_block:pv.predecessor ~to_block:predecessor
-        (Preapply_result.operations (validation_result pv))
-      >>= fun (pending, new_live_blocks, new_live_operations) ->
+        ~live_blocks:new_live_blocks
+        (Preapply_result.operations (validation_result pv)) >>= fun pending ->
+
       let timestamp = Time.now () in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       debug w "%d operations were not washed by the flush"
@@ -665,7 +629,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       let chain_state = Distributed_db.chain_state chain_db in
       Chain.data chain_state >>= fun
         { current_head = predecessor ; current_mempool = mempool ;
-          live_blocks ; live_operations } ->
+          live_blocks ; live_operations ; _ } ->
       let timestamp = Time.now () in
       Prevalidation.create ~predecessor ~timestamp () >>= fun validation_state ->
       let fetching =
@@ -787,12 +751,12 @@ let shutdown (t:t) =
 let flush (t:t) head =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.push_request_and_wait w (Request.Flush head)
+  Prevalidator.Worker.Queue.push_request_and_wait w (Request.Flush head)
 
 let notify_operations (t:t) peer mempool =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.push_request w (Request.Notify (peer, mempool))
+  Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
 
 let operations (t:t) =
   let module Prevalidator: T = (val t) in
@@ -801,17 +765,12 @@ let operations (t:t) =
   ({ (Prevalidator.validation_result pv) with applied = List.rev pv.applied },
    pv.pending)
 
-let pending ?block (t:t) =
+let pending (t:t) =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
   let ops = Preapply_result.operations (Prevalidator.validation_result pv) in
-  match block with
-  | Some to_block ->
-      Prevalidator.list_pendings
-        ~from_block:pv.predecessor ~to_block ops >>= fun (pending, _, _) ->
-      Lwt.return pending
-  | None -> Lwt.return ops
+  Lwt.return ops
 
 let timestamp (t:t) =
   let module Prevalidator: T = (val t) in
@@ -826,7 +785,7 @@ let fitness (t:t) =
 let inject_operation (t:t) op =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.push_request_and_wait w (Inject op)
+  Prevalidator.Worker.Queue.push_request_and_wait w (Inject op)
 
 let status (t:t) =
   let module Prevalidator: T = (val t) in
@@ -841,7 +800,7 @@ let running_workers () =
 let pending_requests (t:t) =
   let module Prevalidator: T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.pending_requests w
+  Prevalidator.Worker.Queue.pending_requests w
 
 let current_request (t:t) =
   let module Prevalidator: T = (val t) in

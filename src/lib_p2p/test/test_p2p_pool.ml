@@ -67,10 +67,10 @@ let sync ch =
 
 let rec sync_nodes nodes =
   iter_p
-    (fun { Process.channel } -> Process.Channel.pop channel)
+    (fun { Process.channel ; _ } -> Process.Channel.pop channel)
     nodes >>=? fun () ->
   iter_p
-    (fun { Process.channel } -> Process.Channel.push channel ())
+    (fun { Process.channel ; _ } -> Process.Channel.push channel ())
     nodes >>=? fun () ->
   sync_nodes nodes
 

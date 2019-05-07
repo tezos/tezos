@@ -43,6 +43,7 @@ type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 (******************* Bootstrap pipeline errors ****************************)
 
 type error += Invalid_locator of P2p_peer.Id.t * Block_locator.t
+type error += Too_short_locator of P2p_peer.Id.t * Block_locator.t
 
 (******************* Protocol validator errors ****************************)
 

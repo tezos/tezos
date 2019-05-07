@@ -1,0 +1,50 @@
+(library
+ (name tezos_client_alpha_commands)
+ (public_name tezos-client-alpha-commands)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-protocol-alpha
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-base-unix
+            tezos-client-alpha
+            tezos-client-commands
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules (:standard \ alpha_commands_registration))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_base_unix
+                   -open Tezos_client_alpha
+                   -open Tezos_client_commands
+                   -open Tezos_rpc)))
+
+(library
+ (name tezos_client_alpha_commands_registration)
+ (public_name tezos-client-alpha-commands.registration)
+ (libraries tezos-base
+            tezos-protocol-alpha
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-alpha
+            tezos-client-commands
+            tezos-client-alpha-commands
+            tezos-rpc)
+ (library_flags (:standard -linkall))
+ (modules alpha_commands_registration)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_alpha
+                   -open Tezos_client_commands
+                   -open Tezos_client_alpha_commands
+                   -open Tezos_rpc)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

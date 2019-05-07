@@ -9,7 +9,7 @@ Activate fundraiser account - Mainnet
 If you took part in the fundraiser you can activate your account for
 the Mainnet on https://check.tezos.com/.
 This feature is also included in some wallets.
-If you have any question or issue refer to that page or to the `Tezos
+If you have any questions or issues, refer to that page or to the `Tezos
 foundation <https://tezos.foundation/>`_ for support.
 
 You may also use ``tezos-client`` to activate your account, **be
@@ -41,7 +41,7 @@ foundation.
 Like explained above, your keys are stored under ``~/.tezos-client``.
 We strongly advice you to first **make a backup** and then
 transfer your tokens to a new pair of keys imported from a ledger (see
-`ledger`).
+:ref:`ledger`).
 
 Check the balance with:
 
@@ -55,8 +55,8 @@ Check the balance with:
 Admin Client
 ------------
 
-The admin client gives access to more commands to interact with the
-peer-to-peer layer in order to:
+The admin client enables you to interact with the peer-to-peer layer in order
+to:
 
 - check the status of the connections
 - force connections to known peers
@@ -90,7 +90,7 @@ Ledger Manager
 
 The preferred way to set up your Ledger is to install `Ledger
 Live
-<https://www.ledger.com/pages/ledger-live>`_.
+<https://shop.ledger.com/pages/ledger-live>`_.
 On Linux make sure you correctly set up your `udev` rules as explained
 `here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
 Connect your ledger, unlock it and go the dashboard.
@@ -214,7 +214,7 @@ of the signer.
 
    vps~$ tezos-client import secret key alice tcp://home-ip:7732/tz1abc...
 
-Every time the client on *vps* needs to sing an operation for
+Every time the client on *vps* needs to sign an operation for
 *alice*, it sends a signature request to the remote signer on
 *home*.
 Note that this setup alone is not secure, **the signer accepts
@@ -271,7 +271,7 @@ helper scripts:
 Run a sandboxed node
 ~~~~~~~~~~~~~~~~~~~~
 
-For instance, if you want to run local network with two nodes, in a
+For instance, if you want to run a local network with two nodes, in the
 first terminal, the following command will initialize a node listening
 for peers on port ``19731`` and listening for RPC on port ``18731``.
 
@@ -285,8 +285,8 @@ stopped.
 The option ``--connections`` is just to remove the spurious “Too few
 connections” warnings by lowering the number of expected connection.
 
-To launch the second node, just run the following command, it will
-listen on port ``19739`` and ``18739``:
+To launch the second node, run the following command in another terminal, and
+it will listen on port ``19739`` and ``18739``:
 
 ::
 
@@ -306,12 +306,12 @@ Once your node is running, open a new terminal and initialize the
 
     eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
-It also define in the current shell session an alias ``tezos-client``
+It will also define in the current shell session an alias ``tezos-client``
 preconfigured for communicating with the same-numbered node.
 
 When you bootstrap a new network, the network is initialized with a
 dummy economic protocol, called `genesis`. If you want to run the same
-protocol than the alphanet, ``init-sandboxed-client`` also defines an
+protocol as the alphanet, ``init-sandboxed-client`` also defines an
 alias ``tezos-activate-alpha``, that you need to execute once for
 activating the whole network.
 For instance:
@@ -371,7 +371,7 @@ binary.
 Tune protocol alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``tezos-active-alpha`` alias use parameters from
+The ``tezos-active-alpha`` alias uses parameters from
 ``scripts/protocol_parameters.json`` to activate protocol alpha. It can
 be useful to tune these parameters when you need to debug something,
 for example, change the number of blocks per cycle, the time between

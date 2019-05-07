@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-30"]
+
 type t = {
   data_dir : string ;
   p2p : p2p ;
@@ -41,7 +43,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  enable_testchain : bool ;
+  disable_testchain : bool ;
 }
 
 and rpc = {
@@ -61,6 +63,7 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
+  history_mode : History_mode.t option ;
 }
 
 val default_data_dir: string
@@ -85,12 +88,13 @@ val update:
   ?rpc_listen_addr:string ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
-  ?enable_testchain:bool ->
+  ?disable_testchain:bool ->
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
   ?log_output:Lwt_log_sink_unix.Output.t ->
   ?bootstrap_threshold:int ->
+  ?history_mode:History_mode.t ->
   t -> t tzresult Lwt.t
 
 val to_string: t -> string

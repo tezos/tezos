@@ -2,13 +2,15 @@
  (name tezos_storage)
  (public_name tezos-storage)
  (libraries tezos-base
+            tezos-shell-services
             lmdb
             irmin-lmdb
-	    tezos-stdlib-unix)
+            tezos-stdlib-unix)
  (flags (:standard -w -9+27-30-32-40@8
                    -safe-string
+		   -open Tezos_shell_services
                    -open Tezos_base__TzPervasives
-		   -open Tezos_stdlib_unix)))
+                   -open Tezos_stdlib_unix)))
 
 (alias
  (name runtest_indent)

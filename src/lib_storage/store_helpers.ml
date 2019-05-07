@@ -55,10 +55,6 @@ module Make_single_store (S : STORE) (N : NAME) (V : VALUE) = struct
     read t >|= function
     | Error _ -> None
     | Ok v -> Some v
-  let read_exn t =
-    read t >>= function
-    | Error _ -> Lwt.fail Not_found
-    | Ok v -> Lwt.return v
   let store t v = S.store t N.name (V.to_bytes v)
   let remove t = S.remove t N.name
 end
@@ -79,7 +75,6 @@ module Make_substore (S : STORE) (N : NAME)
   let known_dir t k = S.known_dir t (to_key k)
   let read t k = S.read t (to_key k)
   let read_opt t k = S.read_opt t (to_key k)
-  let read_exn t k = S.read_exn t (to_key k)
   let store t k v = S.store t (to_key k) v
   let remove t k = S.remove t (to_key k)
   let fold t k ~init ~f =
@@ -108,7 +103,6 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let known_dir (t,i) k = S.known_dir t (to_key i k)
     let read (t,i) k = S.read t (to_key i k)
     let read_opt (t,i) k = S.read_opt t (to_key i k)
-    let read_exn (t,i) k = S.read_exn t (to_key i k)
     let store (t,i) k v = S.store t (to_key i k) v
     let remove (t,i) k = S.remove t (to_key i k)
     let fold (t,i) k ~init ~f =
@@ -218,10 +212,6 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
       read s i >>= function
       | Error _ -> Lwt.return_none
       | Ok v -> Lwt.return_some v
-    let read_exn s i =
-      read s i >>= function
-      | Error _ -> Lwt.fail Not_found
-      | Ok v -> Lwt.return v
     let store s i v = Store.store (s,i) N.name (V.to_bytes v)
     let remove s i = Store.remove (s,i) N.name
     let remove_all s = fold_indexes s ~init:() ~f:(fun i () -> remove s i)
@@ -322,10 +312,6 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
     read s i >>= function
     | Error _ -> Lwt.return_none
     | Ok v -> Lwt.return_some v
-  let read_exn s i =
-    read s i >>= function
-    | Error _ -> Lwt.fail Not_found
-    | Ok v -> Lwt.return v
   let store s i v = S.store s (I.to_path i []) (V.to_bytes v)
   let remove s i = S.remove s (I.to_path i [])
   let remove_all s = S.remove_dir s []

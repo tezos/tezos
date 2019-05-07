@@ -7,8 +7,8 @@ synopsis: "Ledger wallet library for OCaml: Tezos app"
 homepage: "https://github.com/vbmithr/ocaml-ledger-wallet"
 bug-reports: "https://github.com/vbmithr/ocaml-ledger-wallet/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-ledger-wallet"
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
+run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
 depends: [
   "dune" {build & >= "1.7"}
   "ledgerwallet" {= "dev"}

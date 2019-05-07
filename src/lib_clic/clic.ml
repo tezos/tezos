@@ -804,6 +804,21 @@ let args16 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11 s
       converter = fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, (spec11, (spec12, (spec13, (spec14, (spec15, (spec16, ())))))))))))))))) ->
         arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10, spec11, spec12, spec13, spec14, spec15, spec16 }
 
+let args17 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10
+    spec11 spec12 spec13 spec14 spec15 spec16 spec17 =
+  Argument
+    { spec = spec1 >>
+        (spec2 >> (spec3 >> (spec4 >> (spec5 >> (
+             spec6 >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> (spec11 >> (
+                 spec12 >> (spec13 >> (spec14 >> (spec15 >> (
+                     spec16 >> (spec17 >> NoArgs)))))))))))))))) ;
+      converter =
+        fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (
+            spec8, (spec9, (spec10, (spec11, (spec12, (spec13, (
+                spec14, (spec15, (spec16, (spec17, ()))))))))))))))))) ->
+          arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10,
+          spec11, spec12, spec13, spec14, spec15, spec16, spec17 }
+
 (* Some combinators for writing commands concisely. *)
 let param ~name ~desc kind next = Param (name, desc, kind, next)
 let seq_of_param param =
@@ -886,6 +901,8 @@ let exec
   let ctx = conv ctx in
   parse_args ~command options_spec args_dict ctx >>=? fun parsed_options ->
   exec 1 ctx spec (handler (converter parsed_options)) params
+
+[@@@ocaml.warning "-30"]
 
 (* Command dispatch tree *)
 type 'arg level =

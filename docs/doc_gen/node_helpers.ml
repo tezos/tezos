@@ -25,13 +25,13 @@
 
 let genesis : State.Chain.genesis = {
   time =
-    Time.of_notation_exn "2018-04-17T11:46:23Z" ;
+    Time.of_notation_exn "2019-05-07T14:15:38Z" ;
   block =
     Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesisa52f8bUWPcg" ;
+      "BLockGenesisGenesisGenesisGenesisGenesis24618dBBSK8" ;
   protocol =
     Protocol_hash.of_b58check_exn
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
+      "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV" ;
 }
 
 let with_node f =
@@ -51,7 +51,9 @@ let with_node f =
       Node.default_peer_validator_limits
       Node.default_block_validator_limits
       Node.default_prevalidator_limits
-      Node.default_chain_validator_limits >>=? fun node ->
+      Node.default_chain_validator_limits
+      None
+    >>=? fun node ->
     f node >>=? fun () ->
     return () in
   Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run >>= function

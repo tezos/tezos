@@ -45,7 +45,8 @@ val activate:
   t ->
   ?max_child_ttl:int ->
   start_prevalidator:bool ->
-  State.Chain.t -> Chain_validator.t tzresult Lwt.t
+  State.Chain.t ->
+  Chain_validator.t tzresult Lwt.t
 
 val get: t -> Chain_id.t -> Chain_validator.t tzresult
 val get_exn: t -> Chain_id.t -> Chain_validator.t

@@ -46,6 +46,11 @@ let get_chain state chain =
   get_chain_id state chain >>= fun chain_id ->
   State.Chain.get_exn state chain_id
 
+let get_checkpoint state (chain : Chain_services.chain) =
+  get_chain state chain >>= fun chain ->
+  State.Chain.checkpoint chain >>= fun header ->
+  Lwt.return (Block_header.hash header)
+
 let predecessors ignored length head =
   let rec loop acc length block =
     if length <= 0 then
@@ -101,6 +106,12 @@ let list_blocks chain_state ?(length = 1) ?min_date heads =
     requested_heads >>= fun (_, blocks) ->
   return (List.rev blocks)
 
+let snapshot_filename bh history_mode =
+  Format.asprintf "./Tezos_snapshot_%a_%a.%a"
+    Time.pp_hum (Time.now())
+    Block_hash.pp_short bh
+    History_mode.pp history_mode
+
 let rpc_directory =
 
   let dir : State.Chain.t RPC_directory.t ref =
@@ -114,6 +125,10 @@ let rpc_directory =
     dir :=
       RPC_directory.register !dir (RPC_service.subst1 s)
         (fun (chain, a) p q -> f chain a p q) in
+  let register2 s f =
+    dir :=
+      RPC_directory.register !dir (RPC_service.subst2 s)
+        (fun ((chain, a), b) p q -> f chain a b p q) in
 
   let register_dynamic_directory2 ?descr s f =
     dir :=
@@ -123,6 +138,46 @@ let rpc_directory =
 
   register0 S.chain_id begin fun chain () () ->
     return (State.Chain.id chain)
+  end ;
+
+  register0 S.checkpoint begin fun chain () () ->
+    State.Chain.checkpoint chain >>= fun checkpoint ->
+    State.Chain.save_point chain >>= fun (save_point, _) ->
+    State.Chain.caboose chain >>= fun (caboose, _) ->
+    State.history_mode (State.Chain.global_state chain) >>= fun history_mode ->
+    return (checkpoint, save_point, caboose, history_mode)
+  end ;
+
+  register2 S.snapshot_export_block begin fun chain_state export_mode block_hash () () ->
+    (function
+      | "rolling" -> Lwt.return true
+      | "full" -> Lwt.return false
+      | _ -> Lwt.fail Not_found) export_mode >>= fun export_rolling ->
+    let history_mode =
+      (function | true -> History_mode.Rolling | false -> History_mode.Full) export_rolling in
+    let genesis = (State.Chain.genesis chain_state).block in
+    begin
+      match Block_hash.of_b58check_opt block_hash with
+      | Some bh -> return bh
+      | None -> failwith "Invalid block hash %s" block_hash
+    end >>=? fun bh ->
+    let filename = snapshot_filename bh history_mode in
+    Snapshots.snapshot_export_rpc ~export_rolling ~chain_state ~genesis filename (Some block_hash)
+  end ;
+
+  register1 S.snapshot_export_last_checkpoint begin fun chain_state export_mode () () ->
+    (function
+      | "rolling" -> Lwt.return true
+      | "full" -> Lwt.return false
+      | _ -> Lwt.fail Not_found) export_mode >>= fun export_rolling ->
+    let history_mode =
+      (function | true -> History_mode.Rolling | false -> History_mode.Full) export_rolling in
+    let genesis = (State.Chain.genesis chain_state).block in
+    State.Chain.checkpoint chain_state >>= fun last_checkpoint ->
+    let bh = Block_header.hash last_checkpoint in
+    let filename = snapshot_filename bh history_mode in
+    let block_hash_str = Some (Block_hash.to_b58check bh) in
+    Snapshots.snapshot_export_rpc ~export_rolling ~chain_state ~genesis filename block_hash_str
   end ;
 
   (* blocks *)

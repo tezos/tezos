@@ -25,7 +25,7 @@
 
 (** Tezos Protocol Implementation - Error Monad *)
 
-(** {2 Error classification} *************************************************)
+(** {2 Error classification} *)
 
 (** Categories of error *)
 type error_category =
@@ -70,7 +70,7 @@ val register_error_kind :
 (** Classify an error using the registered kinds *)
 val classify_errors : error list -> error_category
 
-(** {2 Monad definition} *****************************************************)
+(** {2 Monad definition} *)
 
 (** The error monad wrapper type, the error case holds a stack of
     error, initialized by the first call to {!fail} and completed by
@@ -146,7 +146,7 @@ val fail_unless : bool -> error -> unit tzresult Lwt.t
 (** Erroneous return on successful assertion *)
 val fail_when : bool -> error -> unit tzresult Lwt.t
 
-(** {2 In-monad list iterators} **********************************************)
+(** {2 In-monad list iterators} *)
 
 (** A {!List.iter} in the monad *)
 val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t

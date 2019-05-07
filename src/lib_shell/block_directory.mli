@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val get_block: State.Chain.t -> Block_services.block -> State.Block.t Lwt.t
+val get_block: State.Chain.t -> Block_services.block -> State.Block.t option Lwt.t
 
 val build_raw_rpc_directory:
   (module Block_services.PROTO) ->

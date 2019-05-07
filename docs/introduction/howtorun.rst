@@ -21,7 +21,7 @@ Implicit accounts cannot have a delegate, so the first step is to
 originate an account, transfer your tez there and set a delegate.
 Notice that an originated account is a special case of a contract
 without code, so it is still necessary to pay for its small storage
-(see `originated_account`).
+(see :ref:`Originated Account <originated-accounts>`).
 
 ::
 
@@ -30,11 +30,10 @@ without code, so it is still necessary to pay for its small storage
                                   --delegate bob
 
 As done before, we originate a contract *alice_del* with manager
-*alice* and we fund it with 1kꜩ.
-The interesting part is setting the delegate to *bob*, when
-originating a contract the delegate is not set by default.
-If you already own contracts that are delegatable you can change
-the delegate with the command ``set delegate``.
+*alice* and we fund it with 1kꜩ. The interesting part here is setting the
+delegate to *bob*, as the delegate is not set by default when originating a
+contract. If you already own contracts that are delegatable you can change the
+delegate with the command ``set delegate``.
 
 
 Notice that, by default, an originated account is not *delegatable*,
@@ -86,7 +85,7 @@ them, they only add up to its rolls count while all the deposits must
 come from the delegate's account.
 
 If a delegate runs out of funds to deposit it won't be able to bake or
-endorse, other than being a missed opportunity for them this has also
+endorse. Other than being a missed opportunity for them, this has also
 negative consequences on the network.
 Missing baking slots slows the network, as it is necessary to wait one
 minute for the baker at priority 2 to bake, while missing endorsements
@@ -112,7 +111,7 @@ The number of active rolls can be computed with two RPCs, first we
 list all the active delegates with ``delegates?active``, then we sum
 all their ``stacking_balance`` and we simply divide by the size of a
 roll, 10kꜩ.
-At the time of writing, on Mainnet the number of active rolls is ~30k
+At the time of writing, on Betanet the number of active rolls is ~30k
 so for each block we know that the chance that we get selected for
 baking is ``1/30k`` while for endorsing is 32 times that.
 Given that every draw is with replacement, the distribution that
@@ -173,9 +172,9 @@ As a rule of thumb if we want to have a very high confidence that we
 won't miss any opportunity we should have around ~3kꜩ for deposits,
 on the other hand the expected returns will probably be around ~10ꜩ per cycle.
 
-After ``preserved_cycles``, not only the delegate takes back control of
-its frozen deposits but it also receives the rewards for its hard work
-which amount to 16ꜩ to bake a block and ``ꜩ2 / <block_priority>`` for
+After ``preserved_cycles``, not only does the delegate take back control of
+its frozen deposits, but it also receives the rewards for its hard work
+which amount to 16ꜩ to bake a block and ``2ꜩ / <block_priority>`` for
 endorsing a block.
 Additionally a baker also receives the fees of the operations it
 included in its blocks.
@@ -219,7 +218,7 @@ their rights to the active ones so that the network is always working
 smoothly.
 Normally even a baker with one single roll should perform enough
 operations during 5 cycles to remain active.
-If for some reason you delegate is marked inactive you can reactivate
+If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
 Baker
@@ -273,8 +272,8 @@ cause the offender to loose its security deposit.
 Remember that having two bakers or endorsers running connected to the
 same account could lead to double baking/endorsing and the loss of all
 your bonds.
-If you are worried about availability of your node when is its turn to
-bake/endorse there are other ways than duplicating your credentials.
+If you are worried about availability of your node when it is its turn to
+bake/endorse, there are other ways than duplicating your credentials.
 **Never** use the same account on two daemons.
 
 

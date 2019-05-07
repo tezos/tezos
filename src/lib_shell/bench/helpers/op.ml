@@ -43,9 +43,10 @@ let sign ?(watermark = Signature.Generic_operation)
 
 let endorsement ?delegate ?level ctxt =
   fun ?(signing_context=ctxt) slots ->
+    let slot = List.hd slots in
     begin
       match delegate with
-      | None -> Context.get_endorser ctxt (List.hd slots)
+      | None -> Context.get_endorser ctxt slot
       | Some delegate -> return delegate
     end >>=? fun delegate_pkh ->
     Account.find delegate_pkh >>=? fun delegate ->
@@ -56,7 +57,7 @@ let endorsement ?delegate ?level ctxt =
     end >>=? fun level ->
     let op =
       Single
-        (Endorsement { level }) in
+        (Endorsement { slot ; level }) in
     return (sign ~watermark:(Signature.Endorsement Chain_id.zero)
               delegate.sk signing_context op)
 

@@ -1,0 +1,24 @@
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: [ "Tezos devteam" ]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "ocamlfind" { build }
+  "dune" { build & >= "1.7" }
+  "tezos-base"
+  "tezos-protocol-compiler"
+  "tezos-protocol-updater"
+]
+build: [
+  [ "%{tezos-protocol-compiler:lib}%/replace"
+      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+      "dune" "alpha" ]
+  [ "dune" "build" "-p" name "-j" jobs ]
+]
+run-test: [
+  [ "dune" "runtest" "-p" name "-j" jobs ]
+]
+synopsis: "Tezos/Protocol: alpha (economic-protocol definition, embedded in `tezos-node`)"

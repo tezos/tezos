@@ -84,7 +84,7 @@ module Types = struct
   }
 
   let view (state : state) _ : view =
-    let { bootstrapped ; last_validated_head ; last_advertised_head } = state in
+    let { bootstrapped ; last_validated_head ; last_advertised_head ; _ } = state in
     { bootstrapped ;
       last_validated_head = Block_header.hash last_validated_head ;
       last_advertised_head = Block_header.hash last_advertised_head }
@@ -106,7 +106,7 @@ let set_bootstrapped pv =
     pv.parameters.notify_bootstrapped () ;
   end
 
-let bootstrap_new_branch w _ancestor _head unknown_prefix =
+let bootstrap_new_branch w _head unknown_prefix =
   let pv = Worker.state w in
   let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
   (* sender and receiver are inverted here because they are from
@@ -191,7 +191,7 @@ let only_if_fitness_increases w distant_header cont =
 let assert_acceptable_head w hash (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  State.Chain.acceptable_block chain_state header >>= fun acceptable ->
   fail_unless acceptable
     (Validation_errors.Checkpoint_error (hash, Some pv.peer_id))
 
@@ -254,8 +254,8 @@ let may_validate_new_branch w distant_hash locator =
         Block_hash.pp_short distant_hash
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
-  | Some (ancestor, unknown_prefix) ->
-      bootstrap_new_branch w ancestor distant_header unknown_prefix
+  | Some unknown_prefix ->
+      bootstrap_new_branch w distant_header unknown_prefix
 
 let on_no_request w =
   let pv = Worker.state w in
@@ -302,7 +302,7 @@ let on_error w r st errs =
   | [Block_validator_errors.System_error _ ] as errs ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       return_unit
-  | [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
+  | [Block_validator_errors.Unavailable_protocol { protocol ; _ } ] -> begin
       Block_validator.fetch_and_compile_protocol
         pv.parameters.block_validator
         ~peer:pv.peer_id
@@ -322,6 +322,13 @@ let on_error w r st errs =
           Worker.record_event w (Event.Request (r, st, Some errs)) ;
           Lwt.return (Error errs)
     end
+  | [ Validation_errors.Too_short_locator _ ] ->
+      debug w
+        "Terminating the validation worker for peer %a (kick)."
+        P2p_peer.Id.pp_short pv.peer_id ;
+      Worker.trigger_shutdown w ;
+      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      return_unit
   | _ ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       Lwt.return (Error errs)
@@ -334,8 +341,8 @@ let on_close w =
 
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
-  State.Block.read_exn chain_state
-    (State.Chain.genesis chain_state).block >>= fun genesis ->
+  State.Block.read_opt chain_state
+    (State.Chain.genesis chain_state).block >|= Option.unopt_assert ~loc:__POS__ >>= fun genesis ->
   let rec pv = {
     peer_id = snd name ;
     parameters = { parameters with notify_new_block } ;
@@ -389,7 +396,7 @@ let create
     let on_close = on_close
     let on_error = on_error
     let on_completion = on_completion
-    let on_no_request _ = return_unit
+    let on_no_request = on_no_request
   end in
   Worker.launch table ~timeout: limits.new_head_request_timeout limits.worker_limits
     name parameters
@@ -403,11 +410,11 @@ let notify_branch w locator =
   (* sender and receiver are inverted here because they are from
      the point of view of the node sending the locator *)
   let seed = {Block_locator.sender_id=pv.peer_id; receiver_id=sender_id } in
-  Worker.drop_request w (New_branch (hash, locator, seed))
+  Worker.Dropbox.put_request w (New_branch (hash, locator, seed))
 
 let notify_head w header =
   let hash = Block_header.hash header in
-  Worker.drop_request w (New_head (hash, header))
+  Worker.Dropbox.put_request w (New_head (hash, header))
 
 let shutdown w =
   Worker.shutdown w

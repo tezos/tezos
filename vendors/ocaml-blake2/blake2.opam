@@ -7,8 +7,8 @@ synopsis: "Cryptography for Tezos"
 homepage: "https://github.com/vbmithr/ocaml-blake2"
 bug-reports: "https://github.com/vbmithr/ocaml-blake2/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-blake2"
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
+run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
 depends: [
   "dune" {build & >= "1.7"}
   "bigstring" {>= "0.1.1"}

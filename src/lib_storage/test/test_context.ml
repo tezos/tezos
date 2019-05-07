@@ -121,7 +121,7 @@ let c = function
   | None -> None
   | Some s -> Some (MBytes.to_string s)
 
-let test_simple { idx ; block2 } =
+let test_simple { idx ; block2 ; _ } =
   checkout idx block2 >>= function
   | None ->
       Assert.fail_msg "checkout block2"
@@ -134,7 +134,7 @@ let test_simple { idx ; block2 } =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return_unit
 
-let test_continuation { idx ; block3a } =
+let test_continuation { idx ; block3a ; _ } =
   checkout idx block3a >>= function
   | None  ->
       Assert.fail_msg "checkout block3a"
@@ -149,7 +149,7 @@ let test_continuation { idx ; block3a } =
       Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
       Lwt.return_unit
 
-let test_fork { idx ; block3b } =
+let test_fork { idx ; block3b ; _ } =
   checkout idx block3b >>= function
   | None  ->
       Assert.fail_msg "checkout block3b"
@@ -164,7 +164,7 @@ let test_fork { idx ; block3b } =
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return_unit
 
-let test_replay { idx ; genesis }  =
+let test_replay { idx ; genesis ; _ }  =
   checkout idx genesis >>= function
   | None  ->
       Assert.fail_msg "checkout genesis_block"
@@ -197,7 +197,7 @@ let fold_keys s k ~init ~f =
   loop k init
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
-let test_fold { idx ; genesis } =
+let test_fold { idx ; genesis ; _ } =
   checkout idx genesis >>= function
   | None ->
       Assert.fail_msg "checkout genesis_block"
@@ -226,12 +226,60 @@ let test_fold { idx ; genesis } =
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return_unit
 
+let test_dump { idx ; block3b; _ } =
+  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir2 ->
+    let dumpfile = base_dir2 // "dump" in
+    let ctxt_hash = block3b in
+    let history_mode = Tezos_shell_services.History_mode.Full in
+    let empty_block_header context =
+      Block_header.{
+        protocol_data = MBytes.empty;
+        shell = {
+          level = 0l;
+          proto_level = 0;
+          predecessor = Block_hash.zero;
+          timestamp = Time.epoch;
+          validation_passes = 0;
+          operations_hash = Operation_list_list_hash.zero;
+          fitness = [];
+          context;
+        } } in
+    let _empty_pruned_block = ({
+        block_header = empty_block_header Context_hash.zero ;
+        operations = [] ;
+        operation_hashes = [] ;
+      } : Context.Pruned_block.t) in
+    let bhs =
+      (fun context ->
+         empty_block_header context,
+         Context.Block_data.empty,
+         history_mode,
+         (fun _ -> return (None, None))
+      ) ctxt_hash
+    in
+    Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
+    let root = base_dir2 // "context" in
+    Context.init ?patch_context:None root >>= fun idx2 ->
+    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun imported ->
+    let expected_ctxt_hash = (fun (bh,_,_, _,_) -> bh.Block_header.shell.context) imported in
+    assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
+    return ()
+  end
+  >>= function
+  | Error err ->
+      Error_monad.pp_print_error Format.err_formatter err ;
+      assert false
+  | Ok () -> Lwt.return_unit
+
+(******************************************************************************)
+
 let tests : (string * (t -> unit Lwt.t)) list = [
   "simple", test_simple ;
   "continuation", test_continuation ;
   "fork", test_fork ;
   "replay", test_replay ;
   "fold", test_fold ;
+  "dump", test_dump ;
 ]
 
 

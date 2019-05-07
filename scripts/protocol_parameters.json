@@ -45,5 +45,7 @@
   "blocks_per_voting_period" : 64,
   "blocks_per_commitment" : 4,
   "preserved_cycles" : 2,
+  "minimum_endorsements_per_priority" : [ 17, 1 ],
+  "delay_per_missing_endorsement" : "1",
   "proof_of_work_threshold": "-1"
 }

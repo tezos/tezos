@@ -69,8 +69,6 @@ Available commands:
 - tezos-client [args]
 - tezos-baker [keys]
 - tezos-baker-test [keys]
-- tezos-accuser [keys]
-- tezos-accuser-test [keys]
 - tezos-endorser [keys]
 - tezos-endorser-test [keys]
 - tezos-signer [args]

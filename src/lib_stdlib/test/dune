@@ -4,9 +4,7 @@
  (libraries tezos-stdlib
             alcotest
             lwt.unix)
- (flags (:standard -w -9-32
-                   -safe-string
-                   -open Tezos_stdlib)))
+ (flags (:standard -open Tezos_stdlib)))
 
 (alias
  (name buildtest)

@@ -1,0 +1,29 @@
+(executables
+ (names test_michelson_v1_macros)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-protocol-alpha
+            tezos-client-alpha
+            alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_client_alpha
+                   -open Tezos_protocol_alpha)))
+
+
+(alias
+(name buildtest)
+(deps test_michelson_v1_macros.exe))
+
+(alias
+(name runtest_michelson_v1_macros)
+(action (run %{exe:test_michelson_v1_macros.exe})))
+
+(alias
+(name runtest)
+(deps (alias runtest_michelson_v1_macros)))
+
+(alias
+(name runtest_indent)
+(deps (glob_files *.ml{,i}))
+(action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

@@ -1,9 +1,7 @@
 (library
  (name tezos_clic)
  (public_name tezos-clic)
- (flags (:standard -w -30
-                   -safe-string
-                   -open Tezos_stdlib
+ (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad))
  (libraries tezos-stdlib
             lwt.unix

@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-30"]
+
 open Lwt.Infix
 open Tezos_base
 
@@ -55,7 +57,6 @@ module Initialization_event = struct
       Format.fprintf ppf "%s initialization: %s"
         name (List.find (fun (_, s) -> s = status) status_names |> fst)
     let doc = "Status of the initialization of the P2P layer."
-    let legacy_section _ = Lwt_log_core.Section.make "node.worker"
     let level _ = Internal_event.Notice
   end
   module Event = Internal_event.Make(Definition)
@@ -87,7 +88,7 @@ let peer_metadata_cfg : _ P2p.peer_meta_config = {
 
 let connection_metadata_cfg cfg : _ P2p.conn_meta_config = {
   conn_meta_encoding = Connection_metadata.encoding ;
-  private_node = (fun { private_node } -> private_node) ;
+  private_node = (fun { private_node ; _ } -> private_node) ;
   conn_meta_value = fun _ -> cfg;
 }
 
@@ -133,7 +134,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_chain_max_tll: int option ;
-  checkpoint: (Int32.t * Block_hash.t) option ;
+  checkpoint: Block_header.t option ;
 }
 
 and peer_validator_limits = Peer_validator.limits = {
@@ -165,8 +166,6 @@ let default_block_validator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Debug ;
-    zombie_lifetime = 3600. ;
-    zombie_memory = 1800. ;
   }
 }
 let default_prevalidator_limits = {
@@ -175,8 +174,6 @@ let default_prevalidator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-    zombie_lifetime = 600. ;
-    zombie_memory = 120. ;
   }
 }
 let default_peer_validator_limits = {
@@ -187,8 +184,6 @@ let default_peer_validator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-    zombie_lifetime = 600. ;
-    zombie_memory = 120. ;
   }
 }
 let default_chain_validator_limits = {
@@ -196,12 +191,10 @@ let default_chain_validator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-    zombie_lifetime = 600. ;
-    zombie_memory = 120. ;
   }
 }
 
-let may_update_checkpoint chain_state checkpoint =
+let may_update_checkpoint chain_state checkpoint history_mode =
   match checkpoint with
   | None ->
       Lwt.return_unit
@@ -209,7 +202,14 @@ let may_update_checkpoint chain_state checkpoint =
       State.best_known_head_for_checkpoint
         chain_state checkpoint >>= fun new_head ->
       Chain.set_head chain_state new_head >>= fun _old_head ->
-      State.Chain.set_checkpoint chain_state checkpoint
+      begin match history_mode with
+        | History_mode.Archive ->
+            State.Chain.set_checkpoint chain_state checkpoint
+        | Full ->
+            State.Chain.set_checkpoint_then_purge_full chain_state checkpoint
+        | Rolling ->
+            State.Chain.set_checkpoint_then_purge_rolling chain_state checkpoint
+      end
 
 module Local_logging =
   Internal_event.Legacy_logging.Make_semantic
@@ -265,16 +265,18 @@ let create
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
-    chain_validator_limits =
+    chain_validator_limits
+    history_mode
+  =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some (config, _limits) -> not config.P2p.disable_mempool, not config.P2p.disable_testchain
     | None -> true, true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ?patch_context
-    genesis >>=? fun (state, mainchain_state, context_index) ->
-  may_update_checkpoint mainchain_state checkpoint >>= fun () ->
+    ~store_root ~context_root ?history_mode ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index, history_mode) ->
+  may_update_checkpoint mainchain_state checkpoint history_mode >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
   store_known_protocols state >>= fun () ->
   Validator.create state distributed_db

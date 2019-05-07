@@ -205,7 +205,7 @@ module Encoding: sig
   (** Provide a transformer from one encoding to a different one.
 
       Used to simplify nested encodings or to change the generic tuples
-      built by {obj1}, {tup1} and the like into proper records.
+      built by {!obj1}, {!tup1} and the like into proper records.
 
       A schema may optionally be provided as documentation of the new encoding. *)
   val conv :
@@ -424,17 +424,17 @@ module Encoding: sig
       See the preamble for an explanation. *)
   module Fixed : sig
 
-    (** @raises Invalid_argument if the argument is less or equal to zero. *)
+    (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val string : int -> string encoding
 
-    (** @raises Invalid_argument if the argument is less or equal to zero. *)
+    (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val bytes : int -> MBytes.t encoding
 
     (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
         there are [n] null bytes ([\000]) added after the value encoded by [e].
         In JSON, padding is ignored.
 
-        @raises Invalid_argument if [n <= 0]. *)
+        @raise Invalid_argument if [n <= 0]. *)
     val add_padding : 'a encoding -> int -> 'a encoding
   end
 
@@ -445,11 +445,11 @@ module Encoding: sig
     val string : string encoding
     val bytes : MBytes.t encoding
 
-    (** @raises Invalid_argument if the encoding argument is variable length
+    (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
-    (** @raises Invalid_argument if the encoding argument is variable length
+    (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
@@ -465,7 +465,7 @@ module Encoding: sig
         an [Invalid_argument] exception. *)
     val string : int -> string encoding
 
-    (** See [string] above. *)
+    (** See {!string} above. *)
     val bytes : int -> MBytes.t encoding
   end
 
@@ -581,7 +581,7 @@ module Json: sig
   (** Encodes a JSON schema (BSON encoded for binary). *)
   val schema_encoding : schema Encoding.t
 
-  (** Create a {!Json_encoding.encoding} from an {encoding}. *)
+  (** Create a {!Json_encoding.encoding} from an {!encoding}. *)
   val convert : 'a Encoding.t -> 'a Json_encoding.encoding
 
   (** Generate a schema from an {!encoding}. *)
@@ -746,7 +746,7 @@ module Binary: sig
   val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
 
   (** [of_bytes_exn enc buf] is equivalent to [to_bytes], except
-      it raises [Read_error] instead of returning [None] in case of error. *)
+      @raise [Read_error] instead of returning [None] in case of error. *)
   val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
 
   (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
@@ -755,7 +755,7 @@ module Binary: sig
   val to_bytes : 'a Encoding.t -> 'a -> MBytes.t option
 
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
-      it raises [Write_error] instead of returning [None] in case of error. *)
+      @raise [Write_error] instead of returning [None] in case of error. *)
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
 
   val describe : 'a Encoding.t -> Binary_schema.t

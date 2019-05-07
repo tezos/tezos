@@ -166,7 +166,7 @@ let generate_and_add_random_endorsements inc =
   fold_left_s Incremental.add_operation inc endorsements
 
 let regenerate_transfers = ref false
-let generate_random_activation ({ remaining_activations ; } as gen_state) inc =
+let generate_random_activation ({ remaining_activations ; _ } as gen_state) inc =
   regenerate_transfers := true ;
   let open Account in
   match remaining_activations with
@@ -179,7 +179,7 @@ let generate_random_activation ({ remaining_activations ; } as gen_state) inc =
       Op.activation inc pkh Account.commitment_secret
 
 exception No_transfer_left
-let rec generate_random_transfer ({ remaining_transfers ; } as gen_state) ctxt =
+let rec generate_random_transfer ({ remaining_transfers ; _ } as gen_state) ctxt =
   if remaining_transfers = [] then raise No_transfer_left;
   let (a1, a2) = List.hd remaining_transfers in
   gen_state.remaining_transfers <- List.tl remaining_transfers;
@@ -220,7 +220,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   in
   (* Nonce *)
   begin Alpha_services.Helpers.current_level ~offset:1l (Block.rpc_ctxt) blk >>|? function
-    | Level.{ expected_commitment = true ; cycle ; level } ->
+    | Level.{ expected_commitment = true ; cycle ; level ; _ } ->
         if_debug begin fun () -> Format.printf "[DEBUG] Commiting a nonce\n%!" end;
         begin
           let (hash, nonce) =
@@ -300,7 +300,7 @@ let init () =
     (1--args.accounts) >>=? fun initial_accounts ->
   if_debug begin fun () ->
     List.iter
-      (fun (Account.{pkh},_) -> Format.printf "[DEBUG] Account %a created\n%!" Signature.Public_key_hash.pp_short pkh )
+      (fun (Account.{pkh; _ },_) -> Format.printf "[DEBUG] Account %a created\n%!" Signature.Public_key_hash.pp_short pkh )
       initial_accounts end;
 
   let possible_transfers =
@@ -316,7 +316,7 @@ let init () =
         return (commitments, { parameters with commitments = List.map snd commitments })
   end >>=? fun (remaining_activations, { bootstrap_accounts=_ ; commitments ;
                                          constants ; security_deposit_ramp_up_cycles ;
-                                         no_reward_cycles }) ->
+                                         no_reward_cycles ; _ }) ->
   let gen_state = { possible_transfers ; remaining_transfers = [] ;
                     nonce_to_reveal = [] ; remaining_activations } in
 
@@ -327,9 +327,9 @@ let init () =
   >>=? fun genesis ->
 
   if_debug_s begin fun () ->
-    iter_s (let open Account in fun ({ pkh } as acc, _) ->
+    iter_s (let open Account in fun ({ pkh ; _ } as acc, _) ->
         let contract = Alpha_context.Contract.implicit_contract acc.pkh in
-        Context.Contract.manager (B genesis) contract >>=? fun { pkh = pkh' } ->
+        Context.Contract.manager (B genesis) contract >>=? fun { pkh = pkh' ; _ } ->
         Context.Contract.balance (B genesis) contract >>=? fun balance ->
         return @@ Format.printf "[DEBUG] %a's manager is %a with a balance of %a\n%!"
           Signature.Public_key_hash.pp_short pkh

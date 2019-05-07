@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-30"]
+
 let (//) = Filename.concat
 
 let home =
@@ -32,8 +34,8 @@ let home =
 
 let default_data_dir = home // ".tezos-node"
 let default_rpc_port       =  8732
-let default_p2p_port       = 19732
-let default_discovery_port = 20732
+let default_p2p_port       =  9732
+let default_discovery_port = 10732
 
 type t = {
   data_dir : string ;
@@ -52,7 +54,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  enable_testchain : bool ;
+  disable_testchain : bool ;
 }
 
 and rpc = {
@@ -72,6 +74,7 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
+  history_mode : History_mode.t option ;
 }
 
 let default_p2p_limits : P2p.limits = {
@@ -101,14 +104,14 @@ let default_p2p_limits : P2p.limits = {
 }
 
 let default_p2p = {
-  expected_pow = 24. ;
-  bootstrap_peers  = [ "bootstrap.zeronet.fun"; "bootzero.tzbeta.net" ] ;
+  expected_pow = 26. ;
+  bootstrap_peers  = [] ;
   listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   discovery_addr = None ;
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
-  enable_testchain = false ;
+  disable_testchain = false ;
 }
 
 let default_rpc = {
@@ -123,6 +126,7 @@ let default_shell = {
   prevalidator_limits = Node.default_prevalidator_limits ;
   peer_validator_limits = Node.default_peer_validator_limits ;
   chain_validator_limits = Node.default_chain_validator_limits ;
+  history_mode = None ;
 }
 
 let default_config = {
@@ -258,16 +262,16 @@ let p2p =
   conv
     (fun { expected_pow ; bootstrap_peers ;
            listen_addr ; discovery_addr ; private_mode ;
-           limits ; disable_mempool ; enable_testchain } ->
+           limits ; disable_mempool ; disable_testchain } ->
       (expected_pow, bootstrap_peers,
        listen_addr, discovery_addr, private_mode, limits,
-       disable_mempool, enable_testchain))
+       disable_mempool, disable_testchain))
     (fun (expected_pow, bootstrap_peers,
           listen_addr, discovery_addr, private_mode, limits,
-          disable_mempool, enable_testchain) ->
+          disable_mempool, disable_testchain) ->
       { expected_pow ; bootstrap_peers ;
         listen_addr ; discovery_addr ; private_mode ; limits ;
-        disable_mempool ; enable_testchain })
+        disable_mempool ; disable_testchain })
     (obj8
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
@@ -308,13 +312,12 @@ let p2p =
                          It can be used to decrease the memory and \
                          computation footprints of the node."
           bool false)
-       (dft "enable_testchain"
-          ~description: "If set to [true], the node will spawn a \
-                         testchain during the protocol's testing \
-                         voting period. Default value is [false]. It \
-                         is disabled to decrease the node storage \
-                         usage and computation by droping the \
-                         validation of the test network blocks."
+       (dft "disable_testchain"
+          ~description: "If set to [true], the node will not spawn a testchain during \
+                         the protocol's testing voting period. \
+                         Default value is [false]. It may be used used to decrease the \
+                         node storage usage and computation by droping the validation \
+                         of the test network blocks."
           bool false)
     )
 
@@ -356,21 +359,17 @@ let rpc : rpc Data_encoding.t =
 
 let worker_limits_encoding
     default_size
-    default_level
-    default_zombie_lifetime
-    default_zombie_memory =
+    default_level =
   let open Data_encoding in
   conv
-    (fun { Worker_types.backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory } ->
-       (backlog_size, backlog_level, zombie_lifetime, zombie_memory))
-    (fun (backlog_size, backlog_level, zombie_lifetime, zombie_memory) ->
-       { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
-    (obj4
+    (fun { Worker_types.backlog_size ; backlog_level ;} ->
+       (backlog_size, backlog_level))
+    (fun (backlog_size, backlog_level) ->
+       { backlog_size ; backlog_level })
+    (obj2
        (dft "worker_backlog_size" uint16 default_size)
        (dft "worker_backlog_level"
-          Internal_event.Level.encoding default_level)
-       (dft "worker_zombie_lifetime" float default_zombie_lifetime)
-       (dft "worker_zombie_memory" float default_zombie_memory))
+          Internal_event.Level.encoding default_level))
 
 let timeout_encoding =
   Data_encoding.ranged_float 0. 500.
@@ -388,9 +387,7 @@ let block_validator_limits_encoding =
              default_shell.block_validator_limits.protocol_timeout))
        (worker_limits_encoding
           default_shell.block_validator_limits.worker_limits.backlog_size
-          default_shell.block_validator_limits.worker_limits.backlog_level
-          default_shell.block_validator_limits.worker_limits.zombie_lifetime
-          default_shell.block_validator_limits.worker_limits.zombie_memory))
+          default_shell.block_validator_limits.worker_limits.backlog_level))
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
@@ -408,8 +405,7 @@ let prevalidator_limits_encoding =
        (worker_limits_encoding
           default_shell.prevalidator_limits.worker_limits.backlog_size
           default_shell.prevalidator_limits.worker_limits.backlog_level
-          default_shell.prevalidator_limits.worker_limits.zombie_lifetime
-          default_shell.prevalidator_limits.worker_limits.zombie_memory))
+       ))
 
 let peer_validator_limits_encoding =
   let open Data_encoding in
@@ -432,8 +428,7 @@ let peer_validator_limits_encoding =
        (worker_limits_encoding
           default_limits.worker_limits.backlog_size
           default_limits.worker_limits.backlog_level
-          default_limits.worker_limits.zombie_lifetime
-          default_limits.worker_limits.zombie_memory))
+       ))
 
 let chain_validator_limits_encoding =
   let open Data_encoding in
@@ -452,26 +447,25 @@ let chain_validator_limits_encoding =
              default_shell.chain_validator_limits.bootstrap_threshold))
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
-          default_shell.chain_validator_limits.worker_limits.backlog_level
-          default_shell.chain_validator_limits.worker_limits.zombie_lifetime
-          default_shell.chain_validator_limits.worker_limits.zombie_memory))
+          default_shell.chain_validator_limits.worker_limits.backlog_level))
 
 let shell =
   let open Data_encoding in
   conv
     (fun { peer_validator_limits ; block_validator_limits ;
-           prevalidator_limits ; chain_validator_limits } ->
+           prevalidator_limits ; chain_validator_limits ; history_mode } ->
       (peer_validator_limits, block_validator_limits,
-       prevalidator_limits, chain_validator_limits))
+       prevalidator_limits, chain_validator_limits, history_mode))
     (fun (peer_validator_limits, block_validator_limits,
-          prevalidator_limits, chain_validator_limits) ->
+          prevalidator_limits, chain_validator_limits, history_mode) ->
       { peer_validator_limits ; block_validator_limits ;
-        prevalidator_limits ; chain_validator_limits })
-    (obj4
+        prevalidator_limits ; chain_validator_limits ; history_mode })
+    (obj5
        (dft "peer_validator" peer_validator_limits_encoding default_shell.peer_validator_limits)
        (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
        (dft "chain_validator" chain_validator_limits_encoding default_shell.chain_validator_limits)
+       (opt "history_mode" History_mode.encoding)
     )
 
 let encoding =
@@ -535,12 +529,13 @@ let update
     ?rpc_listen_addr
     ?(private_mode = false)
     ?(disable_mempool = false)
-    ?(enable_testchain = false)
+    ?(disable_testchain = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
     ?log_output
     ?bootstrap_threshold
+    ?history_mode
     cfg = let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
@@ -589,7 +584,7 @@ let update
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
-    enable_testchain = cfg.p2p.enable_testchain || enable_testchain ;
+    disable_testchain = cfg.p2p.disable_testchain || disable_testchain ;
   }
   and rpc : rpc = {
     listen_addr =
@@ -615,7 +610,8 @@ let update
         ~f:(fun bootstrap_threshold ->
             { cfg.shell.chain_validator_limits
               with bootstrap_threshold })
-        bootstrap_threshold
+        bootstrap_threshold ;
+    history_mode = Option.first_some history_mode cfg.shell.history_mode;
   }
   in
   let internal_events = cfg.internal_events in

@@ -11,9 +11,7 @@
   tezos-error-monad
   tezos-data-encoding
   )
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_stdlib
+ (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad
                    -open Tezos_data_encoding)))
 

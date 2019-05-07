@@ -103,7 +103,6 @@ module type T = sig
   type 'a queue and bounded and infinite
   type dropbox
 
-
   (** Supported kinds of internal buffers. *)
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
@@ -112,8 +111,7 @@ module type T = sig
         { merge : (dropbox t ->
                    any_request ->
                    any_request option ->
-                   any_request option) }
-      -> dropbox buffer_kind
+                   any_request option) }  -> dropbox buffer_kind
   and any_request = Any_request : _ Request.t -> any_request
 
   (** Create a table of workers. *)
@@ -181,27 +179,35 @@ module type T = sig
   val shutdown :
     _ t -> unit Lwt.t
 
-  (** Adds a message to the queue and waits for its result.
-      Cannot be called from within the handlers. *)
-  val push_request_and_wait :
-    _ queue t -> 'a Request.t -> 'a tzresult Lwt.t
+  module type BOX = sig
+    type t
+    val put_request : t -> 'a Request.t -> unit
+    val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
+  end
+  module type QUEUE = sig
+    type 'a t
+    val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+    val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests_length : 'a t -> int
+  end
+  module type BOUNDED_QUEUE = sig
+    type t
+    val try_push_request_now : t -> 'a Request.t -> bool
+  end
 
-  (** Adds a message to the queue. *)
-  val push_request :
-    _ queue t -> 'a Request.t -> unit Lwt.t
+  module Dropbox : sig
+    include BOX with type t := dropbox t
+  end
+  module Queue : sig
+    include QUEUE with type 'a t := 'a queue t
+    include BOUNDED_QUEUE with type t := bounded queue t
 
-  (** Adds a message to the queue immediately.
-      Returns [false] if the queue is full. *)
-  val try_push_request_now :
-    bounded queue t -> 'a Request.t -> bool
+    (** Adds a message to the queue immediately. *)
+    val push_request_now :
+      infinite queue t -> 'a Request.t -> unit
+  end
 
-  (** Adds a message to the queue immediately. *)
-  val push_request_now :
-    infinite queue t -> 'a Request.t -> unit
-
-  (** Sets the current request. *)
-  val drop_request :
-    dropbox t -> 'a Request.t -> unit
 
   (** Detects cancelation from within the request handler to stop
       asynchronous operations. *)
@@ -230,8 +236,6 @@ module type T = sig
   (** Access the event backlog. *)
   val last_events : _ t -> (Internal_event.level * Event.t list) list
 
-  (** Introspect the message queue, gives the times requests were pushed. *)
-  val pending_requests : _ queue t -> (Time.t * Request.view) list
 
   (** Get the running status of a worker. *)
   val status : _ t -> Worker_types.worker_status
@@ -241,13 +245,17 @@ module type T = sig
       treatment started. *)
   val current_request : _ t -> (Time.t * Time.t * Request.view) option
 
+  val information : _ t -> Worker_types.worker_information
+
   (** Introspect the state of a worker. *)
   val view : _ t -> Types.view
 
-  (** Lists the running workers in this group.
-      After they are killed, workers are kept in the table
-      for a number of seconds given in the {!Worker_types.limits}. *)
+  (** Lists the running workers in this group. *)
   val list : 'a table -> (Name.t * 'a t) list
+
+  (** [find_opt table n] is [Some worker] if the [worker] is in the [table] and
+      has name [n]. *)
+  val find_opt : 'a table -> Name.t -> 'a t option
 end
 
 module Make
@@ -283,7 +291,6 @@ module Make
     | Queue_buffer : (Time.t * message) Lwt_pipe.t -> infinite queue buffer
     | Bounded_buffer : (Time.t * message) Lwt_pipe.t -> bounded queue buffer
     | Dropbox_buffer : (Time.t * message) Lwt_dropbox.t -> dropbox buffer
-
   and 'kind t = {
     limits : Worker_types.limits ;
     timeout : float option ;
@@ -304,16 +311,13 @@ module Make
     buffer_kind : 'kind buffer_kind ;
     mutable last_id : int ;
     instances : (Name.t, 'kind t) Hashtbl.t ;
-    zombies : (int, 'kind t) Hashtbl.t
   }
 
   let queue_item ?u r =
     Time.now (),
     Message (r, u)
 
-  let drop_request (w : dropbox t) request =
-    let Dropbox { merge } = w.table.buffer_kind in
-    let Dropbox_buffer message_box = w.buffer in
+  let drop_request w merge message_box request =
     try
       match
         match Lwt_dropbox.peek message_box with
@@ -328,25 +332,7 @@ module Make
           Lwt_dropbox.put message_box (Time.now (), Message (neu, None))
     with Lwt_dropbox.Closed -> ()
 
-  let push_request (type a) (w : a queue t) request =
-    match w.buffer with
-    | Queue_buffer message_queue ->
-        Lwt_pipe.push message_queue (queue_item request)
-    | Bounded_buffer message_queue ->
-        Lwt_pipe.push message_queue (queue_item request)
-
-  let push_request_now (w : infinite queue t) request =
-    let Queue_buffer message_queue = w.buffer in
-    Lwt_pipe.push_now_exn message_queue (queue_item request)
-
-  let try_push_request_now (w : bounded queue t) request =
-    let Bounded_buffer message_queue = w.buffer in
-    Lwt_pipe.push_now message_queue (queue_item request)
-
-  let push_request_and_wait (type a) (w : a queue t) request =
-    let message_queue = match w.buffer with
-      | Queue_buffer message_queue -> message_queue
-      | Bounded_buffer message_queue -> message_queue in
+  let push_request_and_wait w message_queue request =
     let t, u = Lwt.wait () in
     Lwt.catch
       (fun () ->
@@ -358,12 +344,93 @@ module Make
             fail (Closed {base=base_name; name})
         | exn -> fail (Exn exn))
 
+  let drop_request_and_wait w message_box request =
+    let t, u = Lwt.wait () in
+    Lwt.catch
+      (fun () ->
+         Lwt_dropbox.put message_box (queue_item ~u request);
+         t)
+      (function
+        | Lwt_pipe.Closed ->
+            let name = Format.asprintf "%a" Name.pp w.name in
+            fail (Closed {base=base_name; name})
+        | exn -> fail (Exn exn))
+
+  module type BOX = sig
+    type t
+    val put_request : t -> 'a Request.t -> unit
+    val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
+  end
+  module type QUEUE = sig
+    type 'a t
+    val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+    val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests_length : 'a t -> int
+  end
+  module type BOUNDED_QUEUE = sig
+    type t
+    val try_push_request_now : t -> 'a Request.t -> bool
+  end
+  module Dropbox = struct
+
+    let put_request (w : dropbox t) request =
+      let Dropbox { merge } = w.table.buffer_kind in
+      let Dropbox_buffer message_box = w.buffer in
+      drop_request w merge message_box request
+
+    let put_request_and_wait (w : dropbox t) request =
+      let Dropbox_buffer message_box = w.buffer in
+      drop_request_and_wait w message_box request
+
+  end
+
+  module Queue = struct
+
+    let push_request (type a) (w : a queue t) request =
+      match w.buffer with
+      | Queue_buffer message_queue ->
+          Lwt_pipe.push message_queue (queue_item request)
+      | Bounded_buffer message_queue ->
+          Lwt_pipe.push message_queue (queue_item request)
+
+    let push_request_now (w : infinite queue t) request =
+      let Queue_buffer message_queue = w.buffer in
+      Lwt_pipe.push_now_exn message_queue (queue_item request)
+
+    let try_push_request_now (w : bounded queue t) request =
+      let Bounded_buffer message_queue = w.buffer in
+      Lwt_pipe.push_now message_queue (queue_item request)
+
+    let push_request_and_wait (type a) (w : a queue t) request =
+      let message_queue = match w.buffer with
+        | Queue_buffer message_queue -> message_queue
+        | Bounded_buffer message_queue -> message_queue in
+      push_request_and_wait w message_queue request
+
+    let pending_requests (type a) (w : a queue t) =
+      let message_queue = match w.buffer with
+        | Queue_buffer message_queue -> message_queue
+        | Bounded_buffer message_queue -> message_queue in
+      List.map
+        (function (t, Message (req, _)) -> t, Request.view req)
+        (Lwt_pipe.peek_all message_queue)
+
+    let pending_requests_length (type a) (w : a queue t) =
+      let pipe_length (type a) (q : a buffer ) = match q with
+        | Queue_buffer queue -> Lwt_pipe.length queue
+        | Bounded_buffer queue -> Lwt_pipe.length queue
+        | Dropbox_buffer _ -> 1
+      in pipe_length w.buffer
+
+  end
+
   let close (type a) (w : a t) =
     let wakeup = function
       | _, Message (_, Some u) ->
           let name = Format.asprintf "%a" Name.pp w.name in
           Lwt.wakeup_later u (Error [ Closed {base=base_name; name} ])
-      | _ -> () in
+      | _, Message (_, None) -> () in
     let close_queue message_queue =
       let messages = Lwt_pipe.pop_all_now message_queue in
       List.iter wakeup messages ;
@@ -385,23 +452,23 @@ module Make
           Lwt_pipe.pop_with_timeout
             (Lwt_unix.sleep timeout) message_queue >>= fun m ->
           return m in
+    let pop_dropbox message_box =
+      match w.timeout with
+      | None ->
+          Lwt_dropbox.take message_box >>= fun m ->
+          return_some m
+      | Some timeout ->
+          Lwt_dropbox.take_with_timeout
+            (Lwt_unix.sleep timeout) message_box >>= fun m ->
+          return m in
     match w.buffer with
     | Queue_buffer message_queue -> pop_queue message_queue
     | Bounded_buffer message_queue -> pop_queue message_queue
-    | Dropbox_buffer message_box ->
-        match w.timeout with
-        | None ->
-            Lwt_dropbox.take message_box >>= fun m ->
-            return_some m
-        | Some timeout ->
-            Lwt_dropbox.take_with_timeout
-              (Lwt_unix.sleep timeout) message_box >>= fun m ->
-            return m
-
+    | Dropbox_buffer message_box -> pop_dropbox message_box
   let trigger_shutdown w =
     Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
-  let canceler { canceler } = canceler
+  let canceler { canceler ; _ } = canceler
 
   let log_event w evt =
     let (module Logger) = w.logger in
@@ -441,8 +508,7 @@ module Make
   let create_table buffer_kind =
     { buffer_kind ;
       last_id = 0 ;
-      instances = Hashtbl.create 10 ;
-      zombies = Hashtbl.create 10 }
+      instances = Hashtbl.create 10 ; }
 
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
@@ -450,7 +516,7 @@ module Make
     let do_close errs =
       let t0 = match w.status with
         | Running t0 -> t0
-        | _ -> assert false in
+        | Launching _ | Closing _ | Closed _ -> assert false in
       w.status <- Closing (t0, Time.now ()) ;
       close w ;
       Lwt_canceler.cancel w.canceler >>= fun () ->
@@ -458,13 +524,9 @@ module Make
       Hashtbl.remove w.table.instances w.name ;
       Handlers.on_close w >>= fun () ->
       w.state <- None ;
-      Hashtbl.add w.table.zombies w.id w ;
       Lwt.ignore_result
-        (Lwt_unix.sleep w.limits.zombie_memory >>= fun () ->
-         List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
-         Lwt_unix.sleep (w.limits.zombie_lifetime -. w.limits.zombie_memory) >>= fun () ->
-         Hashtbl.remove w.table.zombies w.id ;
-         Lwt.return_unit) ;
+        ( List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
+          Lwt.return_unit) ;
       Lwt.return_unit in
     let rec loop () =
       begin
@@ -571,13 +633,13 @@ module Make
                 event_log ; timeout ;
                 current_request = None ;
                 status = Launching (Time.now ())} in
+      Hashtbl.add table.instances name w ;
       begin
         if id_name = base_name then
           Logger.lwt_log_notice "Worker started"
         else
           Logger.lwt_log_notice "Worker started for %s" name_s
       end >>= fun () ->
-      Hashtbl.add table.instances name w ;
       Handlers.on_launch w name parameters >>=? fun state ->
       w.status <- Running (Time.now ()) ;
       w.state <- Some state ;
@@ -617,27 +679,31 @@ module Make
       (fun (level, ring) -> (level, Ring.elements ring))
       w.event_log
 
-  let pending_requests (type a) (w : a queue t) =
-    let message_queue = match w.buffer with
-      | Queue_buffer message_queue -> message_queue
-      | Bounded_buffer message_queue -> message_queue in
-    List.map
-      (function (t, Message (req, _)) -> t, Request.view req)
-      (Lwt_pipe.peek_all message_queue)
+  let status { status ; _ } = status
 
-  let status { status } = status
+  let current_request { current_request ; _ } = current_request
 
-  let current_request { current_request } = current_request
+  let information (type a) (w : a t) =
+    { Worker_types.instances_number = Hashtbl.length w.table.instances ;
+      wstatus = w.status ;
+      queue_length = match w.buffer with
+        | Queue_buffer pipe ->  Lwt_pipe.length pipe
+        | Bounded_buffer pipe ->  Lwt_pipe.length pipe
+        | Dropbox_buffer _ -> 1
+    }
 
   let view w =
     Types.view (state w) w.parameters
 
-  let list { instances } =
+  let list { instances ; _ } =
     Hashtbl.fold
       (fun n w acc -> (n, w) :: acc)
       instances []
 
-  let protect { canceler } ?on_error f =
+  let find_opt { instances ; _ } =
+    Hashtbl.find_opt instances
+
+  let protect { canceler ; _ } ?on_error f =
     protect ?on_error ~canceler f
 
 end

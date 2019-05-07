@@ -1,13 +1,15 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: ebc2de016e52e8b77f250df174512a793b2fb0e5
+  build_deps_image_version: fdc1ab3f23d1601f00a2165e02fcd9fa3ddd8514
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
 
 stages:
   - doc
   - build
-  - test
+  - unittest
+  - integration
+  - documentation
   - packaging
   - publish
   - deploy
@@ -46,6 +48,11 @@ check_opam_deps:
     - ./scripts/opam-check.sh
     - ./scripts/check_opam_test.sh
 
+check_opam_lint:
+  <<: *build_definition
+  script:
+    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
+
 check_indentation:
   <<: *build_definition
   script:
@@ -62,14 +69,13 @@ build:
     expire_in: 1 day
 
 
-
 ############################################################
 ## Stage: test (only MR)                                  ##
 ############################################################
 
 .test_template: &test_definition
   <<: *build_definition
-  stage: test
+  stage: unittest
   dependencies:
     - build
 
@@ -118,25 +124,15 @@ test:p2p:pool:
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
-test:proto_003_PsddFKi3:lib_protocol:
+test:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
-    - dune build @src/proto_003_PsddFKi3/lib_protocol/runtest
+    - dune build @src/proto_alpha/lib_protocol/runtest
 
-test:proto_003_PsddFKi3:lib_client:
+test:proto_alpha:lib_client:
   <<: *test_definition
   script:
-    - dune build @src/proto_003_PsddFKi3/lib_client/test/runtest
-
-test:proto_004_Pt24m4xi:lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_004_Pt24m4xi/lib_protocol/runtest
-
-test:proto_004_Pt24m4xi:lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_004_Pt24m4xi/lib_client/test/runtest
+    - dune build @src/proto_alpha/lib_client/test/runtest
 
 test:p2p:peerset:
   <<: *test_definition
@@ -156,71 +152,7 @@ test:p2p:banned_peers:
 test:client_alpha:vote:
   <<: *test_definition
   script:
-    - dune build @src/proto_004_Pt24m4xi/lib_delegate/runtest_vote
-
-test:basic.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_basic.sh
-
-test:contracts.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts.sh
-
-test:contracts_opcode.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_opcode.sh
-
-test:contracts_macros.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_macros.sh
-
-test:contracts_mini_scenarios.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
-
-test:multinode.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_multinode.sh
-
-test:inject.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_injection.sh
-
-test:voting.sh:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest_voting.sh
-
-test:proto:sandbox:
-  <<: *test_definition
-  script:
-    - dune build @runtest_sandbox
-
-test:documentation:
-  <<: *test_definition
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-html
-
-test:linkcheck:
-  <<: *test_definition
-  script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - make doc-html-and-linkcheck
-  allow_failure: true
+    - dune build @src/proto_alpha/lib_delegate/runtest_vote
 
 test:validation:
   <<: *test_definition
@@ -231,6 +163,197 @@ test:micheline:
   <<: *test_definition
   script:
     - dune build @src/lib_micheline/runtest
+
+############################################################
+## Stage: run shell integration tests                     ##
+############################################################
+
+# definition for the environment to run all integration tests
+.integration_template: &integration_definition
+  <<: *build_definition
+  stage: integration
+  dependencies:
+    - build
+  before_script:
+    - sudo apk add py-pip python3 python3-dev
+    - sudo pip install --upgrade pip
+    - sudo pip3 install -r tests_python/requirements.txt
+    - make all
+  tags:
+    - gitlab-org
+
+test:basic.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_basic.sh
+
+test:contracts.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts.sh
+
+test:contracts_opcode.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_opcode.sh
+
+test:contracts_macros.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_macros.sh
+
+test:contracts_mini_scenarios.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
+
+test:multinode.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_multinode.sh
+
+test:inject.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_injection.sh
+
+test:voting.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_voting.sh
+
+test:proto:sandbox:
+  <<: *integration_definition
+  script:
+    - dune build @runtest_sandbox
+
+############################################################
+## Stage: run OCaml integration tests                     ##
+############################################################
+
+test:sandboxes:voting:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-voting-demo dune build @src/bin_flextesa/runtest_sandbox_voting_demo
+  artifacts:
+    paths:
+    - flextesa-voting-demo
+    expire_in: 1 day
+    when: on_failure
+  allow_failure: true # This test uses too much resources for GitLab's workers
+
+test:sandboxes:acc-baking:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_baking
+  artifacts:
+    paths:
+    - flextesa-acc-sdb
+    expire_in: 1 day
+    when: on_failure
+
+test:sandboxes:acc-endorsement:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_endorsing
+  artifacts:
+    paths:
+    - flextesa-acc-sde
+    expire_in: 1 day
+    when: on_failure
+
+############################################################
+## Stage: run python integration tests                    ##
+############################################################
+
+integration:linter_python:
+  <<: *integration_definition
+  script:
+    - make -C tests_python lint_all
+
+##BEGIN_INTEGRATION_PYTHON##
+integration:00:baker_endorser:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_baker_endorser.py
+
+integration:01:basic:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_basic.py
+
+integration:02:contract:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_contract.py
+
+integration:03:contract_baker:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_contract_baker.py
+
+integration:04:injection:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_injection.py
+
+integration:05:many_bakers:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_many_bakers.py
+
+integration:06:many_nodes:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_many_nodes.py
+
+integration:07:mempool:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_mempool.py
+
+integration:08:multinode:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode.py
+
+integration:09:rpc:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_rpc.py
+
+integration:10:voting:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_voting.py
+
+
+##END_INTEGRATION_PYTHON##
+
+############################################################
+## Stage: run doc integration tests                       ##
+############################################################
+
+test:documentation:
+  <<: *test_definition
+  stage: documentation
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-html
+
+test:linkcheck:
+  <<: *test_definition
+  stage: documentation
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
+    - sudo pip3 install 'idna<2.7'
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - make doc-html-and-linkcheck
+  allow_failure: true
 
 ############################################################
 ## Stage: building opam packages (only master and *opam*) ##
@@ -337,45 +460,45 @@ opam:16:lmdb:
   variables:
     package: lmdb
 
-opam:17:tezos-base:
-  <<: *opam_definition
-  variables:
-    package: tezos-base
-
-opam:18:pbkdf:
+opam:17:pbkdf:
   <<: *opam_definition
   variables:
     package: pbkdf
 
-opam:19:ocplib-resto-cohttp:
+opam:18:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
+
+opam:19:tezos-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-base
 
 opam:20:irmin-lmdb:
   <<: *opam_definition
   variables:
     package: irmin-lmdb
 
-opam:21:tezos-stdlib-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib-unix
-
-opam:22:bip39:
+opam:21:bip39:
   <<: *opam_definition
   variables:
     package: bip39
 
-opam:23:tezos-rpc-http:
+opam:22:tezos-rpc-http:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http
 
-opam:24:tezos-shell-services:
+opam:23:tezos-shell-services:
   <<: *opam_definition
   variables:
     package: tezos-shell-services
+
+opam:24:tezos-stdlib-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib-unix
 
 opam:25:tezos-storage:
   <<: *opam_definition
@@ -417,240 +540,175 @@ opam:32:tezos-protocol-environment:
   variables:
     package: tezos-protocol-environment
 
-opam:33:tezos-protocol-003-PsddFKi3:
+opam:33:tezos-protocol-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-003-PsddFKi3
+    package: tezos-protocol-alpha
 
 opam:34:tezos-signer-backends:
   <<: *opam_definition
   variables:
     package: tezos-signer-backends
 
-opam:35:tezos-protocol-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-004-Pt24m4xi
-
-opam:36:tezos-protocol-environment-shell:
+opam:35:tezos-protocol-environment-shell:
   <<: *opam_definition
   variables:
     package: tezos-protocol-environment-shell
 
-opam:37:tezos-client-003-PsddFKi3:
+opam:36:tezos-client-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-client-003-PsddFKi3
+    package: tezos-client-alpha
 
-opam:38:tezos-client-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-004-Pt24m4xi
-
-opam:39:tezos-client-commands:
+opam:37:tezos-client-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-commands
 
-opam:40:tezos-protocol-updater:
+opam:38:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:41:tezos-baking-004-Pt24m4xi:
+opam:39:tezos-baking-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-baking-004-Pt24m4xi
+    package: tezos-baking-alpha
 
-opam:42:tezos-p2p:
-  <<: *opam_definition
-  variables:
-    package: tezos-p2p
-
-opam:43:tezos-validation:
-  <<: *opam_definition
-  variables:
-    package: tezos-validation
-
-opam:44:tezos-baking-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-003-PsddFKi3
-
-opam:45:tezos-protocol-demo:
+opam:40:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:46:tezos-protocol-genesis:
+opam:41:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis
 
-opam:47:ocplib-resto-json:
+opam:42:ocplib-resto-json:
   <<: *opam_definition
   variables:
     package: ocplib-resto-json
 
-opam:48:tezos-baking-004-Pt24m4xi-commands:
+opam:43:tezos-p2p:
   <<: *opam_definition
   variables:
-    package: tezos-baking-004-Pt24m4xi-commands
+    package: tezos-p2p
 
-opam:49:tezos-client-base-unix:
+opam:44:tezos-validation:
+  <<: *opam_definition
+  variables:
+    package: tezos-validation
+
+opam:45:tezos-baking-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-alpha-commands
+
+opam:46:tezos-client-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha-commands
+
+opam:47:tezos-client-base-unix:
   <<: *opam_definition
   variables:
     package: tezos-client-base-unix
 
-opam:50:tezos-embedded-protocol-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-003-PsddFKi3
-
-opam:51:tezos-embedded-protocol-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-004-Pt24m4xi
-
-opam:52:tezos-embedded-protocol-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-demo
-
-opam:53:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis
-
-opam:54:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:55:tezos-baking-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-003-PsddFKi3-commands
-
-opam:56:tezos-client-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-003-PsddFKi3-commands
-
-opam:57:tezos-client-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-004-Pt24m4xi-commands
-
-opam:58:tezos-client-demo:
+opam:48:tezos-client-demo:
   <<: *opam_definition
   variables:
     package: tezos-client-demo
 
-opam:59:tezos-client-genesis:
+opam:49:tezos-client-genesis:
   <<: *opam_definition
   variables:
     package: tezos-client-genesis
 
-opam:60:ocplib-ezresto:
+opam:50:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
 
-opam:61:tezos-accuser-004-Pt24m4xi:
+opam:51:tezos-shell:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-004-Pt24m4xi
+    package: tezos-shell
 
-opam:62:tezos-accuser-003-PsddFKi3-commands:
+opam:52:tezos-network-sandbox:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-003-PsddFKi3-commands
+    package: tezos-network-sandbox
 
-opam:63:tezos-baker-004-Pt24m4xi:
+opam:53:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-baker-004-Pt24m4xi
+    package: tezos-embedded-protocol-alpha
 
-opam:64:ocplib-json-typed-browser:
+opam:54:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
-    package: ocplib-json-typed-browser
+    package: tezos-embedded-protocol-demo
+
+opam:55:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:56:tezos-endorser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha-commands
+
+opam:57:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:58:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:59:tezos-accuser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha
+
+opam:60:flextesa:
+  <<: *opam_definition
+  variables:
+    package: flextesa
+
+opam:61:tezos-endorser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha
+
+opam:62:tezos-accuser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha-commands
+
+opam:63:tezos-baker-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-alpha
+
+opam:64:tezos-signer:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer
 
 opam:65:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:66:tezos-signer:
+opam:66:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
-    package: tezos-signer
-
-opam:67:tezos-mempool-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-004-Pt24m4xi
-
-opam:68:tezos-accuser-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-004-Pt24m4xi-commands
-
-opam:69:tezos-client:
-  <<: *opam_definition
-  variables:
-    package: tezos-client
-
-opam:70:tezos-baker-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-003-PsddFKi3
-
-opam:71:tezos-endorser-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-003-PsddFKi3-commands
-
-opam:72:tezos-endorser-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-003-PsddFKi3
-
-opam:73:tezos-accuser-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-003-PsddFKi3
-
-opam:74:tezos-mempool-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-003-PsddFKi3
-
-opam:75:tezos-baker-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-003-PsddFKi3-commands
-
-opam:76:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:77:tezos-baker-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-004-Pt24m4xi-commands
-
-opam:78:tezos-endorser-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-004-Pt24m4xi-commands
-
-opam:79:tezos-endorser-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-004-Pt24m4xi
+    package: ocplib-json-typed-browser
 
 ##END_OPAM##
 
@@ -730,7 +788,7 @@ publish:doc:
   image: alpine:latest
   stage: deploy
   only:
-    - zeronet-snapshots@tezos/tezos
+    - zeronet@tezos/tezos
   dependencies: []
   before_script:
     - mkdir -p ~/.ssh

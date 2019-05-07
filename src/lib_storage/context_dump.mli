@@ -33,11 +33,18 @@ module type Dump_interface = sig
   type key = step list
   type commit_info
 
+  val commit_info_encoding : commit_info Data_encoding.t
+
+  val hash_encoding : hash Data_encoding.t
+  val blob_encoding : [ `Blob of MBytes.t ] Data_encoding.t
+  val node_encoding : [ `Node of MBytes.t ] Data_encoding.t
+
   module Block_header : sig
     type t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
     val equal : t -> t -> bool
+    val encoding : t Data_encoding.t
   end
 
   module Pruned_block : sig
@@ -45,24 +52,29 @@ module type Dump_interface = sig
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
     val header : t -> Block_header.t
+    val encoding : t Data_encoding.t
   end
 
   module Block_data : sig
     type t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
+    val header : t -> Block_header.t
+    val encoding : t Data_encoding.t
   end
 
   module Protocol_data : sig
     type t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
+    val encoding : t Data_encoding.t
   end
 
   module Commit_hash : sig
     type t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t tzresult
+    val encoding : t Data_encoding.t
   end
 
   (* hash manipulation *)
@@ -111,9 +123,13 @@ module type S = sig
 
   val dump_contexts_fd :
     index ->
-    (block_header * block_data *
-     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t) * block_header) list ->
+    (block_header * block_data * History_mode.t *
+     (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
+
+  val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+    (block_header * block_data * History_mode.t *
+     pruned_block list * protocol_data list) tzresult Lwt.t
 end
 
 module Make (I:Dump_interface) : S

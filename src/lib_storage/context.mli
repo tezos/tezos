@@ -59,7 +59,7 @@ val commit_test_chain_genesis:
   Block_header.t Lwt.t
 
 
-(** {2 Generic interface} ****************************************************)
+(** {2 Generic interface} *)
 
 type key = string list
 (** [key] indicates a path in a context. *)
@@ -83,7 +83,7 @@ val fold:
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
-(** {2 Accessing and Updating Versions} **************************************)
+(** {2 Accessing and Updating Versions} *)
 
 val exists: index -> Context_hash.t -> bool Lwt.t
 val checkout: index -> Context_hash.t -> context option Lwt.t
@@ -99,7 +99,7 @@ val set_head: index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 val set_master: index -> Context_hash.t -> unit Lwt.t
 
 
-(** {2 Predefined Fields} ****************************************************)
+(** {2 Predefined Fields} *)
 
 val get_protocol: context -> Protocol_hash.t Lwt.t
 val set_protocol: context -> Protocol_hash.t -> context Lwt.t
@@ -172,16 +172,34 @@ val get_protocol_data_from_header :
 
 val dump_contexts :
   index ->
-  (Block_header.t * Block_data.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
-   Block_header.t) list ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) ->
   filename:string ->
   unit tzresult Lwt.t
 
 val dump_contexts_fd :
   index ->
-  (Block_header.t * Block_data.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
-   Block_header.t) list ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) ->
   fd:Lwt_unix.file_descr ->
   unit tzresult Lwt.t
+
+val restore_contexts : index -> filename:string ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   Pruned_block.t list * Protocol_data.t list) tzresult Lwt.t
+
+val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   Pruned_block.t list * Protocol_data.t list) tzresult Lwt.t
+
+val validate_context_hash_consistency_and_commit :
+  data_hash:Context_hash.t ->
+  expected_context_hash:Context_hash.t ->
+  timestamp:Time.t ->
+  test_chain:Test_chain_status.t ->
+  protocol_hash:Protocol_hash.t ->
+  message:string ->
+  author:string ->
+  parents:Context_hash.t list ->
+  index:index ->
+  bool Lwt.t

@@ -179,7 +179,8 @@ let main
              let cctxt = (client_config :> Client_context.prompter)
            end)) ;
       Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
-      Client_keys.register_signer (module Tezos_signer_backends.Ledger) ;
+      Client_keys.register_signer
+        (module Tezos_signer_backends.Ledger.Signer_implementation) ;
       Client_keys.register_signer (module Socket.Unix) ;
       Client_keys.register_signer (module Socket.Tcp) ;
       Client_keys.register_signer (module Http) ;

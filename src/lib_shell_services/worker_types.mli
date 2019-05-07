@@ -28,11 +28,7 @@ type limits =
   { backlog_size : int
   (** Number of event stored in the backlog for each debug level. *) ;
     backlog_level : Internal_event.level
-  (** Stores events at least as important as this value. *) ;
-    zombie_lifetime : float
-  (** How long dead workers are kept in the introspection table. *) ;
-    zombie_memory : float
-    (** How long zombie workers' logs are kept. *) }
+  (** Stores events at least as important as this value. *) ; }
 
 (** The running status of an individual worker. *)
 type worker_status =
@@ -43,6 +39,15 @@ type worker_status =
 
 (** Worker status serializer for RPCs. *)
 val worker_status_encoding : error list Data_encoding.t -> worker_status Data_encoding.t
+
+type worker_information = {
+  instances_number : int ;
+  wstatus: worker_status ;
+  queue_length : int ;
+}
+
+val worker_information_encoding :
+  error list Data_encoding.t -> worker_information Data_encoding.t
 
 (** The runnning status of an individual request. *)
 type request_status =

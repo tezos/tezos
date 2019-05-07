@@ -1,0 +1,53 @@
+(executables
+ (names test_michelson_parser
+        test_rpc
+        test_vote)
+ (libraries tezos-base
+            tezos-rpc-http
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-genesis
+            tezos-client-alpha
+            tezos-baking-alpha
+            tezos-client-base-unix
+            tezos-signer-backends
+            alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_rpc_http
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_genesis
+                   -open Tezos_client_alpha
+                   -open Tezos_baking_alpha
+                   -open Tezos_client_base_unix)))
+
+(alias
+ (name buildtest)
+ (deps test_michelson_parser.exe
+       test_rpc.exe
+       test_vote.exe))
+
+(alias
+ (name runtest_michelson_parser)
+ (action (run %{exe:test_michelson_parser.exe})))
+
+(alias
+ (name runtest_vote)
+ (locks  /tcp-port/18400)
+ (action (chdir %{workspace_root} (run %{exe:test_vote.exe} %{bin:tezos-node} 18400))))
+
+(alias
+ (name runtest_rpc)
+ (locks  /tcp-port/18500)
+ (action (chdir %{workspace_root} (run %{exe:test_rpc.exe} %{bin:tezos-node} 18500))))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_michelson_parser)
+       (alias runtest_rpc)
+       (alias runtest_vote)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

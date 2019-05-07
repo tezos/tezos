@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-## from genesis to demo
+## from genesis to proto_test_injection
 
 set -e
 
@@ -30,9 +30,9 @@ done
 
 sleep 2
 
-protocol_version=`$compiler -hash-only "$test_dir/demo"`
+protocol_version=`$compiler -hash-only "$test_dir/proto_test_injection"`
 
-$admin_client inject protocol "$test_dir/demo"
+$admin_client inject protocol "$test_dir/proto_test_injection"
 $admin_client list protocols
 
 $client activate protocol $protocol_version \

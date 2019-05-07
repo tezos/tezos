@@ -75,11 +75,6 @@ end  = struct
         let secret_key = convert_encoding scalar_encoding Pvss.Secret_key.encoding s in
         { secret_key ; public_key = Pvss.Secret_key.to_public_key secret_key })
 
-  (** Convert a secret_key to a public key *)
-  let public secret_key =
-    convert_encoding group_encoding Pvss.Public_key.encoding
-      (Sp.Group.mul secret_key Sp.Group.g)
-
   let t = 5
   let n = 8
 
@@ -96,7 +91,7 @@ end  = struct
 
 
   let keypairs = random_keypairs n
-  let public_keys = List.map (fun {public_key} -> public_key) keypairs
+  let public_keys = List.map (fun { public_key ; _ } -> public_key) keypairs
 
   let ((shares, commitments, proof),
        (other_shares, other_commitments, other_proof)) =

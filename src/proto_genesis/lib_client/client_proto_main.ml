@@ -27,7 +27,7 @@ open Proto_genesis
 
 let protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+    "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let protocol_data = { command ; signature = Signature.zero } in
@@ -43,11 +43,6 @@ let int64_parameter =
   (Clic.parameter (fun _ p ->
        try return (Int64.of_string p)
        with _ -> failwith "Cannot read int64"))
-
-let int_parameter =
-  (Clic.parameter (fun _ p ->
-       try return (int_of_string p)
-       with _ -> failwith "Cannot read int"))
 
 let file_parameter =
   Clic.parameter (fun _ p ->

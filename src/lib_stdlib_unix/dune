@@ -1,9 +1,7 @@
 (library
  (name tezos_stdlib_unix)
  (public_name tezos-stdlib-unix)
- (flags (:standard -w -9-30
-                   -open Tezos_base__TzPervasives
-                   -safe-string))
+ (flags (:standard -open Tezos_base__TzPervasives))
  (libraries tezos-base
             lwt.unix
             ipaddr.unix

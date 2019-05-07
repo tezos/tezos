@@ -232,6 +232,14 @@ val args16 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
   ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg -> ('p, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o * 'p, 'ctx) options
 
+(** Include 17 optional parameters *)
+val args17 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
+  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
+  ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg -> ('p, 'ctx) arg ->
+  ('q, 'ctx) arg ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o * 'p * 'q, 'ctx) options
+
 (** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)
@@ -365,7 +373,7 @@ val restore_formatter : Format.formatter -> formatter_state -> unit
 type error += Help : _ command option -> error
 
 (** Find and call the applicable command on the series of arguments.
-    @raises [Failure] if the command list would be ambiguous. *)
+    @raise [Failure] if the command list would be ambiguous. *)
 val dispatch: 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
 
 (** Parse the global options, and return their value, with the rest of

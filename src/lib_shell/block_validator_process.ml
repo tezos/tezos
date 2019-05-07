@@ -87,16 +87,16 @@ let apply_block bvp ~predecessor block_header operations =
   let chain_state = State.Block.chain_state predecessor in
   let chain_id = State.Block.chain_id predecessor in
   let predecessor_block_header = State.Block.header predecessor in
-  let max_operations_ttl = State.Block.max_operations_ttl predecessor in
+  State.Block.max_operations_ttl predecessor >>=? fun max_operations_ttl ->
   let block_hash = Block_header.hash block_header in
   begin
     Chain.data chain_state >>= fun chain_data ->
     if State.Block.equal chain_data.current_head predecessor then
-      Lwt.return (chain_data.live_blocks, chain_data.live_operations)
+      return (chain_data.live_blocks, chain_data.live_operations)
     else
       Chain_traversal.live_blocks
-        predecessor (State.Block.max_operations_ttl predecessor)
-  end >>= fun (live_blocks, live_operations) ->
+        predecessor max_operations_ttl
+  end >>=? fun (live_blocks, live_operations) ->
   Block_validation.check_liveness
     ~live_operations ~live_blocks block_hash operations >>=? fun () ->
   match bvp with

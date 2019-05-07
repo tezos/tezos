@@ -99,7 +99,7 @@ More details on fees and cost model
 Protocol:
 ~~~~~~~~~
 
-The creation of a new tz{1,2,3} address now requires a burn of `ꜩ0.257`,
+The creation of a new tz{1,2,3} address now requires a burn of `0.257ꜩ`,
 in-line with the creation of KT account.
 
 Every manager operation now costs at least ``10000`` in gas,
@@ -147,12 +147,12 @@ operations, still including header and signature.
 
 By default::
 
-   minimal_fees = 0.000 1 ꜩ (100 µꜩ)
-   minimal_nanotez_per_gas_unit = 100 nꜩ/gu (0.000 000 1 ꜩ/gu)
-   minimal_nanotez_per_byte = 1000 nꜩ/B (0.000 001 ꜩ/B)
+   minimal_fees = 0.000 1ꜩ (100µꜩ)
+   minimal_nanotez_per_gas_unit = 100nꜩ/gu (0.000 000 1ꜩ/gu)
+   minimal_nanotez_per_byte = 1000nꜩ/B (0.000 001ꜩ/B)
 
 For instance, a single transaction to an existing implicit address
-will require a transaction fee of at least `0.001 273 ꜩ`
+will require a transaction fee of at least `0.001 273ꜩ`
 to be included by bakers who choose to follow the default settings.
 
 These settings may be changed by passing the following flags to the baker

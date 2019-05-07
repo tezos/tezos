@@ -20,11 +20,11 @@ After a successful compilation, you should have the following binaries:
   (see :ref:`signer`);
 
 Note that Alphanet and Zeronet only support the last version of the
-protocol which is always called `alpha` while Mainnet must also
+protocol which is always called `alpha` while Betanet must also
 support all past protocols.
-For this reason the name of the 3 daemons in Mainnet contains the
+For this reason the name of the 3 daemons in Betanet contains the
 incremental number and the partial hash of the protocol they are bound
-to, such as ``tezos-{baker,endorser,accuser}-004-Pt24m4xi``.
+to, such as ``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
 
 
 Read The Friendly Manual
@@ -97,11 +97,13 @@ any way to a Tezos address on the blockchain.
 Node synchronization
 ~~~~~~~~~~~~~~~~~~~~
 
-Whenever a node starts, it tries to retrieve the most current head of the
-chain from its peers. This can be a long process when a node is launched for
-the first time, or if it has many blocks to retrieve. When the synchronization
-is complete, the node is said to be *bootstrapped*. Some operations require
-the node to be bootstrapped.
+Whenever a node starts, it tries to retrieve the most current head of the chain
+from its peers. This can be a long process if there are many blocks to retrieve
+(e.g when a node is launched for the first time, or has been out of sync for a
+while), or on a slow network connection.
+
+Once the synchronization is complete, the node is said to be *bootstrapped*.
+Some operations require the node to be bootstrapped.
 
 Node protocol
 ~~~~~~~~~~~~~
@@ -115,11 +117,14 @@ Storage
 ~~~~~~~
 
 All blockchain data is stored under ``$HOME/.tezos-node/``.
+
 If for some reason your node is misbehaving or there has been an
 upgrade of the network, it is safe to remove this directory, it just
 means that your node will take some time to resync the chain.
-You can keep ``identity.json`` if it takes a long time for you to
-compute it and only remove the ``store`` and ``context`` directories.
+
+If removing this directory, please note that if it took you a long time to
+compute your node identity, keep the ``identity.json`` file and instead only
+remove the child ``store`` and ``context`` directories.
 
 If you are also running a baker make sure that it has access to the
 ``.tezos-node`` directory of the node.
@@ -128,7 +133,7 @@ If you are also running a baker make sure that it has access to the
 RPC interface
 ~~~~~~~~~~~~~
 
-The only interface to the node is through Json RPC calls and it is disabled by
+The only interface to the node is through JSON RPC calls and it is disabled by
 default.  A more detailed documentation can be found in the :ref:`RPC index.
 <rpc>` The RPC interface must be enabled in order for the clients
 to communicate with the node, but is should not be publicly accessible on the
@@ -166,7 +171,7 @@ chain (time is in UTC so it may differ from your local):
    tezos-client get timestamp
 
 Beware that the commands available on the client depend on the specific
-protocol ran by the node. For instance, `get timestamp` isn't available when
+protocol run by the node. For instance, `get timestamp` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
@@ -176,7 +181,7 @@ A simple wallet
 The client is also a basic wallet and after the activation above you
 will notice that the directory ``.tezos-client`` has been populated with
 3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
-The content of each file is in json and keeps the mapping between
+The content of each file is in JSON and keeps the mapping between
 aliases (``alice`` in our case) and what you would expect from the name
 of the file.
 Secret keys are stored on disk encrypted with a password except when
@@ -184,7 +189,7 @@ using a hardware wallet (see :ref:`ledger`).
 An additional file ``contracts`` contains the addresses of `originated
 contracts`, which have the form *KT1…*.
 
-We can for example generate a new pair of keys, which can used locally
+We can for example generate a new pair of keys, which can be used locally
 with the alias *bob*:
 
 ::
@@ -243,7 +248,7 @@ Please preserve the JSON file, after each reset of Zeronet or
 Alphanet, you will have to reactivate the wallet.
 
 Please drink carefully and don't abuse the faucet: it only contains
-30,000 wallets for a total amount of ꜩ760,000,000.
+30,000 wallets for a total amount of 760,000,000ꜩ.
 
 
 Transactions
@@ -281,9 +286,9 @@ operation that seems lost.
 Receipts for operations and blocks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After an operation the client prints a `receipt` that recapitulates
-the effects of the operation on the blockchain.
-It is possible to review the receipt of a transaction with:
+After an operation succeeds, the client prints a `receipt` of the propagation
+of the operation to the blockchain. It is possible to review the receipt of a
+transaction with:
 
 ::
 
@@ -342,7 +347,7 @@ An interesting block receipt is the one produced at the end of a
 cycle as many delegates receive back part of their unfrozen accounts.
 
 
-.. _originated_accounts:
+.. _originated-accounts:
 
 Originated accounts and contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -498,7 +503,7 @@ The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific informations you'll
 have to resort to RPCs.
 For example to check the value of important constants in Tezos, which
-may differ between Mainnet, Alphanet and Zeronet, you can use:
+may differ between Betanet, Alphanet and Zeronet, you can use:
 
 ::
 

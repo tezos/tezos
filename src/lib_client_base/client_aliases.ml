@@ -196,9 +196,6 @@ module Alias = functor (Entity : Entity) -> struct
         list in
     wallet#write Entity.name list wallet_encoding
 
-  let save wallet list =
-    wallet#write Entity.name wallet_encoding list
-
   include Entity
 
   let alias_parameter () = parameter
@@ -241,38 +238,26 @@ module Alias = functor (Entity : Entity) -> struct
       next
 
   let parse_source_string cctxt s =
-    let read path =
-      Lwt.catch
-        (fun () ->
-           Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
-           return content)
-        (fun exn ->
-           failwith
-             "cannot read file (%s)" (Printexc.to_string exn))
-      >>=? fun content ->
-      of_source content in
-    begin
-      match String.split ~limit:1 ':' s with
-      | [ "alias" ; alias ]->
-          find cctxt alias
-      | [ "text" ; text ] ->
-          of_source text
-      | [ "file" ; path ] ->
-          read path
-      | _ ->
-          find cctxt s >>= function
-          | Ok v -> return v
-          | Error a_errs ->
-              read s >>= function
-              | Ok v -> return v
-              | Error r_errs ->
-                  of_source s >>= function
-                  | Ok v -> return v
-                  | Error s_errs ->
-                      let all_errs =
-                        List.flatten [ a_errs ; r_errs ; s_errs ] in
-                      Lwt.return (Error all_errs)
-    end
+    match String.split ~limit:1 ':' s with
+    | [ "alias" ; alias ]->
+        find cctxt alias
+    | [ "text" ; text ] ->
+        of_source text
+    | [ "file" ; path ] ->
+        cctxt#read_file path >>=? of_source
+    | _ ->
+        find cctxt s >>= function
+        | Ok v -> return v
+        | Error a_errs ->
+            cctxt#read_file s >>=? of_source >>= function
+            | Ok v -> return v
+            | Error r_errs ->
+                of_source s >>= function
+                | Ok v -> return v
+                | Error s_errs ->
+                    let all_errs =
+                      List.flatten [ a_errs ; r_errs ; s_errs ] in
+                    Lwt.return (Error all_errs)
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =

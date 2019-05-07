@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** This is for use *within* the data encoding library only. Instead, you should
-    use the corresponding module intended for use: {Data_encoding.Encoding}. *)
+    use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
 module Kind: sig
   type t = [ `Fixed of int | `Dynamic | `Variable ]

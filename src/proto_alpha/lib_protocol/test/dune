@@ -1,0 +1,45 @@
+(executable
+ (name main)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-protocol-environment
+            alcotest-lwt
+            tezos_alpha_test_helpers
+            michelson_parser
+            tezos-stdlib-unix
+            bip39
+            zarith
+            lwt
+            alcotest
+            bigstring)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_alpha_test_helpers
+                   )))
+
+(alias
+ (name buildtest)
+ (package tezos-protocol-alpha)
+ (deps main.exe))
+
+; runs only the `Quick tests
+(alias
+ (name runtest_proto_alpha)
+ (package tezos-protocol-alpha)
+ (action (chdir %{workspace_root} (run %{exe:main.exe} -v -q))))
+
+; runs both `Quick and `Slow tests
+(alias
+ (name runtest_slow)
+ (package tezos-protocol-alpha)
+ (action (chdir %{workspace_root} (run %{exe:main.exe} -v))))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-alpha)
+ (deps (alias runtest_proto_alpha)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml*))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

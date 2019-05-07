@@ -471,7 +471,7 @@ module Query = struct
       >>= function
       | Ok json ->
           begin try
-              let { time_stamp ; event } =
+              let { time_stamp ; event ; _ } =
                 Data_encoding.Json.destruct
                   (wrapped_encoding Event.encoding) json in
               f (snd previous)

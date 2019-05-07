@@ -66,7 +66,8 @@ class simple_printer log =
   end
 
 class type wallet = object
-  method password_filename : string option
+  method load_passwords : string Lwt_stream.t option
+  method read_file : string -> string tzresult Lwt.t
   method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
@@ -93,6 +94,10 @@ class type io_rpcs = object
   inherit RPC_context.json
 end
 
+class type ui = object
+  method sleep : float -> unit Lwt.t
+end
+
 class type full = object
   inherit printer
   inherit prompter
@@ -100,10 +105,12 @@ class type full = object
   inherit RPC_context.json
   inherit chain
   inherit block
+  inherit ui
 end
 
 class proxy_context (obj : full) = object
-  method password_filename = obj#password_filename
+  method load_passwords = obj#load_passwords
+  method read_file = obj#read_file
   method base = obj#base
   method chain = obj#chain
   method block = obj#block
@@ -129,4 +136,5 @@ class proxy_context (obj : full) = object
   method write : type a. string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t = obj#write
   method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
   method prompt_password : type a. (a, MBytes.t tzresult) lwt_format -> a = obj#prompt_password
+  method sleep : float -> unit Lwt.t = obj#sleep
 end

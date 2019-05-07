@@ -8,8 +8,8 @@ homepage: "https://github.com/vbmithr/ocaml-uecc"
 synopsis: "Bindings for ECDH and ECDSA for 8-bit, 32-bit, and 64-bit processors"
 bug-reports: "https://github.com/vbmithr/ocaml-uecc/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-uecc"
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
+run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
 depends: [
   "dune" {build & >= "1.7"}
   "bigstring" {>= "0.1.1"}

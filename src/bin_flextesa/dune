@@ -1,0 +1,50 @@
+(executables
+  (names main)
+  (public_names flextesa)
+  (libraries tezos-network-sandbox)
+  (flags (:standard -w -9-27-30-32-40@8 -safe-string)))
+
+(alias
+  (name runtest_sandbox_accusations_simple_double_baking)
+  (locks /tcp-port/10000_range)
+  (action
+    (run %{exe:main.exe} accusations simple-double-baking
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-acc-sdb/}
+         --with-timestamp
+         --base-port 10_000
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node} )))
+
+(alias
+  (name runtest_sandbox_accusations_simple_double_endorsing)
+  (locks /tcp-port/10000_range)
+  (action
+    (run %{exe:main.exe} accusations simple-double-endorsing
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-acc-sde/}
+         --with-timestamp
+         --base-port 10_000
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node} )))
+
+(alias
+  (name runtest_sandbox_voting_demo)
+  (locks /tcp-port/30000_range)
+  (action
+    (run %{exe:main.exe} voting
+         ../../../../src/bin_client/test/proto_test_injection
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-voting-demo/}
+         --base-port 30_000
+         --size 3
+         --with-timestamp
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-admin-client-binary %{bin:tezos-admin-client}
+         --tezos-node-binary %{bin:tezos-node}
+         )))
+
+(alias
+ (name runtest)
+ (deps
+  (alias runtest_sandbox_accusations_simple_double_baking)
+  (alias runtest_sandbox_accusations_simple_double_endorsing)
+   (alias runtest_sandbox_voting_demo)
+   ))

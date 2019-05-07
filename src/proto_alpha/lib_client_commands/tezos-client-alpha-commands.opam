@@ -1,0 +1,22 @@
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: [ "Tezos devteam" ]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "ocamlfind" { build }
+  "dune" { build & >= "1.7" }
+  "tezos-base"
+  "tezos-protocol-environment"
+  "tezos-protocol-alpha"
+  "tezos-shell-services"
+  "tezos-client-base"
+  "tezos-client-alpha"
+  "tezos-client-commands"
+]
+build: [
+  [ "dune" "build" "-p" name "-j" jobs ]
+]
+synopsis: "Tezos/Protocol: alpha (protocol-specific commands for `tezos-client`)"

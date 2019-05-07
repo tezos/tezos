@@ -8,18 +8,13 @@
             tezos-client-commands
             tezos-client-genesis
             tezos-client-demo
-            tezos-client-003-PsddFKi3
+            tezos-client-alpha
             tezos-stdlib-unix
             tezos-client-base-unix
-            tezos-client-003-PsddFKi3-commands.registration
-            tezos-baking-003-PsddFKi3-commands.registration
-            tezos-client-004-Pt24m4xi
-            tezos-client-004-Pt24m4xi-commands.registration
-            tezos-baking-004-Pt24m4xi-commands.registration
+            tezos-client-alpha-commands.registration
+            tezos-baking-alpha-commands.registration
             tezos-signer-backends)
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -open Tezos_base__TzPervasives
+  (flags (:standard -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http
                     -open Tezos_stdlib_unix
                     -open Tezos_shell_services

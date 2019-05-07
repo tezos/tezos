@@ -224,27 +224,40 @@ module type T = sig
   val shutdown :
     _ t -> unit Lwt.t
 
-  (** Adds a message to the queue and waits for its result.
-      Cannot be called from within the handlers. *)
-  val push_request_and_wait :
-    _ queue t -> 'a Request.t -> 'a tzresult Lwt.t
+  (** The following interface are common elements of multiple modules below.
+      They are used to minimize repetition. *)
+  module type BOX = sig
+    (** With [BOX]es, you can put a request right at the front *)
+    type t
+    val put_request : t -> 'a Request.t -> unit
+    val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
+  end
+  module type QUEUE = sig
+    (** With [QUEUE]s, you can push requests in the queue *)
+    type 'a t
+    val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+    val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests_length : 'a t -> int
+  end
+  module type BOUNDED_QUEUE = sig
+    (** With [BOUNDED_QUEUE]s, you can push requests in the queue tentatively *)
+    type t
+    val try_push_request_now : t -> 'a Request.t -> bool
+  end
 
-  (** Adds a message to the queue. *)
-  val push_request :
-    _ queue t -> 'a Request.t -> unit Lwt.t
+  module Dropbox : sig
+    include BOX with type t := dropbox t
+  end
+  module Queue : sig
+    include QUEUE with type 'a t := 'a queue t
+    include BOUNDED_QUEUE with type t := bounded queue t
 
-  (** Adds a message to the queue immediately.
-      Returns [false] if the queue is full. *)
-  val try_push_request_now :
-    bounded queue t -> 'a Request.t -> bool
+    (** Adds a message to the queue immediately. *)
+    val push_request_now :
+      infinite queue t -> 'a Request.t -> unit
+  end
 
-  (** Adds a message to the queue immediately. *)
-  val push_request_now :
-    infinite queue t -> 'a Request.t -> unit
-
-  (** Sets the current request. *)
-  val drop_request :
-    dropbox t -> 'a Request.t -> unit
 
   (** Detects cancelation from within the request handler to stop
       asynchronous operations. *)
@@ -273,9 +286,6 @@ module type T = sig
   (** Access the event backlog. *)
   val last_events : _ t -> (Internal_event.level * Event.t list) list
 
-  (** Introspect the message queue, gives the times requests were pushed. *)
-  val pending_requests : _ queue t -> (Time.t * Request.view) list
-
   (** Get the running status of a worker. *)
   val status : _ t -> Worker_types.worker_status
 
@@ -284,13 +294,18 @@ module type T = sig
       treatment started. *)
   val current_request : _ t -> (Time.t * Time.t * Request.view) option
 
+  val information : _ t -> Worker_types.worker_information
+
   (** Introspect the state of a worker. *)
   val view : _ t -> Types.view
 
-  (** Lists the running workers in this group.
-      After they are killed, workers are kept in the table
-      for a number of seconds given in the {!Worker_types.limits}. *)
+  (** Lists the running workers in this group. *)
   val list : 'a table -> (Name.t * 'a t) list
+
+  (** [find_opt table n] is [Some worker] if the [worker] is in the [table] and
+      has name [n]. *)
+  val find_opt : 'a table -> Name.t -> 'a t option
+
 end
 
 

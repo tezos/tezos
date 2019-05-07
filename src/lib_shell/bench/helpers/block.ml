@@ -62,7 +62,7 @@ let get_next_baker_by_priority priority block =
     ~all:true
     ~max_priority:(priority+1) block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp} = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p } -> p = priority)  bakers in
+        timestamp; _ } = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p ; _ } -> p = priority)  bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
@@ -70,16 +70,16 @@ let get_next_baker_by_account pkh block =
     ~delegates:[pkh]
     ~max_priority:256 block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp ; priority } = List.hd bakers in
+        timestamp ; priority ; _ } = List.hd bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt
     ~max_priority:256 block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp ; priority } =
+        timestamp ; priority ; _ } =
     List.find
-      (fun { Alpha_services.Delegate.Baking_rights.delegate } ->
+      (fun { Alpha_services.Delegate.Baking_rights.delegate ; _ } ->
          not (List.mem delegate excludes))
       bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
@@ -155,8 +155,8 @@ module Forge = struct
     end >>=? fun fitness ->
     begin
       Alpha_services.Helpers.current_level ~offset:1l (rpc_ctxt) pred >>|? function
-      | { expected_commitment = true } -> Some (fst (Proto_Nonce.generate ()))
-      | { expected_commitment = false } -> None
+      | { expected_commitment = true ; _ } -> Some (fst (Proto_Nonce.generate ()))
+      | { expected_commitment = false ; _ } -> None
     end >>=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash = Operation_list_list_hash.compute
@@ -203,7 +203,7 @@ let initial_context
     no_reward_cycles
   =
   let bootstrap_accounts =
-    List.map (fun (Account.{ pk = public_key ; pkh = public_key_hash }, amount) ->
+    List.map (fun (Account.{ pk = public_key ; pkh = public_key_hash ; _ }, amount) ->
         Parameters_repr.{ public_key = Some public_key ; public_key_hash ; amount }
       ) initial_accounts
   in
@@ -296,6 +296,7 @@ let genesis
     ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
     ?(time_between_blocks = Constants_repr.default.time_between_blocks)
     ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
+    ?(minimum_endorsements_per_priority = Constants_repr.default.minimum_endorsements_per_priority)
     ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
     ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
     ?(proof_of_work_threshold = Int64.(neg one))
@@ -307,8 +308,12 @@ let genesis
     ?(endorsement_security_deposit = Constants_repr.default.endorsement_security_deposit)
     ?(block_reward = Constants_repr.default.block_reward)
     ?(endorsement_reward = Constants_repr.default.endorsement_reward)
+    ?(endorsement_reward_priority_bonus = Constants_repr.default.endorsement_reward_priority_bonus)
+    ?(endorsement_bonus_intercept = Constants_repr.default.endorsement_bonus_intercept)
+    ?(endorsement_bonus_slope = Constants_repr.default.endorsement_bonus_slope)
     ?(cost_per_byte = Constants_repr.default.cost_per_byte)
     ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(delay_per_missing_endorsement = Constants_repr.default.delay_per_missing_endorsement)
     (initial_accounts : (Account.t * Tez_repr.t) list) =
   let constants : Constants_repr.parametric = {
     preserved_cycles ;
@@ -318,6 +323,7 @@ let genesis
     blocks_per_voting_period ;
     time_between_blocks ;
     endorsers_per_block ;
+    minimum_endorsements_per_priority ;
     hard_gas_limit_per_operation ;
     hard_gas_limit_per_block ;
     proof_of_work_threshold ;
@@ -329,8 +335,12 @@ let genesis
     endorsement_security_deposit ;
     block_reward ;
     endorsement_reward ;
+    endorsement_reward_priority_bonus ;
+    endorsement_bonus_intercept ;
+    endorsement_bonus_slope ;
     cost_per_byte ;
     hard_storage_limit_per_operation ;
+    delay_per_missing_endorsement ;
   } in
   genesis_with_parameters constants initial_accounts
 
@@ -379,7 +389,7 @@ let bake_n ?policy n b =
     (fun b _ -> bake ?policy b) b (1 -- n)
 
 let bake_until_cycle_end ?policy b =
-  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle ; _ } ; _ } ->
   let current_level = b.header.shell.level in
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
@@ -390,7 +400,7 @@ let bake_until_n_cycle_end ?policy n b =
     (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let bake_until_cycle ?policy cycle (b:t) =
-  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle ; _ } ; _ } ->
   let rec loop (b:t) =
     let current_cycle =
       let current_level = b.header.shell.level in

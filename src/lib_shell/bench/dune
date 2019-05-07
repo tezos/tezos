@@ -3,9 +3,7 @@
  (libraries tezos-base
             tezos-shell
             tezos_alpha_bench_helpers)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
                    -open Tezos_alpha_bench_helpers)))
 

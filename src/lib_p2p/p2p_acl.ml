@@ -180,7 +180,7 @@ module IPGreylist = struct
   let add acl addr time =
     acl.greylist_ips <- IpSet.add addr time acl.greylist_ips
 
-  let mem acl addr = IpSet.mem addr !acl.greylist_ips
+  let mem acl addr = IpSet.mem addr acl.greylist_ips
 
   (* The GC operation works only on the address set. Peers are removed
      from the ring in a round-robin fashion. If a address is removed
@@ -225,7 +225,7 @@ module PeerGreylist = struct
     PeerRing.add acl.greylist_peers peer_id
 
   let mem acl peer_id =
-    (PeerRing.mem acl.greylist_peers peer_id)
+    PeerRing.mem acl.greylist_peers peer_id
 
 end
 

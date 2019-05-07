@@ -98,7 +98,7 @@ let check_network ctxt =
 
 let get_commands_for_version ctxt network chain block protocol =
   Shell_services.Blocks.protocols ctxt ~chain ~block () >>= function
-  | Ok { next_protocol = version } -> begin
+  | Ok { next_protocol = version ; _ } -> begin
       match protocol with
       | None ->
           return (Some version, Client_commands.commands_for_version version network)
@@ -126,13 +126,15 @@ let get_commands_for_version ctxt network chain block protocol =
           return (Some version, Client_commands.commands_for_version version network)
     end
 
-let select_commands ctxt { chain ; block ; protocol } =
+let select_commands ctxt { chain ; block ; protocol ; _ } =
   check_network ctxt >>= fun network ->
-  get_commands_for_version ctxt network chain block protocol >>|? fun (_, commands_for_version)  ->
+  get_commands_for_version
+    ctxt network chain block protocol >>|? fun (_, commands_for_version)  ->
   Client_rpc_commands.commands @
   Tezos_signer_backends.Ledger.commands () @
   Client_keys_commands.commands network @
   Client_helpers_commands.commands () @
+  Client_snapshot_commands.commands () @
   commands_for_version
 
 let () = Client_main_run.run (module Client_config) ~select_commands

@@ -46,7 +46,8 @@ class type io = object
 end
 
 class type wallet = object
-  method password_filename : string option
+  method load_passwords : string Lwt_stream.t option
+  method read_file : string -> string tzresult Lwt.t
   method with_lock : (unit -> 'a Lwt.t) -> 'a  Lwt.t
   method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
   method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
@@ -73,6 +74,10 @@ class type io_rpcs = object
   inherit RPC_context.json
 end
 
+class type ui = object
+  method sleep : float -> unit Lwt.t
+end
+
 class type full = object
   inherit printer
   inherit prompter
@@ -80,6 +85,7 @@ class type full = object
   inherit RPC_context.json
   inherit chain
   inherit block
+  inherit ui
 end
 
 class simple_printer : (string -> string -> unit Lwt.t) -> printer

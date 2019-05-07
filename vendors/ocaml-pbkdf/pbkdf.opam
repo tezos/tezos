@@ -8,9 +8,8 @@ authors:      ["Alfredo Beaumont <alfredo.beaumont@gmail.com>" "Sonia Meruelo <s
 maintainer:   ["Alfredo Beaumont <alfredo.beaumont@gmail.com>"]
 license:      "BSD2"
 synopsis:     "Password based key derivation functions from PKCS#5, RFC 2898"
-
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
-run-test: [ "dune" "runtest" "-p" name "-j" jobs ]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
+run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
 depends: [
   "dune" { build & >= "1.7" }
   "hacl"

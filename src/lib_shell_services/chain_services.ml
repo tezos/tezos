@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,6 +45,13 @@ type invalid_block = {
 type prefix = Block_services.chain_prefix
 let path = Block_services.chain_path
 
+let checkpoint_encoding =
+  (obj4
+     (req "block" Block_header.encoding)
+     (req "save_point" int32)
+     (req "caboose" int32)
+     (req "history_mode" History_mode.encoding))
+
 let invalid_block_encoding =
   conv
     (fun { hash ; level ; errors } -> (hash, level, errors))
@@ -63,6 +71,27 @@ module S = struct
       ~query: RPC_query.empty
       ~output: Chain_id.encoding
       RPC_path.(path / "chain_id")
+
+  let checkpoint =
+    RPC_service.get_service
+      ~description:"The current checkpoint for this chain."
+      ~query: RPC_query.empty
+      ~output: checkpoint_encoding
+      RPC_path.(path / "checkpoint")
+
+  let snapshot_export_block =
+    RPC_service.get_service
+      ~description:"Export a snapshot for this chain"
+      ~query: RPC_query.empty
+      ~output:Data_encoding.string
+      RPC_path.(path / "snapshot_export" /: RPC_arg.string /: RPC_arg.string)
+
+  let snapshot_export_last_checkpoint =
+    RPC_service.get_service
+      ~description:"Export a snapshot of the last checkpoint for this chain"
+      ~query: RPC_query.empty
+      ~output:Data_encoding.string
+      RPC_path.(path / "snapshot_export" /: RPC_arg.string)
 
   module Blocks = struct
 
@@ -145,12 +174,25 @@ let make_call1 s ctxt chain a q p =
   let s = RPC_service.prefix path s in
   RPC_context.make_call2 s ctxt chain a q p
 
+let make_call2 s ctxt chain a q p r =
+  let s = RPC_service.prefix path s in
+  RPC_context.make_call3 s ctxt chain a q p r
+
 let chain_id ctxt =
   let f = make_call0 S.chain_id ctxt in
   fun ?(chain = `Main) () ->
     match chain with
     | `Hash h -> return h
     | _ -> f chain () ()
+
+let checkpoint ctxt ?(chain = `Main) () =
+  make_call0 S.checkpoint ctxt chain () ()
+
+let snapshot_export_block ctxt ?(chain = `Main) ~export_mode ~block_hash =
+  make_call2 S.snapshot_export_block ctxt chain export_mode block_hash () ()
+
+let snapshot_export_last_checkpoint ctxt ?(chain = `Main) ~export_mode =
+  make_call1 S.snapshot_export_last_checkpoint ctxt chain export_mode () ()
 
 module Blocks = struct
 

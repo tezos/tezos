@@ -51,6 +51,10 @@ let unopt_exn err = function
   | Some x -> x
   | _ -> raise err
 
+let unopt_assert ~loc:(name, line, pos, _) = function
+  | Some v -> v
+  | None -> raise (Assert_failure (name, line, pos))
+
 let first_some a b = match a, b with
   | None, None -> None
   | None, Some v -> Some v

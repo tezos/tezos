@@ -104,6 +104,7 @@ val genesis:
   ?blocks_per_voting_period:int32 ->
   ?time_between_blocks:Period_repr.t list ->
   ?endorsers_per_block:int ->
+  ?minimum_endorsements_per_priority:int list ->
   ?hard_gas_limit_per_operation:Z.t ->
   ?hard_gas_limit_per_block:Z.t ->
   ?proof_of_work_threshold:int64 ->
@@ -115,8 +116,12 @@ val genesis:
   ?endorsement_security_deposit:Tez_repr.tez ->
   ?block_reward:Tez_repr.tez ->
   ?endorsement_reward:Tez_repr.tez ->
-  ?cost_per_byte: Tez_repr.t ->
-  ?hard_storage_limit_per_operation: Z.t ->
+  ?endorsement_reward_priority_bonus:Tez_repr.tez ->
+  ?endorsement_bonus_intercept:int ->
+  ?endorsement_bonus_slope:int ->
+  ?cost_per_byte:Tez_repr.t ->
+  ?hard_storage_limit_per_operation:Z.t ->
+  ?delay_per_missing_endorsement:Period_repr.t ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and

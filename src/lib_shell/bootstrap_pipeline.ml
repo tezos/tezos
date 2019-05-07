@@ -53,25 +53,26 @@ type t = {
 
 let operations_index_tag = Tag.def ~doc:"Operations index" "operations_index" Format.pp_print_int
 
-let assert_acceptable_header pipeline
-    hash (header : Block_header.t) =
+let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
   let time_now = Time.now () in
   fail_unless
     (Time.(add time_now 15L >= header.shell.timestamp))
-    (Future_block_header { block = hash; time = time_now;
+    (Future_block_header { block = hash ;
+                           time = time_now ;
                            block_time = header.shell.timestamp }) >>=? fun () ->
-  State.Chain.checkpoint chain_state >>= fun (checkpoint_level, checkpoint) ->
+  State.Chain.checkpoint chain_state >>= fun checkpoint ->
   fail_when
-    (Int32.equal header.shell.level checkpoint_level &&
-     not (Block_hash.equal checkpoint hash))
+    (Int32.equal header.shell.level checkpoint.shell.level &&
+     not (Block_header.equal checkpoint header))
     (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
   Chain.head chain_state >>= fun head ->
-  let checkpoint_reached = (State.Block.header head).shell.level >= checkpoint_level in
+  let checkpoint_reached =
+    (State.Block.header head).shell.level >= checkpoint.shell.level in
   if checkpoint_reached then
     (* If reached the checkpoint, every block before the checkpoint
        must be part of the chain. *)
-    if header.shell.level <= checkpoint_level then
+    if header.shell.level <= checkpoint.shell.level then
       Chain.mem chain_state hash >>= fun in_chain ->
       fail_unless in_chain
         (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
@@ -142,8 +143,37 @@ let headers_fetch_worker_loop pipeline =
     (* sender and receiver are inverted here because they are from
        the point of view of the node sending the locator *)
     let seed = {Block_locator.sender_id=pipeline.peer_id; receiver_id=sender_id } in
-    let steps = Block_locator.to_steps seed pipeline.locator in
-    iter_s (fetch_step pipeline) steps >>=? fun () ->
+    let chain_state = Distributed_db.chain_state pipeline.chain_db in
+    let state = State.Chain.global_state chain_state in
+    State.history_mode state >>= fun history_mode ->
+    begin match history_mode with
+      | History_mode.Archive ->
+          Lwt.return_none
+      | Full | Rolling ->
+          let chain_state = Distributed_db.chain_state pipeline.chain_db in
+          State.Chain.save_point chain_state >>= Lwt.return_some
+    end >>= begin fun save_point ->
+      let steps = match save_point with
+        | None ->
+            Block_locator.to_steps seed pipeline.locator
+        | Some (save_point_level, save_point) ->
+            let head, _ = (pipeline.locator : Block_locator.t :> _ * _) in
+            let head_level = head.shell.level in
+            let truncate_limit = Int32.(sub head_level save_point_level) in
+            Block_locator.to_steps_truncate ~limit:(Int32.to_int truncate_limit)
+              ~save_point seed pipeline.locator
+      in
+      match steps with
+      | [] ->
+          fail (Too_short_locator (sender_id, pipeline.locator))
+      | { Block_locator.predecessor ; _ } :: _ ->
+          State.Block.known chain_state predecessor >>= fun predecessor_known ->
+          (* Check that the locator is anchored in a block locally known *)
+          fail_unless
+            predecessor_known
+            (Too_short_locator (sender_id, pipeline.locator)) >>=? fun () ->
+          iter_s (fetch_step pipeline) steps
+    end >>=? fun () ->
     return_unit
   end >>= function
   | Ok () ->
@@ -172,6 +202,14 @@ let headers_fetch_worker_loop pipeline =
           -% a P2p_peer.Id.Logging.tag pipeline.peer_id
           -% a node_time_tag time
           -% a block_time_tag block_time) >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt.return_unit
+  | Error ([ Too_short_locator _ ] as err) ->
+      pipeline.errors <- pipeline.errors @ err ;
+      lwt_log_info Tag.DSL.(fun f ->
+          f "Too short locator received"
+          -% t event "too_short_locator"
+        ) >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->

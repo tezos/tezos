@@ -99,7 +99,6 @@ module Atom = struct
   let uint30 = int `Uint30
   let int31 = int `Int31
 
-  let char state v = int8 state (int_of_char v)
   let bool state v = uint8 state (if v then 255 else 0)
 
   let int32 state v =
@@ -249,34 +248,34 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
         raise List_too_long
     | List (_, e) ->
         List.iter (write_rec e state) value
-    | Obj (Req { encoding = e }) -> write_rec e state value
-    | Obj (Opt { kind = `Dynamic ; encoding = e }) -> begin
+    | Obj (Req { encoding = e ; _ }) -> write_rec e state value
+    | Obj (Opt { kind = `Dynamic ; encoding = e ; _ }) -> begin
         match value with
         | None -> Atom.bool state false
         | Some value -> Atom.bool state true ; write_rec e state value
       end
-    | Obj (Opt { kind = `Variable ; encoding = e }) -> begin
+    | Obj (Opt { kind = `Variable ; encoding = e ; _ }) -> begin
         match value with
         | None -> ()
         | Some value -> write_rec e state value
       end
-    | Obj (Dft { encoding = e }) -> write_rec e state value
-    | Objs { left ; right } ->
+    | Obj (Dft { encoding = e ; _ }) -> write_rec e state value
+    | Objs { left ; right ; _ } ->
         let (v1, v2) = value in
         write_rec left state v1 ;
         write_rec right state v2
     | Tup e -> write_rec e state value
-    | Tups { left ; right } ->
+    | Tups { left ; right ; _ } ->
         let (v1, v2) = value in
         write_rec left state v1 ;
         write_rec right state v2
-    | Conv { encoding = e ; proj } ->
+    | Conv { encoding = e ; proj ; _ } ->
         write_rec e state (proj value)
-    | Union { tag_size ; cases } ->
+    | Union { tag_size ; cases ; _ } ->
         let rec write_case = function
           | [] -> raise No_case_matched
-          | Case { tag = Json_only } :: tl -> write_case tl
-          | Case { encoding = e ; proj ; tag = Tag tag } :: tl ->
+          | Case { tag = Json_only ; _ } :: tl -> write_case tl
+          | Case { encoding = e ; proj ; tag = Tag tag ; _ } :: tl ->
               match proj value with
               | None -> write_case tl
               | Some value ->
@@ -294,9 +293,9 @@ let rec write_rec : type a. a Encoding.t -> state -> a -> unit =
           (state.offset - initial_offset - Binary_size.integer_to_size kind)
     | Check_size { limit ; encoding = e } ->
         write_with_limit limit e state value
-    | Describe { encoding = e } -> write_rec e state value
-    | Splitted { encoding = e } -> write_rec e state value
-    | Mu { fix } -> write_rec (fix e) state value
+    | Describe { encoding = e ; _ } -> write_rec e state value
+    | Splitted { encoding = e ; _ } -> write_rec e state value
+    | Mu { fix ; _ } -> write_rec (fix e) state value
     | Delayed f -> write_rec (f ()) state value
 
 and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =

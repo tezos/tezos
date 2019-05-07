@@ -65,6 +65,8 @@ module IPGreylist : sig
       given time. *)
   val remove_old: t -> older_than:Time.t -> unit
 
+  val mem: t -> P2p_addr.t -> bool
+
   val encoding: P2p_addr.t list Data_encoding.t
 
 end
@@ -73,6 +75,7 @@ module IPBlacklist : sig
 
   val add: t -> P2p_addr.t -> unit
   val remove: t -> P2p_addr.t -> unit
+  val mem: t -> P2p_addr.t -> bool
 
 end
 
@@ -80,6 +83,7 @@ module PeerBlacklist : sig
 
   val add: t -> P2p_peer.Id.t -> unit
   val remove: t -> P2p_peer.Id.t -> unit
+  val mem: t -> P2p_peer.Id.t -> bool
 
 end
 
@@ -87,6 +91,7 @@ end
 module PeerGreylist : sig
 
   val add: t -> P2p_peer.Id.t -> unit
+  val mem: t -> P2p_peer.Id.t -> bool
 
 end
 

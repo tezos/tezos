@@ -72,14 +72,14 @@ echo 'Checking the current period = proposal with non empty listings'
 
 echo 'Injecting protocols...'
 
-cp -r demo $tempdir/proto1
+cp -r proto_test_injection $tempdir/proto1
 proto1=`$admin_client inject protocol $tempdir/proto1 | sed -E 's/Injected protocol (.*) successfully/\1/'`
 
-cp -r demo $tempdir/proto2
+cp -r proto_test_injection $tempdir/proto2
 echo '(* 2 *)' >> $tempdir/proto2/main.ml
 proto2=`$admin_client inject protocol $tempdir/proto2 | sed -E 's/Injected protocol (.*) successfully/\1/'`
 
-cp -r demo $tempdir/proto3
+cp -r proto_test_injection $tempdir/proto3
 echo '(* 3 *)' >> $tempdir/proto3/main.ml
 proto3=`$admin_client inject protocol $tempdir/proto3 | sed -E 's/Injected protocol (.*) successfully/\1/'`
 

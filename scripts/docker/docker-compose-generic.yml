@@ -1,16 +1,12 @@
-version: '3'
-
-volumes:
-  client_data:
-  node_data:
-
+version: "2"
 services:
+
   node:
-    image: tezos/tezos:zeronet
+    image: tezos/tezos:latest
     hostname: node
     command: tezos-node
     ports:
-      - 19732:19732
+      - 9732:9732
     expose:
       - '8732'
     volumes:
@@ -21,7 +17,7 @@ services:
   ## Duplicate the `baker/endorser/accuser` containers for each PROTOCOL
   ## in file `active_protocol_versions`
   baker-alpha:
-    image: tezos/tezos:zeronet
+    image: tezos/tezos:latest
     hostname: baker-alpha
     environment:
       - PROTOCOL=alpha
@@ -29,12 +25,11 @@ services:
     links:
       - node
     volumes:
-      - node_data:/var/run/tezos/node:ro
       - client_data:/var/run/tezos/client
     restart: on-failure
 
   endorser-alpha:
-    image: tezos/tezos:zeronet
+    image: tezos/tezos:latest
     hostname: endorser-alpha
     environment:
       - PROTOCOL=alpha
@@ -46,7 +41,7 @@ services:
     restart: on-failure
 
   accuser-alpha:
-    image: tezos/tezos:zeronet
+    image: tezos/tezos:latest
     hostname: accuser-alpha
     environment:
       - PROTOCOL=alpha
@@ -56,3 +51,7 @@ services:
     volumes:
       - client_data:/var/run/tezos/client
     restart: on-failure
+
+volumes:
+  node_data:
+  client_data:

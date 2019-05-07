@@ -74,7 +74,7 @@ let init ?mapsize path =
         | "nosync" -> [ Lmdb.NoSync ]
         | "nometasync" -> [ Lmdb.NoMetaSync ]
         | _ ->
-            Printf.eprintf "Unrecognized TEZOS_SYNC option : %s\n\
+            Printf.eprintf "Unrecognized TEZOS_STORE_SYNC option : %s\n\
                             allowed: nosync nometasync" s;
             []
   in
@@ -82,7 +82,7 @@ let init ?mapsize path =
   | Ok dir -> return { dir ; parent = Lwt.new_key () }
   | Error err -> failwith "%a" Lmdb.pp_error err
 
-let close { dir } = Lmdb.closedir dir
+let close { dir ; _ } = Lmdb.closedir dir
 
 let known { dir ; parent } key =
   begin match Lwt.get parent with
@@ -115,15 +115,6 @@ let read { dir ; parent } key =
   end |> function
   | Ok v -> return v
   | Error _err -> fail (Unknown key)
-
-let read_exn { dir ; parent } key =
-  begin match Lwt.get parent with
-    | Some (txn, db, _cursor) -> Lmdb.get txn db (concat key) >>| MBytes.copy
-    | None ->
-        Lmdb.with_ro_db dir ~f:begin fun txn db ->
-          Lmdb.get txn db (concat key) >>| MBytes.copy
-        end
-  end |> of_result
 
 let store { dir ; parent } k v =
   begin match Lwt.get parent with
@@ -307,3 +298,13 @@ let fold_keys t k ~init ~f =
 
 let keys t =
   fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+
+let open_with_atomic_rw ?mapsize path f =
+  let open Error_monad in
+  init ?mapsize path >>=? fun state ->
+  with_rw_cursor_lwt state ~f:(fun _c -> f state) >>=? fun res ->
+  close state ;
+  return res
+
+let with_atomic_rw state f =
+  with_rw_cursor_lwt state ~f:(fun _c -> f ())

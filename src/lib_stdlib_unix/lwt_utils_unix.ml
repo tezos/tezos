@@ -323,7 +323,7 @@ module Socket = struct
               | [] ->
                   Lwt.return
                     (Error (failure "could not connect to '%s'" host :: List.rev acc))
-              | { Unix.ai_family; ai_socktype; ai_protocol; ai_addr } :: addrs ->
+              | { Unix.ai_family ; ai_socktype ; ai_protocol ; ai_addr ; _ } :: addrs ->
                   let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
                   protect ~on_error:begin fun e ->
                     Lwt_unix.close sock >>= fun () ->
@@ -350,7 +350,7 @@ module Socket = struct
           (handle_litteral_ipv6 host) service (AI_PASSIVE :: opts) >>= function
         | [] -> failwith "could not resolve host '%s'" host
         | addrs ->
-            let do_bind { Unix.ai_family; ai_socktype; ai_protocol; ai_addr } =
+            let do_bind { Unix.ai_family ; ai_socktype ; ai_protocol ; ai_addr ; _ } =
               let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
               Lwt_unix.setsockopt sock SO_REUSEADDR true ;
               Lwt_unix.bind sock ai_addr >>= fun () ->

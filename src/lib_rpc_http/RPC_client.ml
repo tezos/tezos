@@ -429,7 +429,7 @@ type config = {
 let config_encoding =
   let open Data_encoding in
   conv
-    (fun { host ; port ; tls } -> (host, port, tls))
+    (fun { host ; port ; tls ; logger = _ } -> (host, port, tls))
     (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger })
     (obj3
        (req "host" string)

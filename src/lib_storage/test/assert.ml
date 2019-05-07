@@ -77,3 +77,9 @@ let equal_key_dir_list ?msg l1 l2 =
       | `Key k -> "Key " ^ String.concat "/" k
       | `Dir k -> "Dir " ^ String.concat "/" k)
     l1 l2
+
+let equal_context_hash_list ?msg l1 l2 =
+  let pr_persist hash =
+    Printf.sprintf "[%s]" @@ Context_hash.to_string hash
+  in
+  make_equal_list ?msg Context_hash.(=) pr_persist l1 l2

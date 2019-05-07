@@ -100,6 +100,7 @@ and context = {
   parents: GitStore.Commit.t list ;
   tree: GitStore.tree ;
 }
+
 type t = context
 
 (*-- Version Access and Update -----------------------------------------------*)
@@ -255,11 +256,6 @@ module Hack = struct
 
   let sort_entries = List.fast_sort Sort_key.compare
 
-  let pp_hex ppf x =
-    let buf = IrminBlake2B.to_raw x in
-    let `Hex hex = Hex.of_cstruct buf in
-    Fmt.string ppf hex
-
   module Entry = struct
     type kind = [ `Node | `Contents of Metadata.t ]
     type entry = { kind : kind; name : string; node : IrminBlake2B.t; }
@@ -348,9 +344,6 @@ let commit ~time ?message context =
 (*-- Generic Store Primitives ------------------------------------------------*)
 
 let data_key key = "data" :: key
-let undata_key = function
-  | "data" :: key -> key
-  | _ -> assert false
 
 type key = string list
 type value = MBytes.t
@@ -441,7 +434,6 @@ let init ?patch_context ?mapsize ?readonly root =
 
 let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
-
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = GitStore.Tree.empty in
   let ctxt = { index ; tree ; parents = [] } in
@@ -514,13 +506,13 @@ module Pruned_block = struct
     let open Data_encoding in
     conv
       (fun { block_header ; operations ; operation_hashes} ->
-         (block_header, operations, operation_hashes))
-      (fun (block_header, operations, operation_hashes) ->
+         (operations, operation_hashes, block_header))
+      (fun (operations, operation_hashes, block_header) ->
          { block_header ; operations ; operation_hashes})
       (obj3
-         (req "block_header" (dynamic_size Block_header.encoding))
          (req "operations" (list (tup2 int31 (list (dynamic_size Operation.encoding)))))
-         (req "operation_hashes" (list (tup2 int31 (list Operation_hash.encoding))))
+         (req "operation_hashes" (list (tup2 int31 (list (dynamic_size Operation_hash.encoding)))))
+         (req "block_header" Block_header.encoding)
       )
 
   let to_bytes =
@@ -540,22 +532,23 @@ module Block_data = struct
     operations : Operation.t list list ;
   }
 
+  let header { block_header } = block_header
+
   let encoding =
     let open Data_encoding in
     conv
       (fun { block_header  ;
              operations} ->
-        (block_header,
-         operations))
-      (fun (block_header,
-            operations) ->
+        (operations,
+         block_header))
+      (fun (operations,
+            block_header) ->
         { block_header ;
           operations})
       (obj2
-         (req "block_header" (dynamic_size Block_header.encoding))
-         (req "operations"
-            (list (list (dynamic_size Operation.encoding))))
-      )
+         (req "operations" (list (list (dynamic_size Operation.encoding))))
+         (req "block_header" Block_header.encoding
+         ))
 
   let to_bytes =
     Data_encoding.Binary.to_bytes_exn encoding
@@ -678,6 +671,46 @@ module Dumpable_context = struct
     | `Node h1, `Node h2 -> Context_hash.( h1 = h2 )
     | `Contents _, `Node _ | `Node _, `Contents _ -> false
 
+  let commit_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun irmin_info ->
+         let author = Irmin.Info.author irmin_info in
+         let message = Irmin.Info.message irmin_info in
+         let date = Irmin.Info.date irmin_info in
+         (author, message, date))
+      (fun (author, message, date) ->
+         Irmin.Info.v ~author ~date message)
+      (obj3
+         (req "author" string)
+         (req "message" string)
+         (req "date" int64))
+
+  let blob_encoding =
+    let open Data_encoding in
+    conv
+      (fun (`Blob h) -> h)
+      (fun h -> `Blob h)
+      (obj1 (req "blob" bytes))
+
+  let node_encoding =
+    let open Data_encoding in
+    conv
+      (fun (`Node h) -> h)
+      (fun h -> `Node h)
+      (obj1 (req "node" bytes))
+
+  let hash_encoding : hash Data_encoding.t =
+    let open Data_encoding in
+    let kind_encoding = string_enum [("node", `Node) ; ("blob", `Blob) ] in
+    conv
+      begin fun hash -> hash_export hash end
+      begin function
+        | (`Node, h) -> `Node (Context_hash.of_bytes_exn h)
+        | (`Blob, h) -> `Contents (Context_hash.of_bytes_exn h, ())
+      end
+      (obj2 (req "kind" kind_encoding) (req "value" bytes))
+
   let context_parents ctxt =
     match ctxt with
     | { parents = [commit]; _ } ->
@@ -727,7 +760,6 @@ module Dumpable_context = struct
     | Some sub_tree ->
         GitStore.Tree.add_tree tree key sub_tree >>=
         Lwt.return_some
-
 
   let add_mbytes index tree key bytes =
     GitStore.Tree.hash index.repo (`Contents (bytes, ())) >>= fun _ignored  ->
@@ -803,6 +835,79 @@ let get_protocol_data_from_header index block_header =
       info ;
     })
 
+(* Mock some GitStore types, so we can build our own Merkle tree. *)
+
+module Mock : sig
+
+  val node : GitStore.Repo.t -> P.Node.key -> GitStore.node
+
+  val commit : GitStore.repo -> Hack.key -> P.Commit.value -> GitStore.commit
+
+end = struct
+
+  [@@@ocaml.warning "-37"]
+
+  type commit = { r: GitStore.Repo.t ; h: Context_hash.t; v: P.Commit.value }
+
+  type empty
+
+  type u =
+    | Map : empty -> u
+    | Key : GitStore.Repo.t * P.Node.key -> u
+    | Both: empty * empty * empty -> u
+
+  and node = {mutable v : u}
+
+  let node repo key =
+    let t : u = Key (repo, key) in
+    let node : node = {v = t} in
+    (Obj.magic node : GitStore.node)
+
+  let commit r h v =
+    let c : commit = {r ; h ; v} in
+    (Obj.magic c : GitStore.commit)
+
+end
+
+let validate_context_hash_consistency_and_commit
+    ~data_hash
+    ~expected_context_hash
+    ~timestamp
+    ~test_chain
+    ~protocol_hash
+    ~message
+    ~author
+    ~parents
+    ~index
+  =
+  let protocol_value = Protocol_hash.to_bytes protocol_hash in
+  let test_chain_value = Data_encoding.Binary.to_bytes_exn
+      Test_chain_status.encoding test_chain in
+  let tree = GitStore.Tree.empty in
+  GitStore.Tree.add tree current_protocol_key protocol_value >>= fun tree ->
+  GitStore.Tree.add tree current_test_chain_key test_chain_value >>= fun tree ->
+  let info = Irmin.Info.v ~date:(Time.to_seconds timestamp) ~author message in
+  let o_tree = Hack.cast (match tree with `Node n -> n | _ -> assert false) in
+  let map = match o_tree with Map m -> m | _ -> assert false in
+  let data_tree = Hack.Key data_hash in
+  let new_map = Hack.Map (Hack.StepMap.add "data" (`Node data_tree) map) in
+  let node = Hack.hash_node new_map in
+  let commit = P.Commit.Val.v ~parents ~node ~info in
+  let computed_context_hash = P.Commit.Key.digest P.Commit.Val.t commit in
+  if Context_hash.equal expected_context_hash computed_context_hash then
+    let mock_parents = List.map (fun h -> Mock.commit index.repo h commit) parents in
+    let ctxt = {index ; tree = GitStore.Tree.empty ; parents = mock_parents} in
+    set_test_chain ctxt test_chain >>= fun ctxt ->
+    set_protocol ctxt protocol_hash >>= fun ctxt ->
+    let data_t = `Node (Mock.node index.repo data_hash) in
+    GitStore.Tree.add_tree ctxt.tree current_data_key data_t >>= fun new_tree ->
+    GitStore.Commit.v ctxt.index.repo ~info ~parents:ctxt.parents new_tree
+    >>= fun commit ->
+    let ctxt_h = GitStore.Commit.hash commit in
+    Lwt.return (Context_hash.equal ctxt_h expected_context_hash)
+  else
+    Lwt.return_false
+
 (* Context dumper *)
 
 module Context_dumper = Context_dump.Make(Dumpable_context)
@@ -864,3 +969,30 @@ let dump_contexts idx datas ~filename =
           fail (Cannot_create_file msg))
   >>=? fun fd ->
   dump_contexts_fd idx datas ~fd
+
+let restore_contexts idx ~filename =
+  let file_init () =
+    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY;] 0o600
+    >>= return
+  in
+  Lwt.catch file_init
+    (function
+      | Unix.Unix_error (e,_,_) -> fail @@ Cannot_open_file (Unix.error_message e)
+      | exc ->
+          let msg = Printf.sprintf "unknown error: %s" (Printexc.to_string exc) in
+          fail (Cannot_open_file msg))
+  >>=? fun fd ->
+  Lwt.finalize
+    (fun () ->
+       restore_contexts_fd idx ~fd
+       >>=? fun result ->
+       Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR
+       >>= fun current ->
+       Lwt_unix.fstat fd
+       >>= fun stats ->
+       let total = stats.Lwt_unix.st_size in
+       if current = total
+       then return result
+       else fail @@ Suspicious_file (total - current)
+    )
+    (fun () -> Lwt_unix.close fd)

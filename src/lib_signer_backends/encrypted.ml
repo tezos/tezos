@@ -156,19 +156,14 @@ let rec interactive_decrypt_loop
   | None ->
       interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
 
-(* add all passwords in [filename] to the list of known passwords *)
-let password_file_load = function
-  |Some filename ->
-      if Sys.file_exists filename then begin
-        let stream = Lwt_io.lines_of_file filename in
-        Lwt_stream.iter
-          (fun p ->
-             passwords := MBytes.of_string p :: !passwords)
-          stream >>= fun () ->
-        return_unit
-      end
-      else
-        return_unit
+(* add all passwords obtained by [ctxt#load_passwords] to the list of known passwords *)
+let password_file_load ctxt = match ctxt#load_passwords with
+  | Some stream ->
+      Lwt_stream.iter
+        (fun p ->
+           passwords := MBytes.of_string p :: !passwords)
+        stream >>= fun () ->
+      return_unit
   | None -> return_unit
 
 let rec noninteractive_decrypt_loop algo ~encrypted_sk = function
@@ -200,7 +195,7 @@ let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt >>=? fun sks ->
-  password_file_load cctxt#password_filename >>=? fun () ->
+  password_file_load cctxt >>=? fun () ->
   iter_s begin fun (name, sk_uri) ->
     if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then
       return_unit
@@ -211,7 +206,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
 
 let decrypt_list (cctxt : #Client_context.io_wallet) keys =
   Secret_key.load cctxt >>=? fun sks ->
-  password_file_load cctxt#password_filename >>=? fun () ->
+  password_file_load cctxt >>=? fun () ->
   iter_s begin fun (name, sk_uri) ->
     if Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme &&
        (keys = [] || List.mem name keys) then

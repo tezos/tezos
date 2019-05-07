@@ -83,7 +83,7 @@ module Types = struct
   }
 
   let view (state : state) _ : view =
-    let { bootstrapped ; active_peers ; bootstrapped_peers } = state in
+    let { bootstrapped ; active_peers ; bootstrapped_peers ; _ } = state in
     { bootstrapped ;
       active_peers =
         P2p_peer.Table.fold (fun id _ l -> id :: l) active_peers [] ;
@@ -103,16 +103,17 @@ let shutdown w =
   Worker.shutdown w
 
 let shutdown_child nv active_chains =
-  Lwt_utils.may ~f:(fun ({ parameters = { chain_state ; global_chains_input ; } }, shutdown) ->
-      Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
-      Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
-      State.update_chain_data nv.parameters.chain_state begin fun _ chain_data ->
-        Lwt.return (Some { chain_data with test_chain = None }, ())
-      end >>= fun () ->
-      shutdown () >>= fun () ->
-      nv.child <- None ;
-      Lwt.return_unit
-    ) nv.child
+  Lwt_utils.may ~f:(fun
+                     ({ parameters = { chain_state ; global_chains_input ; _ } ; _ }, shutdown) ->
+                     Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
+                     Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
+                     State.update_chain_data nv.parameters.chain_state begin fun _ chain_data ->
+                       Lwt.return (Some { chain_data with test_chain = None }, ())
+                     end >>= fun () ->
+                     shutdown () >>= fun () ->
+                     nv.child <- None ;
+                     Lwt.return_unit
+                   ) nv.child
 
 let notify_new_block w block =
   let nv = Worker.state w in
@@ -124,7 +125,7 @@ let notify_new_block w block =
          with Not_found -> ()) ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
-  Worker.push_request_now w (Validated block)
+  Worker.Queue.push_request_now w (Validated block)
 
 let may_toggle_bootstrapped_chain w =
   let nv = Worker.state w in
@@ -171,17 +172,33 @@ let with_activated_peer_validator w peer_id f =
       | Worker_types.Launching _ -> return_unit
 
 let may_update_checkpoint chain_state new_head =
-  State.Chain.checkpoint chain_state >>= fun (old_level, _old_block) ->
-  let new_level = State.Block.last_allowed_fork_level new_head in
-  if new_level <= old_level then
-    Lwt.return_unit
+  State.Chain.checkpoint chain_state >>= fun checkpoint ->
+  State.Block.last_allowed_fork_level new_head >>=? fun new_level ->
+  if new_level <= checkpoint.shell.level then
+    return_unit
   else
+    let state = State.Chain.global_state chain_state in
+    State.history_mode state >>= fun history_mode ->
     let head_level = State.Block.level new_head in
     State.Block.predecessor_n new_head
       (Int32.to_int (Int32.sub head_level new_level)) >>= function
-    | None -> Lwt.return_unit (* should not happen *)
-    | Some new_block ->
-        State.Chain.set_checkpoint chain_state (new_level, new_block)
+    | None -> assert false (* should not happen *)
+    | Some new_checkpoint ->
+        State.Block.read_opt chain_state new_checkpoint >>= function
+        | None -> assert false (* should not happen *)
+        | Some new_checkpoint ->
+            Log.log_notice "@[Update to checkpoint %a (running in mode %a).@]"
+              Block_hash.pp (State.Block.hash new_checkpoint)
+              History_mode.pp history_mode ;
+            let new_checkpoint = State.Block.header new_checkpoint in
+            begin match history_mode with
+              | History_mode.Archive ->
+                  State.Chain.set_checkpoint chain_state new_checkpoint
+              | Full ->
+                  State.Chain.set_checkpoint_then_purge_full chain_state new_checkpoint
+              | Rolling ->
+                  State.Chain.set_checkpoint_then_purge_rolling chain_state new_checkpoint
+            end >>= fun () -> return_unit
 
 let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
@@ -190,8 +207,8 @@ let may_switch_test_chain w active_chains spawn_child block =
     State.Block.test_chain block >>= function
     | Not_running, _ -> shutdown_child nv active_chains >>= return
     | (Forking _ | Running _), None -> return_unit (* only for snapshots *)
-    | (Forking { protocol ; expiration }
-      | Running { protocol ; expiration }), Some forking_block ->
+    | (Forking { protocol ; expiration ; _ }
+      | Running { protocol ; expiration ; _ }), Some forking_block ->
         let genesis = Context.compute_testchain_genesis (State.Block.hash forking_block) in
         let chain_id = Context.compute_testchain_chain_id genesis in
         let activated =
@@ -327,8 +344,8 @@ let on_request (type a) w
   if not accepted_head then
     return Event.Ignored_head
   else begin
-    Chain.set_head nv.parameters.chain_state block >>= fun previous ->
-    may_update_checkpoint nv.parameters.chain_state block >>= fun () ->
+    Chain.set_head nv.parameters.chain_state block >>=? fun previous ->
+    may_update_checkpoint nv.parameters.chain_state block >>=? fun () ->
     broadcast_head w ~previous block >>= fun () ->
     begin match nv.prevalidator with
       | Some old_prevalidator ->
@@ -401,10 +418,9 @@ let on_close w =
   Lwt.return_unit
 
 let on_launch start_prevalidator w _ parameters =
-  Chain.init_head parameters.chain_state >>= fun () ->
   (if start_prevalidator then
      State.read_chain_data parameters.chain_state
-       (fun _ {State.current_head} -> Lwt.return current_head) >>= fun head ->
+       (fun _ { State.current_head ; _ } -> Lwt.return current_head) >>= fun head ->
      State.Block.protocol_hash head >>= fun head_hash ->
      safe_get_protocol head_hash >>= function
      | Ok (module Proto) -> begin
@@ -510,6 +526,7 @@ let rec create
       chain_db = Distributed_db.activate db chain_state ;
       chain_state ;
       limits } in
+  Chain.init_head chain_state >>=? fun () ->
   Worker.launch table
     prevalidator_limits.worker_limits
     (State.Chain.id chain_state)
@@ -544,25 +561,25 @@ let create
     global_db state limits
 
 let chain_id w =
-  let { parameters = { chain_state } } = Worker.state w in
+  let { parameters = { chain_state ; _ } ; _ } = Worker.state w in
   State.Chain.id chain_state
 
 let chain_state w =
-  let { parameters = { chain_state } } = Worker.state w in
+  let { parameters = { chain_state ; _ } ; _ } = Worker.state w in
   chain_state
 
 let prevalidator w =
-  let { prevalidator } = Worker.state w in
+  let { prevalidator ; _ } = Worker.state w in
   prevalidator
 
 let chain_db w =
-  let { parameters = { chain_db } } = Worker.state w in
+  let { parameters = { chain_db ; _ } ; _ } = Worker.state w in
   chain_db
 
 let child w =
   match (Worker.state w).child with
   | None -> None
-  | Some ({ parameters = { chain_state } }, _) ->
+  | Some ({ parameters = { chain_state ;_ } ; _ }, _) ->
       try Some (List.assoc (State.Chain.id chain_state) (Worker.list table))
       with Not_found -> None
 
@@ -577,18 +594,18 @@ let assert_fitness_increases ?(force = false) w distant_header =
        (State.Block.fitness local_header) <= 0)
     (failure "Fitness too low")
 
-let assert_checkpoint w hash (header: Block_header.t) =
+let assert_checkpoint w (header: Block_header.t) =
   let pv = Worker.state w in
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
-  State.Chain.acceptable_block chain_state hash header >>= fun acceptable ->
+  State.Chain.acceptable_block chain_state header >>= fun acceptable ->
   fail_unless acceptable
-    (Validation_errors.Checkpoint_error (hash, None))
+    (Validation_errors.Checkpoint_error (Block_header.hash header, None))
 
 let validate_block w ?force hash block operations =
   let nv = Worker.state w in
   assert (Block_hash.equal hash (Block_header.hash block)) ;
   assert_fitness_increases ?force w block >>=? fun () ->
-  assert_checkpoint w hash block >>=? fun () ->
+  assert_checkpoint w block >>=? fun () ->
   Block_validator.validate
     ~canceler:(Worker.canceler w)
     ~notify_new_block:(notify_new_block w)
@@ -597,22 +614,22 @@ let validate_block w ?force hash block operations =
     hash block operations
 
 let bootstrapped w =
-  let { bootstrapped_waiter } = Worker.state w in
+  let { bootstrapped_waiter ; _ } = Worker.state w in
   Lwt.protected bootstrapped_waiter
 
 let valid_block_watcher w =
-  let { valid_block_input } = Worker.state w in
+  let { valid_block_input ; _ } = Worker.state w in
   Lwt_watcher.create_stream valid_block_input
 
 let new_head_watcher w =
-  let { new_head_input } = Worker.state w in
+  let { new_head_input ; _ } = Worker.state w in
   Lwt_watcher.create_stream new_head_input
 
 let status = Worker.status
 
 let running_workers () = Worker.list table
 
-let pending_requests t = Worker.pending_requests t
+let pending_requests t = Worker.Queue.pending_requests t
 
 let current_request t = Worker.current_request t
 

@@ -34,11 +34,6 @@ let default_tcp_port =
   | None -> "7732"
   | Some port -> port
 
-let default_unix_path =
-  match Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH" with
-  | None -> Filename.concat (Sys.getenv "HOME") (".tezos-signer.sock")
-  | Some path -> path
-
 let default_https_host =
   match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
   | None -> "localhost"
@@ -118,7 +113,7 @@ let may_setup_pidfile = function
 
 let commands base_dir require_auth : Client_context.full command list =
   Tezos_signer_backends.Ledger.commands () @
-  (Client_keys_commands.commands (Some `Zeronet) @
+  (Client_keys_commands.commands None @
    [ command ~group
        ~desc: "Launch a signer daemon over a TCP socket."
        (args5
@@ -266,13 +261,10 @@ let commands base_dir require_auth : Client_context.full command list =
           Handler.Authorized_key.add ~force:false cctxt name key)
    ])
 
-
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
 let default_base_dir =
   Filename.concat home ".tezos-signer"
-
-let (//) = Filename.concat
 
 let string_parameter () : (string, _) parameter =
   parameter (fun _ x -> return x)

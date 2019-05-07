@@ -1,0 +1,16 @@
+(executable
+ (name main_endorser_alpha)
+ (public_name tezos-endorser-alpha)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-alpha-commands)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_client_alpha
+                   -open Tezos_client_commands
+                   -open Tezos_baking_alpha_commands
+                   -open Tezos_client_base_unix)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

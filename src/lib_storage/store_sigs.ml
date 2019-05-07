@@ -51,7 +51,6 @@ module type SINGLE_STORE = sig
   val known: t -> bool Lwt.t
   val read: t -> value tzresult Lwt.t
   val read_opt: t -> value option Lwt.t
-  val read_exn: t -> value Lwt.t
   val store: t -> value -> unit Lwt.t
   val remove: t -> unit Lwt.t
 end
@@ -65,7 +64,6 @@ module type STORE = sig
   val known: t -> key -> bool Lwt.t
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
-  val read_exn: t -> key -> value Lwt.t
   val store: t -> key -> value -> unit Lwt.t
   val remove: t -> key -> unit Lwt.t
 
@@ -108,7 +106,6 @@ module type MAP_STORE = sig
   val known: t -> key -> bool Lwt.t
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
-  val read_exn: t -> key -> value Lwt.t
   val store: t -> key -> value -> unit Lwt.t
   val remove: t -> key -> unit Lwt.t
   val keys: t -> key list Lwt.t

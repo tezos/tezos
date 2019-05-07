@@ -218,7 +218,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
   let oc = open_out functor_file in
   Packer.dump oc hash
     (Array.map
-       begin fun { Protocol.name }  ->
+       begin fun { Protocol.name ; _ }  ->
          let name_lowercase = String.uncapitalize_ascii name in
          source_dir // name_lowercase ^ ".ml"
        end

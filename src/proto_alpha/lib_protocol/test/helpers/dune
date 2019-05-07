@@ -1,0 +1,25 @@
+(library
+ (name tezos_alpha_test_helpers)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-shell-services
+            tezos-protocol-environment
+            tezos-protocol-alpha
+            tezos-crypto
+            tezos-data-encoding
+            tezos-rpc
+            alcotest
+            alcotest-lwt
+            lwt
+            zarith
+            ocplib-endian
+            cstruct
+            secp256k1)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml*))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

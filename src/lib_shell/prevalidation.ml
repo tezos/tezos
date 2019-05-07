@@ -120,15 +120,16 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
     let { Block_header.shell =
             { fitness = predecessor_fitness ;
               timestamp = predecessor_timestamp ;
-              level = predecessor_level } } =
+              level = predecessor_level ; _ } ; _ } =
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
     let predecessor_header = State.Block.header predecessor in
     let predecessor_hash = State.Block.hash predecessor in
+    State.Block.max_operations_ttl predecessor >>=? fun max_op_ttl ->
     Chain_traversal.live_blocks
       predecessor
-      (State.Block.max_operations_ttl predecessor)
-    >>= fun (live_blocks, live_operations) ->
+      max_op_ttl
+    >>=? fun (live_blocks, live_operations) ->
     Block_validation.update_testchain_status
       predecessor_context predecessor_header
       timestamp >>=? fun predecessor_context ->
@@ -284,7 +285,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   let pred_shell_header = State.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
   Block_validation.may_patch_protocol
-    ~level block_result >>=? fun { fitness ; context ; message } ->
+    ~level block_result >>=? fun { fitness ; context ; message ; _ } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
   Context.get_protocol context >>= fun protocol ->
   let proto_level =

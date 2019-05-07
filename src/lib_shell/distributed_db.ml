@@ -63,7 +63,7 @@ module Make_raw
 
   module Request = struct
     type param = Request_message.param request_param
-    let active { active } = active ()
+    let active { active ; _ } = active ()
     let initial_delay  = Request_message.initial_delay
 
     let rec send state gid keys =
@@ -102,7 +102,7 @@ module Make_raw
     let table = Table.create ?global_input scheduler param in
     { scheduler ; table }
 
-  let shutdown { scheduler } =
+  let shutdown { scheduler ; _ } =
     Scheduler.shutdown scheduler
 
 end
@@ -113,7 +113,6 @@ module Fake_operation_storage = struct
   let known _ _ = Lwt.return_false
   let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
   let read_opt _ _ = Lwt.return_none
-  let read_exn _ _ = raise Not_found
 end
 
 module Raw_operation =
@@ -143,9 +142,6 @@ module Block_header_storage = struct
   let read_opt chain_state h =
     State.Block.read_opt chain_state h >>= fun b ->
     Lwt.return (Option.map ~f:State.Block.header b)
-  let read_exn chain_state h =
-    State.Block.read_exn chain_state h >>= fun b ->
-    Lwt.return (State.Block.header b)
 end
 
 module Raw_block_header =
@@ -179,10 +175,6 @@ module Operation_hashes_storage = struct
     | Some b ->
         State.Block.operation_hashes b i >>= fun (ops, _) ->
         Lwt.return_some ops
-  let read_exn chain_state (h, i) =
-    State.Block.read_exn chain_state h >>= fun b ->
-    State.Block.operation_hashes b i >>= fun (ops, _) ->
-    Lwt.return ops
 end
 
 module Operations_table =
@@ -234,14 +226,6 @@ module Raw_operation_hashes = struct
             None
       end)
 
-  let inject_all table hash operations =
-    Lwt_list.mapi_p
-      (fun i ops -> Table.inject table (hash, i) ops)
-      operations >>= Lwt_list.for_all_s (fun x -> Lwt.return x)
-
-  let read_all table hash n =
-    map_p (fun i -> Table.read table (hash, i)) (0 -- (n-1))
-
   let clear_all table hash n =
     List.iter (fun i -> Table.clear_or_cancel table (hash, i)) (0 -- (n-1))
 
@@ -261,10 +245,6 @@ module Operations_storage = struct
     | Some b ->
         State.Block.operations b i >>= fun (ops, _) ->
         Lwt.return_some ops
-  let read_exn chain_state (h, i) =
-    State.Block.read_exn chain_state h >>= fun b ->
-    State.Block.operations b i >>= fun (ops, _) ->
-    Lwt.return ops
 end
 
 module Raw_operations = struct
@@ -307,14 +287,6 @@ module Raw_operations = struct
             None
       end)
 
-  let inject_all table hash operations =
-    Lwt_list.mapi_p
-      (fun i ops -> Table.inject table (hash, i) ops)
-      operations >>= Lwt_list.for_all_s (fun x -> Lwt.return x)
-
-  let read_all table hash n =
-    map_p (fun i -> Table.read table (hash, i)) (0 -- (n-1))
-
   let clear_all table hash n =
     List.iter (fun i -> Table.clear_or_cancel table (hash, i)) (0 -- (n-1))
 
@@ -326,7 +298,6 @@ module Protocol_storage = struct
   let known = State.Protocol.known
   let read = State.Protocol.read
   let read_opt = State.Protocol.read_opt
-  let read_exn = State.Protocol.read_exn
 end
 
 module Raw_protocol =
@@ -392,22 +363,22 @@ let noop_callback = {
 
 type t = db
 
-let state { disk } = disk
-let chain_state { chain_state } = chain_state
-let db { global_db } = global_db
+let state { disk ; _ } = disk
+let chain_state { chain_state ; _ } = chain_state
+let db { global_db ; _ } = global_db
 
 let my_peer_id chain_db = P2p.peer_id chain_db.global_db.p2p
 
 let get_peer_metadata chain_db = P2p.get_peer_metadata chain_db.global_db.p2p
 
-let read_block_header { disk } h =
+let read_block_header { disk ; _ } h =
   State.read_block disk h >>= function
   | Some b ->
       Lwt.return_some (State.Block.chain_id b, State.Block.header b)
   | None ->
       Lwt.return_none
 
-let find_pending_block_header { peer_active_chains } h  =
+let find_pending_block_header { peer_active_chains ; _ } h  =
   Chain_id.Table.fold
     (fun _chain_id chain_db acc ->
        match acc with
@@ -419,7 +390,7 @@ let find_pending_block_header { peer_active_chains } h  =
     peer_active_chains
     None
 
-let find_pending_operations { peer_active_chains } h i =
+let find_pending_operations { peer_active_chains ; _ } h i =
   Chain_id.Table.fold
     (fun _chain_id chain_db acc ->
        match acc with
@@ -431,7 +402,7 @@ let find_pending_operations { peer_active_chains } h i =
     peer_active_chains
     None
 
-let find_pending_operation_hashes { peer_active_chains } h i =
+let find_pending_operation_hashes { peer_active_chains ; _ } h i =
   Chain_id.Table.fold
     (fun _chain_id chain_db acc ->
        match acc with
@@ -443,7 +414,7 @@ let find_pending_operation_hashes { peer_active_chains } h i =
     peer_active_chains
     None
 
-let find_pending_operation { peer_active_chains } h =
+let find_pending_operation { peer_active_chains ; _ } h =
   Chain_id.Table.fold
     (fun _chain_id chain_db acc ->
        match acc with
@@ -455,7 +426,7 @@ let find_pending_operation { peer_active_chains } h =
     peer_active_chains
     None
 
-let read_operation { active_chains } h =
+let read_operation { active_chains ; _ } h =
   Chain_id.Table.fold
     (fun chain_id chain_db acc ->
        acc >>= function
@@ -579,7 +550,7 @@ module P2p_reader = struct
     | Get_current_head chain_id ->
         may_handle global_db state chain_id @@ fun chain_db ->
         Peer_metadata.incr meta @@ Received_request Head ;
-        let { Connection_metadata.disable_mempool } =
+        let { Connection_metadata.disable_mempool ; _ } =
           P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
         begin
           if disable_mempool then
@@ -598,7 +569,7 @@ module P2p_reader = struct
         may_handle global_db state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
-        let { Connection_metadata.disable_mempool } =
+        let { Connection_metadata.disable_mempool ; _ } =
           P2p.connection_local_metadata chain_db.global_db.p2p state.conn in
         let known_invalid =
           known_invalid ||
@@ -812,7 +783,7 @@ end
 let active_peer_ids p2p () =
   List.fold_left
     (fun acc conn ->
-       let { P2p_connection.Info.peer_id } = P2p.connection_info p2p conn in
+       let { P2p_connection.Info.peer_id ; _ } = P2p.connection_info p2p conn in
        P2p_peer.Set.add peer_id acc)
     P2p_peer.Set.empty
     (P2p.connections p2p)
@@ -842,7 +813,7 @@ let create disk p2p =
     } in
   db
 
-let activate ({ p2p ; active_chains } as global_db) chain_state =
+let activate ({ p2p ; active_chains ; _ } as global_db) chain_state =
   P2p.on_new_connection p2p (P2p_reader.run global_db) ;
   P2p.iter_connections p2p (P2p_reader.run global_db) ;
   P2p.activate p2p;
@@ -885,7 +856,7 @@ let set_callback chain_db callback =
   chain_db.callback <- callback
 
 let deactivate chain_db =
-  let { active_chains ; p2p } = chain_db.global_db in
+  let { active_chains ; p2p ; _ } = chain_db.global_db in
   let chain_id = State.Chain.id chain_db.chain_state in
   Chain_id.Table.remove active_chains chain_id ;
   P2p_peer.Table.iter
@@ -900,18 +871,18 @@ let deactivate chain_db =
   Lwt.return_unit >>= fun () ->
   Lwt.return_unit
 
-let get_chain { active_chains } chain_id =
+let get_chain { active_chains ; _ } chain_id =
   Chain_id.Table.find_opt active_chains chain_id
 
-let greylist { global_db = { p2p } } peer_id =
+let greylist { global_db = { p2p ; _ } ; _ } peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)
 
-let disconnect { global_db = { p2p } } peer_id =
+let disconnect { global_db = { p2p ; _ } ; _ } peer_id =
   match P2p.find_connection p2p peer_id with
   | None -> Lwt.return_unit
   | Some conn -> P2p.disconnect p2p conn
 
-let shutdown { p2p_readers ; active_chains } =
+let shutdown { p2p_readers ; active_chains ; _ } =
   P2p_peer.Table.fold
     (fun _peer_id reader acc ->
        P2p_reader.shutdown reader >>= fun () -> acc)
@@ -958,9 +929,9 @@ let commit_protocol db h p =
   Raw_protocol.Table.clear_or_cancel db.protocol_db.table h ;
   return (res <> None)
 
-let watch_block_header { block_input } =
+let watch_block_header { block_input ; _ } =
   Lwt_watcher.create_stream block_input
-let watch_operation { operation_input } =
+let watch_operation { operation_input ; _ } =
   Lwt_watcher.create_stream operation_input
 
 module Raw = struct
@@ -983,7 +954,6 @@ module Make
   type error += Timeout = Table.Timeout
   let read t k = Table.read (Kind.proj t) k
   let read_opt t k = Table.read_opt (Kind.proj t) k
-  let read_exn t k = Table.read_exn (Kind.proj t) k
   let prefetch t ?peer ?timeout k p =
     Table.prefetch (Kind.proj t) ?peer ?timeout k p
   let fetch t ?peer ?timeout k p =
@@ -1101,7 +1071,7 @@ module Advertise = struct
       let msg_disable_mempool =
         Message.Current_head (chain_id, State.Block.header head, Mempool.empty) in
       let send_mempool state =
-        let { Connection_metadata.disable_mempool } =
+        let { Connection_metadata.disable_mempool ; _ } =
           P2p.connection_remote_metadata chain_db.global_db.p2p state.conn in
         let msg = if disable_mempool then msg_disable_mempool else msg_mempool in
         ignore @@ P2p.try_send chain_db.global_db.p2p state.conn msg

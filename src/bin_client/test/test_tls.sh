@@ -1,7 +1,5 @@
 #! /usr/bin/env bash
 
-## from genesis to demo
-
 set -e
 
 export USE_TLS=true

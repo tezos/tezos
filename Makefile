@@ -37,7 +37,7 @@ endif
 	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	 done
 
-PROTOCOLS := genesis demo 003_PsddFKi3 004_Pt24m4xi
+PROTOCOLS := genesis alpha demo
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
 
 generate_dune: ${DUNE_INCS}
@@ -61,7 +61,7 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 doc-html: all
 	@dune build @doc
-	@./tezos-client -protocol PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-client.html
+	@./tezos-client -protocol PtG6cmhhWF8AY5gVQhCaUASbgu8CGebkGPdNSX26m3CSnxvih9v man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-client.html
 	@./tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-admin-client.html
 	@./tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-signer.html
 	@./tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-baker-alpha.html
@@ -78,7 +78,11 @@ doc-html: all
 doc-html-and-linkcheck: doc-html
 	@${MAKE} -C docs all
 
-build-test:
+build-sandbox:
+	@dune build src/bin_flextesa/main.exe
+	@cp _build/default/src/bin_flextesa/main.exe tezos-sandbox
+
+build-test: build-sandbox
 	@dune build @buildtest
 
 test:
@@ -109,6 +113,7 @@ uninstall:
 
 clean:
 	@-dune clean
+	@-find . -name dune-project -delete
 	@-rm -f \
 		tezos-node \
 		tezos-client \

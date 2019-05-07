@@ -50,7 +50,7 @@ module type HASHABLE = sig
 
 end
 
-(** {2 Hash Types} ************************************************************)
+(** {2 Hash Types} *)
 
 (** The signature of an abstract hash type, as produced by functor
     {!Make_SHA256}. The {!t} type is abstracted for separating the

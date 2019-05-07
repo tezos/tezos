@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
 type json =
   [ `O of (string * json) list
   | `Bool of bool
@@ -131,7 +130,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t = fun e ->
   match e.encoding with
   | Conv { proj ; inj ; encoding = e ; schema } -> begin
       match lift_union e with
-      | { encoding = Union { kind ; tag_size ; cases } } ->
+      | { encoding = Union { kind ; tag_size ; cases } ; _ } ->
           make @@
           Union { kind ; tag_size ;
                   cases = List.map
@@ -160,7 +159,7 @@ and lift_union_in_pair
   = fun b p e1 e2 ->
     let open Encoding in
     match lift_union e1, lift_union e2 with
-    | e1, { encoding = Union { tag_size ; cases } } ->
+    | e1, { encoding = Union { tag_size ; cases ; _ } ; _ } ->
         make @@
         Union { kind = `Dynamic (* ignored *) ; tag_size ;
                 cases =
@@ -176,7 +175,7 @@ and lift_union_in_pair
                               inj = (fun (x, y) -> (x, inj y)) ;
                               tag })
                     cases }
-    | { encoding = Union { tag_size ; cases } }, e2 ->
+    | { encoding = Union { tag_size ; cases ; _ } ; _ }, e2 ->
         make @@
         Union { kind = `Dynamic (* ignored *) ; tag_size ;
                 cases =
@@ -242,29 +241,29 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Array (_, e) -> array (get_json e) (* FIXME TODO enforce max_length *)
   | List (_, e) -> list (get_json e)
   | Obj f -> obj1 (field_json f)
-  | Objs { left ; right } ->
+  | Objs { left ; right ; _ } ->
       merge_objs (get_json left) (get_json right)
   | Tup e -> tup1 (get_json e)
-  | Tups { left ; right } ->
+  | Tups { left ; right ; _ } ->
       merge_tups (get_json left) (get_json right)
   | Conv { proj ; inj ; encoding = e ; schema } -> conv ?schema proj inj (get_json e)
   | Describe { id ; title ; description ; encoding = e } ->
       def id ?title ?description (get_json e)
-  | Mu { name ; fix } as ty ->
+  | Mu { name ; fix ; _ } as ty ->
       mu name (fun json_encoding -> get_json @@ fix (make ~json_encoding ty))
-  | Union { cases } -> union (List.map case_json cases)
-  | Splitted { json_encoding } -> json_encoding
-  | Dynamic_size { encoding = e } -> get_json e
-  | Check_size { encoding } -> get_json encoding
+  | Union { cases ; _ } -> union (List.map case_json cases)
+  | Splitted { json_encoding ; _ } -> json_encoding
+  | Dynamic_size { encoding = e ; _ } -> get_json e
+  | Check_size { encoding ; _ } -> get_json encoding
   | Delayed f -> get_json (f ())
 
 and field_json
   : type a. a Encoding.field -> a Json_encoding.field =
   let open Json_encoding in
   function
-  | Encoding.Req { name ; encoding = e } -> req name (get_json e)
-  | Encoding.Opt { name ; encoding = e } -> opt name (get_json e)
-  | Encoding.Dft { name ; encoding = e ; default = d} -> dft name (get_json e) d
+  | Encoding.Req { name ; encoding = e ; _ } -> req name (get_json e)
+  | Encoding.Opt { name ; encoding = e ; _ } -> opt name (get_json e)
+  | Encoding.Dft { name ; encoding = e ; default = d; _ } -> dft name (get_json e) d
 
 and case_json : type a. a Encoding.case -> a Json_encoding.case =
   let open Json_encoding in
@@ -304,12 +303,6 @@ let cannot_destruct fmt =
     fmt
 
 type t = json
-
-let to_root = function
-  | `O ctns -> `O ctns
-  | `A ctns -> `A ctns
-  | `Null -> `O []
-  | oth -> `A [ oth ]
 
 let to_string ?(newline = false) ?minify j =
   Format.asprintf "%a%s"
