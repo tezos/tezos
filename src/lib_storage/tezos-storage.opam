@@ -9,9 +9,10 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
+  "tezos-shell-services"
   "lmdb"
   "irmin-lmdb"
-  "tezos-stdlib-unix" { with-test }
+  "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
 ]
 build: [

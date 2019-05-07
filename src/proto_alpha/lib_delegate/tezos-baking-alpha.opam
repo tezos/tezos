@@ -15,6 +15,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-client-alpha"
+  "tezos-client-base-unix" { with-test }
   "tezos-node" { with-test }
   "tezos-client-genesis" { with-test }
   "tezos-client-base-unix" { with-test }

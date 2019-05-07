@@ -16,6 +16,7 @@ depends: [
   "tezos-client-commands"
   "tezos-client-alpha"
   "tezos-baking-alpha"
+  "tezos-client-base-unix" { with-test }
   "tezos-signer-backends" { with-test }
 ]
 build: [
