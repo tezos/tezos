@@ -52,7 +52,7 @@ class TestInjectionAndActivation:
 
     def test_check_protocol(self, clients, session):
         proto = session['proto_hash']
-        params = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
+        params = ['-p', 'PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV']
         for client in clients:
             assert utils.check_protocol(client, proto, params=params)
 
@@ -88,7 +88,7 @@ class TestActivation:
         assert client.get_level() == 1
 
     def test_protocol_genesis(self, client):
-        proto = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+        proto = 'PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV'
         assert client.get_protocol() == proto
 
     def test_bake(self, client):
