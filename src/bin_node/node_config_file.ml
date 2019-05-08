@@ -34,8 +34,8 @@ let home =
 
 let default_data_dir = home // ".tezos-node"
 let default_rpc_port       =  8732
-let default_p2p_port       =  9732
-let default_discovery_port = 10732
+let default_p2p_port       = 19732
+let default_discovery_port = 20732
 
 type t = {
   data_dir : string ;
@@ -104,8 +104,8 @@ let default_p2p_limits : P2p.limits = {
 }
 
 let default_p2p = {
-  expected_pow = 26. ;
-  bootstrap_peers  = [] ;
+  expected_pow = 24. ;
+  bootstrap_peers  = [ "bootstrap.zeronet.fun"; "bootzero.tzbeta.net" ] ;
   listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   discovery_addr = None ;
   private_mode = false ;
