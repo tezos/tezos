@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import tempfile
 import shutil
 import json
@@ -109,6 +109,7 @@ class Sandbox:
                  log_levels: Dict[str, str] = None,
                  private: bool = True,
                  config_client: bool = True,
+                 use_tls: Tuple[str, str] = None,
                  branch: str = "") -> None:
         """ Launches new node with given node_id and initializes client
 
@@ -163,8 +164,9 @@ class Sandbox:
         node = Node(node_bin, self.sandbox_file,
                     p2p_port=p2p_node, rpc_port=rpc_node,
                     peers=peers_rpc, log_file=log_file, params=params,
-                    log_levels=log_levels)
-        client = Client(local_client, local_admin_client, rpc_port=rpc_node)
+                    log_levels=log_levels, use_tls=use_tls)
+        client = Client(local_client, local_admin_client, rpc_port=rpc_node,
+                        use_tls=bool(use_tls))
         time.sleep(0.1)
         # make sure node didn't fail at startup
         assert node.poll() is None, 'Seems node failed at startup'
@@ -409,8 +411,9 @@ class SandboxMultiBranch(Sandbox):
                  log_levels: Dict[str, str] = None,
                  private: bool = True,
                  config_client: bool = True,
+                 use_tls: Tuple[str, str] = None,
                  branch: str = "") -> None:
         assert not branch
         branch = self._branch_map[node_id]
         super().add_node(node_id, peers, params, log_levels, private,
-                         config_client, branch)
+                         config_client, use_tls, branch)

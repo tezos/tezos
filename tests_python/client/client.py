@@ -54,7 +54,7 @@ class Client:
             base_dir (str): path to the client dir. If None, a temp file is
                             created.
             rpc_port (int): port of the server
-            use_tls (bool): use TLS TODO
+            use_tls (bool): use TLS
             disable_disclaimer (bool): disable disclaimer
         Returns:
             A Client instance.
@@ -80,7 +80,6 @@ class Client:
                         host, '-port', str(rpc_port)]
 
         if use_tls:
-            assert False, "not implemented yet"  # TODO
             client.append('-S')
             admin_client.append('-S')
 

@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import subprocess
 import os
 import tempfile
@@ -18,7 +18,7 @@ class Node(subprocess.Popen):
                  sandbox_file: str = None,
                  expected_pow: float = 0.0,
                  node_dir: str = None,
-                 use_tls: bool = False,
+                 use_tls: Tuple[str, str] = None,
                  params: List[str] = None,
                  log_file: str = None,
                  p2p_port: int = 9732,
@@ -28,6 +28,10 @@ class Node(subprocess.Popen):
                  env: Dict[str, str] = None):
 
         """Creates a new Popen instance for a tezos-node, and manages context.
+
+        args:
+            use_tls (tuple): None if no tls, else couple of strings
+                            (certificate, key)
 
         Creates a temporary node directory unless provided  by caller.
         Generate node identity.
@@ -76,13 +80,11 @@ class Node(subprocess.Popen):
                 node_run.append(f'127.0.0.1:{peer}')
 
         if use_tls:
-            assert 0, 'TLS not implemented yet'  # TODO
-            # with open(f'{node_dir}/tezos.crt', 'w+') as file:
-            #     file.write(resources.CERTIFICATE)
-            # with open(f'{node_dir}/tezos.key', 'w+') as file:
-            #     file.write(resources.PRIVATE_KEY)
-            # node_config += ['--rpc-tls', f'{node_dir}/tezos.crt,
-            #                 {node_dir}/tezos.key']
+            # We can't create tezos.crt/tezos.key here
+            # as node_dir has to be empty when we run node_config
+            node_config += ['--rpc-tls',
+                            f'{node_dir}/tezos.crt,{node_dir}/tezos.key']
+
         new_env = None
         if env is not None:
             new_env = os.environ.copy()
@@ -100,6 +102,13 @@ class Node(subprocess.Popen):
         print(node_identity_str)
         subprocess.run(node_identity, check=True, env=new_env)
         node_run_str = utils.format_command(node_run)
+
+        if use_tls:
+            with open(f'{node_dir}/tezos.crt', 'w+') as file:
+                file.write(use_tls[0])
+            with open(f'{node_dir}/tezos.key', 'w+') as file:
+                file.write(use_tls[1])
+
         print(node_run_str)
         stdout, stderr = utils.prepare_log(node_run, log_file)
         subprocess.Popen.__init__(self, node_run, stdout=stdout, stderr=stderr,
