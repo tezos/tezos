@@ -326,6 +326,10 @@ integration:10:voting:
   script:
     - pytest tests_python/tests/test_voting.py
 
+integration:11:tls:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_tls.py
 
 ##END_INTEGRATION_PYTHON##
 
