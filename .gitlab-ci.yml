@@ -331,6 +331,11 @@ integration:11:tls:
   script:
     - pytest tests_python/tests/test_tls.py
 
+integration:12:cors:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_cors.py
+
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
