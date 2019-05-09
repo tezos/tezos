@@ -280,6 +280,7 @@ let addr = ref Ipaddr.V6.localhost
 let port = ref (1024 + Random.int 8192)
 let clients = ref 10
 let repeat_connections = ref 5
+let log_config = ref None
 
 let spec = Arg.[
 
@@ -295,19 +296,26 @@ let spec = Arg.[
 
 
     "-v", Unit (fun () ->
-        Lwt_log_core.(add_rule "test.p2p.connection-pool" Info) ;
-        Lwt_log_core.(add_rule "p2p.connection-pool" Info)),
+        log_config := Some (
+            Lwt_log_sink_unix.create_cfg
+              ~rules:("test.p2p.connection-pool -> info; p2p.connection-pool -> info")
+              () )),
     " Log up to info msgs" ;
 
     "-vv", Unit (fun () ->
-        Lwt_log_core.(add_rule "test.p2p.connection-pool" Debug) ;
-        Lwt_log_core.(add_rule "p2p.connection-pool" Debug)),
+        log_config := Some (
+            Lwt_log_sink_unix.create_cfg
+              ~rules:("test.p2p.connection-pool -> debug; p2p.connection-pool -> debug")
+              () )),
     " Log up to debug msgs";
 
   ]
 
+let init_logs = lazy (Internal_event_unix.init  ?lwt_log_sink:!log_config  ())
+
 let wrap n f =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    Lazy.force init_logs >>= fun () ->
     f () >>= function
     | Ok () -> Lwt.return_unit
     | Error error ->

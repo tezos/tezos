@@ -234,8 +234,11 @@ let () =
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg
 
+let init_logs = lazy (Internal_event_unix.init  ())
+
 let wrap n f =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    Lazy.force init_logs >>= fun () ->
     f () >>= function
     | Ok () -> Lwt.return_unit
     | Error error ->

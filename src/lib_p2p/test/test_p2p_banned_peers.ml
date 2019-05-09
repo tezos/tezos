@@ -70,8 +70,11 @@ let test_gc _ =
   Lwt.return_unit
 
 let () =
+  let init_logs = lazy (Internal_event_unix.init  ()) in
   let wrap (n, f) =
-    Alcotest_lwt.test_case n `Quick (fun _ () -> f ()) in
+    Alcotest_lwt.test_case n `Quick begin fun _ () ->
+      Lazy.force init_logs >>= fun () ->
+      f () end in
   Alcotest.run ~argv:[|""|] "tezos-p2p" [
     "p2p.peerset",
     List.map wrap [
