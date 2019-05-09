@@ -66,13 +66,14 @@ let commands () =
          Shell_services.Chain.checkpoint cctxt ~chain:cctxt#chain ()
          >>=? fun (block_header, save_point, caboose, history_mode) ->
          cctxt#message
-           "@[<v 0>Full checkpoint: %s@,\
-            History mode: %a@,\
+           "@[<v 0>Checkpoint hash: %s@,\
             Checkpoint level: %ld@,\
+            History mode: %a@,\
             Save point level: %ld@,\
             Caboose level: %ld@]"
            (Block_header.to_b58check block_header)
+           block_header.shell.level
            History_mode.pp history_mode
-           save_point caboose block_header.shell.level >>= fun () ->
+           save_point caboose >>= fun () ->
          return ())
   ]
