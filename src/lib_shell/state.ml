@@ -756,8 +756,11 @@ module Chain = struct
         Header.read_opt (store, block_hash) >>= function
         | None -> assert false (* Should not happen. *)
         | Some header ->
-            store_header_and_prune_block store block_hash >>= fun () ->
-            prune_loop header.shell.predecessor (pred limit)
+            if Block_hash.equal block_hash genesis_hash then
+              Lwt.return block_hash
+            else
+              store_header_and_prune_block store block_hash >>= fun () ->
+              prune_loop header.shell.predecessor (pred limit)
     and delete_loop block_hash (n_blocks, blocks) =
       begin if n_blocks >= 4000 then
           do_delete blocks >>= fun () ->
