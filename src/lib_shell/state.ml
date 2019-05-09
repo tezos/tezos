@@ -737,7 +737,6 @@ module Chain = struct
     end
 
   let purge_loop_rolling global_store store ~genesis_hash block_hash limit =
-    assert (limit > 0);
     let do_delete blocks =
       Store.with_atomic_rw global_store @@ fun () ->
       Lwt_list.iter_s (delete_block store) blocks in
@@ -772,13 +771,15 @@ module Chain = struct
       | Some header ->
           if Block_hash.equal genesis_hash block_hash
           then do_delete blocks
-          else begin
-            delete_loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks)
-          end
+          else delete_loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks)
     in
     Header.read_opt (store, block_hash) >|=
     Option.unopt_assert ~loc:__POS__ >>= fun header ->
-    prune_loop header.shell.predecessor limit
+    if limit = 0 then
+      delete_loop header.shell.predecessor (0, []) >>= fun () ->
+      Lwt.return block_hash
+    else
+      prune_loop header.shell.predecessor limit
 
   let purge_rolling chain_state ((lvl, hash) as checkpoint) =
     Shared.use chain_state.global_state.global_data begin fun global_data ->
@@ -788,7 +789,6 @@ module Chain = struct
         Header.read_opt (store, hash) >|=
         Option.unopt_assert ~loc:__POS__ >>= fun header ->
         let max_op_ttl = contents.max_operations_ttl in
-        assert (max_op_ttl > 0);
         let limit = min max_op_ttl (Int32.to_int header.shell.level) in
         purge_loop_rolling ~genesis_hash:chain_state.genesis.block
           global_data.global_store store hash limit >>= fun caboose_hash ->
