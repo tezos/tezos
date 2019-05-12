@@ -120,7 +120,8 @@ let get_delegates cctxt state = match state.delegates with
   | [] ->
       Client_keys.get_keys cctxt >>=? fun keys ->
       let delegates = List.map (fun (_,pkh,_,_) -> pkh) keys in
-      return delegates
+      return Signature.Public_key_hash.Set.
+               (delegates |> of_list |> elements)
   | (_ :: _) as delegates -> return delegates
 
 let endorse_for_delegate cctxt block delegate_pkh =

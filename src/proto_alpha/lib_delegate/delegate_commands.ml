@@ -242,10 +242,18 @@ let endorser_commands () =
          may_lock_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
+         let delegates = List.map snd delegates in
+         let delegates_no_duplicates = Signature.Public_key_hash.Set.
+                                         (delegates |> of_list |> elements) in
+         begin if List.length delegates <> List.length delegates_no_duplicates then
+             cctxt#message "Warning: the list of public key hash aliases contains \
+                            duplicate hashes, which are ignored"
+           else Lwt.return ()
+         end >>= fun () ->
          Client_daemon.Endorser.run cctxt
            ~chain:cctxt#chain
            ~delay:endorsement_delay
-           (List.map snd delegates)
+           delegates_no_duplicates
       )
   ]
 
