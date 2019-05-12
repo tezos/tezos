@@ -61,6 +61,11 @@
                    -open Error_monad))
  (modules Data Services Main))
 
+(install
+ (section lib)
+ (package tezos-embedded-protocol-genesis)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
 (library
  (name tezos_embedded_protocol_genesis)
  (public_name tezos-embedded-protocol-genesis)

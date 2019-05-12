@@ -61,6 +61,11 @@
                    -open Error_monad))
  (modules Error Services Main))
 
+(install
+ (section lib)
+ (package tezos-embedded-protocol-demo)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
 (library
  (name tezos_embedded_protocol_demo)
  (public_name tezos-embedded-protocol-demo)

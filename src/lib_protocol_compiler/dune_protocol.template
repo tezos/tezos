@@ -53,6 +53,11 @@
                    -open Error_monad))
  (modules %%MODULES%%))
 
+(install
+ (section lib)
+ (package tezos-embedded-protocol-%%VERSION%%)
+ (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+
 (library
  (name tezos_embedded_protocol_%%LIB_VERSION%%)
  (public_name tezos-embedded-protocol-%%VERSION%%)
