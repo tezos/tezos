@@ -230,8 +230,8 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
     Console.say state EF.(wf "Injecting protocol from %s" tmpdir)
     >>= fun () ->
     Running_processes.run_successful_cmdf state
-      "cp -r %s %s && echo '(* Protocol %s *)' >> %s/main.mli"
-      (Filename.quote demo_path) (Filename.quote tmpdir) name
+      "cp -L -r %s %s && echo '(* Protocol %s *)' >> %s/main.mli"
+      (Filename.quote (Filename.dirname demo_path)) (Filename.quote tmpdir) name
       (Filename.quote tmpdir)
     >>= fun _ ->
     Tezos_admin_client.successful_command admin_0 state
