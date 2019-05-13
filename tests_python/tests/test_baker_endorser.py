@@ -36,7 +36,7 @@ class TestAllDeamonsWithOperations:
     def test_setup_network(self, sandbox):
         # Set appropriate time to avoid double-baking
         parameters = dict(constants.PARAMETERS)
-        parameters["time_between_blocks"] = ["10", "0"]
+        parameters["time_between_blocks"] = ["15", "0"]
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=['--connections', '500'])
         utils.activate_alpha(sandbox.client(0), parameters)
