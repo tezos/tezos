@@ -7,7 +7,6 @@
             tezos-p2p
             tezos-stdlib-unix
             tezos-shell-services
-            tezos-stdlib-unix
             tezos-protocol-updater
             tezos-validation)
  (flags (:standard -open Tezos_base__TzPervasives
