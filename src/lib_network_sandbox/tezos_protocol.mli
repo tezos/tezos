@@ -67,7 +67,7 @@ end
 (** [t] wraps bootstrap parameters for sandboxed protocols. *)
 type t =
   { id: string
-  ; bootstrap_accounts: (Account.t * int) list
+  ; bootstrap_accounts: (Account.t * Int64.t) list
   ; dictator: Account.t
   ; bootstrap_contracts: (Account.t * int * Script.origin) list
   ; expected_pow: int

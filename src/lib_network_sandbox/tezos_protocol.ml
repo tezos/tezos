@@ -194,7 +194,7 @@ end
 
 type t =
   { id: string
-  ; bootstrap_accounts: (Account.t * int) list
+  ; bootstrap_accounts: (Account.t * Int64.t) list
   ; dictator: Account.t
   ; bootstrap_contracts: (Account.t * int * Script.origin) list
   ; expected_pow: int
@@ -214,7 +214,7 @@ let default () =
   { id= "default-bootstrap"
   ; bootstrap_accounts=
       List.init 4 ~f:(fun n ->
-          (Account.of_namef "bootacc-%d" n, 4_000_000_000_000) )
+          (Account.of_namef "bootacc-%d" n, 4_000_000_000_000L) )
   ; dictator
   ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)]
   ; expected_pow= 1
@@ -230,7 +230,7 @@ let default () =
 let protocol_parameters_json t : Ezjsonm.t =
   let open Ezjsonm in
   let make_account (account, amount) =
-    strings [Account.pubkey account; sprintf "%d" amount]
+    strings [Account.pubkey account; sprintf "%Ld" amount]
   in
   let make_contract (deleg, amount, script) =
     dict
@@ -240,7 +240,7 @@ let protocol_parameters_json t : Ezjsonm.t =
   in
   dict
     [ ( "bootstrap_accounts"
-      , list make_account (t.bootstrap_accounts @ [(t.dictator, 1)]) )
+      , list make_account (t.bootstrap_accounts @ [(t.dictator, 1L)]) )
     ; ("bootstrap_contracts", list make_contract t.bootstrap_contracts)
     ; ("time_between_blocks", list (ksprintf string "%d") t.time_between_blocks)
     ; ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
@@ -330,7 +330,7 @@ let cli_term () =
       )
       $ value
           (opt_all
-             (pair ~sep:'@' (t4 ~sep:',' string string string string) int)
+             (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
              []
              (info ["add-bootstrap-account"]
                 ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"

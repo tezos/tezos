@@ -21,7 +21,7 @@ let little_mesh_with_bakers ?base_port ?kiln state ~starting_level ~node_exec
       ; bootstrap_accounts=
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
               if List.exists bakers ~f:(fun baker -> n = fst baker) then (n, v)
-              else (n, 1_000) ) }
+              else (n, 1_000L) ) }
     , bakers )
   in
   let net_size = 3 in
@@ -377,7 +377,7 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
         time_between_blocks= [block_interval; block_interval * 2]
       ; bootstrap_accounts=
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if n = fst baker then (n, v) else (n, 1_000) ) }
+              if n = fst baker then (n, v) else (n, 1_000L) ) }
     , baker )
   in
   let topology =

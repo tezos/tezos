@@ -62,7 +62,7 @@ let voting_period_to_string (p : voting_period) =
 
 let transfer state ~client ~src ~dst ~amount =
   Tezos_client.successful_client_cmd state ~client
-    [ "--wait"; "none"; "transfer"; sprintf "%d" amount; "from"; src; "to"; dst
+    [ "--wait"; "none"; "transfer"; sprintf "%Ld" amount; "from"; src; "to"; dst
     ; "--fee"; "0.05"; "--burn-cap"; "0.3" ]
 
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
@@ -76,7 +76,7 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
       | `String p when p = period_name -> return (`Done (nth - 1))
       | other ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
-              transfer state ~client ~amount:1
+              transfer state ~client ~amount:1L
                 ~src:baker.Tezos_client.Keyed.key_name ~dst
               >>= fun res -> return () )
           >>= fun _ ->
@@ -103,7 +103,7 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
         time_between_blocks= [1; 0]
       ; bootstrap_accounts=
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if fst baker = n then (n, v) else (n, 1_000) ) }
+              if fst baker = n then (n, v) else (n, 1_000L) ) }
     , fst baker
     , snd baker )
   in
@@ -157,7 +157,7 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
           ~clients:[special_baker.Tezos_client.Keyed.client] ] ;
   transfer state (* Tezos_client.successful_client_cmd state *)
     ~client:(client 0)
-    ~amount:(baker_0_balance / 2_000_000)
+    ~amount:(Int64.div baker_0_balance 2_000_000L)
     ~src:"baker-0" ~dst:special_baker.Tezos_client.Keyed.key_name
   >>= fun res ->
   Console.say state
@@ -409,7 +409,7 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       match Jqo.field json_metadata ~k:"next_protocol" with
       | `String p when p = winner -> return (`Done (nth - 1))
       | other ->
-          transfer state ~client ~amount:1
+          transfer state ~client ~amount:1L
             ~src:baker_0.Tezos_client.Keyed.key_name
             ~dst:special_baker.Tezos_client.Keyed.key_name
           >>= fun _ ->
