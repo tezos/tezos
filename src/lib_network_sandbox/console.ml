@@ -79,7 +79,9 @@ let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
     (_, _) Asynchronous_result.t =
   let date =
     if o#console.with_timestamp then
-      sprintf "[%s]" Tezos_base.Time.(now () |> to_notation)
+      let date = Tezos_stdlib_unix.Systime_os.now ()
+                 |> Tezos_base.Time.System.to_notation in
+      sprintf "[%s]" date
     else ""
   in
   let ppf = o#console.formatter in
@@ -98,7 +100,9 @@ let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
 let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
   let date =
     if o#console.with_timestamp then
-      sprintf "[%s]" Tezos_base.Time.(now () |> to_notation)
+      let date = Tezos_stdlib_unix.Systime_os.now ()
+                 |> Tezos_base.Time.System.to_notation in
+      sprintf "[%s]" date
     else ""
   in
   let msg = EF.(label (ksprintf prompt "%s%s:" o#application_name date) ef) in

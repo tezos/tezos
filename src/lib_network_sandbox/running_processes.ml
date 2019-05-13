@@ -106,7 +106,8 @@ let ef ?(all = false) state =
     label (af "Processes:") (list all_procs))
 
 let start t process =
-  let date = Tezos_base.Time.(now () |> to_notation) in
+  let date = Tezos_stdlib_unix.Systime_os.now ()
+             |> Tezos_base.Time.System.to_notation in
   let open_file f =
     Lwt_exception.catch ~attach:[("open_file", f)]
       Lwt.Infix.(
