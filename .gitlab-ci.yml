@@ -633,30 +633,30 @@ opam:50:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:51:tezos-network-sandbox:
+opam:51:tezos-shell:
   <<: *opam_definition
   variables:
-    package: tezos-network-sandbox
+    package: tezos-shell
 
 opam:52:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:53:tezos-embedded-protocol-demo:
+opam:53:tezos-network-sandbox:
+  <<: *opam_definition
+  variables:
+    package: tezos-network-sandbox
+
+opam:54:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:54:tezos-embedded-protocol-genesis:
+opam:55:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
-
-opam:55:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
 
 opam:56:tezos-endorser-alpha-commands:
   <<: *opam_definition
