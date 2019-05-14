@@ -34,9 +34,9 @@ class TestAllDeamonsWithOperations:
        we kill the bakers and check everyone synchronize to the same head. '''
 
     def test_setup_network(self, sandbox):
-        # Set appropriate time to avoid double-baking
         parameters = dict(constants.PARAMETERS)
-        parameters["time_between_blocks"] = ["15", "0"]
+        # each priority has a delay of 1 sec
+        parameters["time_between_blocks"] = ["1"]
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=['--connections', '500'])
         utils.activate_alpha(sandbox.client(0), parameters)
