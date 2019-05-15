@@ -1,6 +1,5 @@
 (executables
   (names main)
-  (public_names flextesa)
   (libraries tezos-network-sandbox)
   (flags (:standard -w -9-27-30-32-40@8 -safe-string)))
 
@@ -17,12 +16,12 @@
 
 (alias
   (name runtest_sandbox_accusations_simple_double_endorsing)
-  (locks /tcp-port/10000_range)
+  (locks /tcp-port/20000_range)
   (action
     (run %{exe:main.exe} accusations simple-double-endorsing
          --root-path %{env:ROOT_PATH=/tmp/flextesa-acc-sde/}
          --with-timestamp
-         --base-port 10_000
+         --base-port 20_000
          --tezos-client-binary %{bin:tezos-client}
          --tezos-node-binary %{bin:tezos-node} )))
 
@@ -47,5 +46,4 @@
  (deps
   (alias runtest_sandbox_accusations_simple_double_baking)
   (alias runtest_sandbox_accusations_simple_double_endorsing)
-   (alias runtest_sandbox_voting_demo)
-   ))
+  (alias runtest_sandbox_voting_demo)))

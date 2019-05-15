@@ -678,37 +678,32 @@ opam:59:tezos-accuser-alpha:
   variables:
     package: tezos-accuser-alpha
 
-opam:60:flextesa:
-  <<: *opam_definition
-  variables:
-    package: flextesa
-
-opam:61:tezos-endorser-alpha:
+opam:60:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:62:tezos-accuser-alpha-commands:
+opam:61:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:63:tezos-baker-alpha:
+opam:62:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:64:tezos-signer:
+opam:63:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:65:tezos-node:
+opam:64:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:66:ocplib-json-typed-browser:
+opam:65:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
