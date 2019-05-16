@@ -264,10 +264,10 @@ let simple_double_endorsement ~starting_level ?kiln ~state ~base_port node_exec
   >>= fun () ->
   Tezos_client.Keyed.endorse state baker_0 "baker-0 endorsing with node 0"
   >>= fun () ->
-  Tezos_client.Keyed.endorse state baker_1_n0 "baker-1 endorsing with node 0"
-  >>= fun () ->
   find_endorsement_in_mempool state ~client:client_0
   >>= fun endorsement_0 ->
+  Tezos_client.Keyed.endorse state baker_1_n0 "baker-1 endorsing with node 0"
+  >>= fun () ->
   Helpers.kill_node state node_0
   >>= fun () ->
   Helpers.restart_node state node_2 ~client_exec
