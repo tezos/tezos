@@ -271,67 +271,67 @@ integration:linter_python:
     - make -C tests_python lint_all
 
 ##BEGIN_INTEGRATION_PYTHON##
-integration:00:baker_endorser:
+integration:baker_endorser:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_baker_endorser.py
 
-integration:01:basic:
+integration:basic:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_basic.py
 
-integration:02:contract:
+integration:contract:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_contract.py
 
-integration:03:contract_baker:
+integration:contract_baker:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py
 
-integration:04:injection:
+integration:injection:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_injection.py
 
-integration:05:many_bakers:
+integration:many_bakers:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_many_bakers.py
 
-integration:06:many_nodes:
+integration:many_nodes:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_many_nodes.py
 
-integration:07:mempool:
+integration:mempool:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_mempool.py
 
-integration:08:multinode:
+integration:multinode:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_multinode.py
 
-integration:09:rpc:
+integration:rpc:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_rpc.py
 
-integration:10:voting:
+integration:voting:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_voting.py
 
-integration:11:tls:
+integration:tls:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_tls.py
 
-integration:12:cors:
+integration:cors:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_cors.py
