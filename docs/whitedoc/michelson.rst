@@ -3021,7 +3021,6 @@ Full grammar
       | list <type>
       | set <comparable type>
       | operation
-      | address
       | contract <type>
       | pair <type> <type>
       | or <type> <type>
@@ -3037,6 +3036,7 @@ Full grammar
       | bool
       | key_hash
       | timestamp
+      | address
 
 Reference implementation
 ------------------------
